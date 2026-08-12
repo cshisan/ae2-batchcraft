@@ -1,0 +1,14 @@
+{
+  "$schema": "../schema.json",
+  "includes": ["../common/common.json"],
+  "generatedBackground": {"width": 176, "height": 124},
+  "text": {
+    "dialog_title": {"text": {"translate": "item.ae2_batchcraft.pattern_p2p_tunnel_output"}, "position": {"left": 8, "top": 6}}
+  },
+  "widgets": {
+    "syncInputSettings": {"left": 8, "top": 22, "width": 80, "height": 14},
+    "returnStrict": {"left": 12, "top": 50, "width": 73, "height": 18},
+    "returnUnblocked": {"left": 91, "top": 50, "width": 73, "height": 18},
+    "resetTask": {"left": 12, "top": 92, "width": 152, "height": 18}
+  }
+}

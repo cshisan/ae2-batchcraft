@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [" I ", "RWR", " O "],
+  "key": {
+    "I": { "item": "ae2_batchcraft:pattern_p2p_tunnel_input" },
+    "O": { "item": "ae2_batchcraft:pattern_p2p_tunnel_output" },
+    "R": { "item": "minecraft:redstone" },
+    "W": { "item": "appliedenergistics2:wireless_terminal" }
+  },
+  "result": { "item": "ae2_batchcraft:component_placer", "count": 1 }
+}

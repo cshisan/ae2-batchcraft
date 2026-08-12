@@ -1,0 +1,32 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "cn.ae2bc.mixin",
+  "refmap": "ae2_batchcraft.refmap.json",
+  "compatibilityLevel": "JAVA_17",
+  "mixins": [
+    "AEBaseMenuInvoker",
+    "CableBusContainerMixin",
+    "GenericStackInvAccessor",
+    "P2PTunnelPartMixin",
+    "PatternProviderLogicAccessor",
+    "PatternProviderLogicMixin",
+    "PatternProviderReturnInventoryMixin",
+    "PatternProviderMenuMixin",
+    "PatternEncodingLogicMixin",
+    "PatternEncodingTermMenuEncodeMixin",
+    "PatternEncodingTermMenuMixin"
+  ],
+  "client": [
+    "AEBaseScreenAccessor",
+    "EncodedPatternItemMixin",
+    "PatternEncodingTermScreenMixin",
+    "PatternProviderScreenMixin",
+    "PatternProviderUpgradePanelMixin",
+    "UpgradesPanelAccessor",
+    "WidgetContainerAccessor"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

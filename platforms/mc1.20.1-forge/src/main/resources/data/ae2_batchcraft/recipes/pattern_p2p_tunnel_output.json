@@ -1,0 +1,24 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "pattern": [
+    "IRI",
+    "RTR",
+    "IRI"
+  ],
+  "key": {
+    "I": {
+      "item": "minecraft:iron_ingot"
+    },
+    "R": {
+      "item": "minecraft:redstone"
+    },
+    "T": {
+      "item": "ae2:me_p2p_tunnel"
+    }
+  },
+  "result": {
+    "count": 2,
+    "item": "ae2_batchcraft:pattern_p2p_tunnel_output"
+  }
+}

@@ -1,0 +1,26 @@
+{
+  DataVersion: 3955,
+  size: [6, 1, 3],
+  data: [
+    {pos: [0, 0, 1], state: "ae2:pattern_provider{push_direction:east}", nbt: {blocking_mode: "NO", id: "ae2:pattern_provider", lock_crafting_mode: "NONE", pattern_access_terminal: "YES", priority: 0, returnInv: [], sendList: [], visual: {}}},
+    {pos: [1, 0, 1], state: "ae2:cable_bus{light_level:0,waterlogged:false}", nbt: {cable: {id: "ae2:cyan_smart_cable", visual: {connections: ["west", "east"], missingChannel: 0b, powered: 1b}}, hasRedstone: 2, id: "ae2:cable_bus", west: {freq: 10525s, id: "ae2_batchcraft:pattern_p2p_tunnel_input", output: 0b, visual: {missingChannel: 0b, powered: 1b}}, visual: {}}},
+    {pos: [2, 0, 1], state: "ae2:cable_bus{light_level:0,waterlogged:false}", nbt: {cable: {PatternP2PFrequency: 10525s, id: "ae2_batchcraft:pattern_p2p_unit_manager", visual: {connections: ["west", "east"], missingChannel: 0b, powered: 1b}}, hasRedstone: 2, id: "ae2:cable_bus", visual: {}}},
+    {pos: [3, 0, 0], state: "ae2:cable_bus{light_level:0,waterlogged:false}", nbt: {cable: {id: "ae2:cyan_smart_cable", visual: {connections: ["south", "east"], missingChannel: 0b, powered: 1b}}, hasRedstone: 2, id: "ae2:cable_bus", visual: {}}},
+    {pos: [3, 0, 1], state: "ae2:cable_bus{light_level:0,waterlogged:false}", nbt: {cable: {id: "ae2:cyan_smart_cable", visual: {connections: ["north", "south", "west", "east"], missingChannel: 0b, powered: 1b}}, hasRedstone: 2, id: "ae2:cable_bus", visual: {}}},
+    {pos: [3, 0, 2], state: "ae2:cable_bus{light_level:0,waterlogged:false}", nbt: {cable: {id: "ae2:cyan_smart_cable", visual: {connections: ["north", "east"], missingChannel: 0b, powered: 1b}}, hasRedstone: 2, id: "ae2:cable_bus", visual: {}}},
+    {pos: [4, 0, 0], state: "ae2:cable_bus{light_level:0,waterlogged:false}", nbt: {cable: {id: "ae2:cyan_smart_cable", visual: {connections: ["west"], missingChannel: 0b, powered: 1b}}, hasRedstone: 2, id: "ae2:cable_bus", east: {id: "ae2_batchcraft:pattern_p2p_unit_port_place", visual: {missingChannel: 0b, powered: 1b}}, visual: {}}},
+    {pos: [4, 0, 1], state: "ae2:cable_bus{light_level:0,waterlogged:false}", nbt: {cable: {id: "ae2:cyan_smart_cable", visual: {connections: ["west"], missingChannel: 0b, powered: 1b}}, hasRedstone: 2, id: "ae2:cable_bus", east: {id: "ae2_batchcraft:pattern_p2p_unit_port_redstone", visual: {missingChannel: 0b, powered: 1b}}, visual: {}}},
+    {pos: [4, 0, 2], state: "ae2:cable_bus{light_level:0,waterlogged:false}", nbt: {cable: {id: "ae2:cyan_smart_cable", visual: {connections: ["west"], missingChannel: 0b, powered: 1b}}, hasRedstone: 2, id: "ae2:cable_bus", east: {id: "ae2_batchcraft:pattern_p2p_unit_port_transfer", visual: {missingChannel: 0b, powered: 1b}}, visual: {}}},
+    {pos: [5, 0, 0], state: "minecraft:stone"},
+    {pos: [5, 0, 1], state: "minecraft:redstone_lamp{lit:true}"},
+    {pos: [5, 0, 2], state: "minecraft:furnace{facing:south,lit:false}", nbt: {BurnTime: 0s, CookTime: 0s, CookTimeTotal: 0s, Items: [], RecipesUsed: {}, id: "minecraft:furnace"}}
+  ],
+  entities: [],
+  palette: [
+    "ae2:pattern_provider{push_direction:east}",
+    "ae2:cable_bus{light_level:0,waterlogged:false}",
+    "minecraft:stone",
+    "minecraft:redstone_lamp{lit:true}",
+    "minecraft:furnace{facing:south,lit:false}"
+  ]
+}

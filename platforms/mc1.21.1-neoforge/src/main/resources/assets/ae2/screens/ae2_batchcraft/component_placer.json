@@ -1,0 +1,164 @@
+{
+  "$schema": "../schema.json",
+  "includes": [
+    "../common/common.json"
+  ],
+  "generatedBackground": {
+    "width": 176,
+    "height": 228
+  },
+  "slots": {
+    "AE2_BATCHCRAFT_CABLE_MARKER": {
+      "left": 40,
+      "top": 22,
+      "grid": "HORIZONTAL"
+    },
+    "AE2_BATCHCRAFT_PART_MARKER": {
+      "left": 88,
+      "top": 22,
+      "grid": "HORIZONTAL"
+    },
+    "STORAGE": {
+      "left": 8,
+      "top": 115,
+      "grid": "HORIZONTAL"
+    },
+    "PLAYER_INVENTORY": {
+      "left": 8,
+      "bottom": 84,
+      "grid": "BREAK_AFTER_9COLS"
+    },
+    "PLAYER_HOTBAR": {
+      "left": 8,
+      "bottom": 26,
+      "grid": "HORIZONTAL"
+    }
+  },
+  "text": {
+    "dialog_title": {
+      "text": {
+        "translate": "item.ae2_batchcraft.component_placer"
+      },
+      "position": {
+        "left": 8,
+        "top": 6
+      }
+    },
+    "cable_label": {
+      "text": {
+        "translate": "gui.ae2_batchcraft.component_placer.cable"
+      },
+      "position": {
+        "left": 8,
+        "top": 25
+      }
+    },
+    "part_label": {
+      "text": {
+        "translate": "gui.ae2_batchcraft.component_placer.part"
+      },
+      "position": {
+        "left": 60,
+        "top": 25
+      }
+    },
+    "frequencyText": {
+      "text": {
+        "text": "0000"
+      },
+      "position": {
+        "left": 150,
+        "top": 25
+      },
+      "align": "RIGHT"
+    },
+    "offsetX": {
+      "text": {
+        "text": "X: 0"
+      },
+      "position": {
+        "left": 36,
+        "top": 44
+      },
+      "align": "CENTER"
+    },
+    "offsetY": {
+      "text": {
+        "text": "Y: 0"
+      },
+      "position": {
+        "left": 36,
+        "top": 59
+      },
+      "align": "CENTER"
+    },
+    "offsetZ": {
+      "text": {
+        "text": "Z: 0"
+      },
+      "position": {
+        "left": 36,
+        "top": 74
+      },
+      "align": "CENTER"
+    },
+    "materials_label": {
+      "text": {
+        "translate": "gui.ae2_batchcraft.component_placer.materials"
+      },
+      "position": {
+        "left": 8,
+        "top": 106
+      }
+    },
+    "aeLinkWarning": {
+      "text": {
+        "translate": "gui.ae2_batchcraft.component_placer.not_linked",
+        "color": "red"
+      },
+      "position": {
+        "left": 168,
+        "top": 106
+      },
+      "align": "RIGHT"
+    },
+    "aeLinkConnected": {
+      "text": {
+        "translate": "gui.ae2_batchcraft.component_placer.linked",
+        "color": "green"
+      },
+      "position": {
+        "left": 168,
+        "top": 106
+      },
+      "align": "RIGHT"
+    },
+    "player_inventory_title": {
+      "text": {
+        "translate": "container.inventory"
+      },
+      "position": {
+        "left": 8,
+        "top": 134
+      }
+    }
+  },
+  "widgets": {
+    "frequency": { "left": 154, "top": 22, "width": 14, "height": 14 },
+    "directionFront": { "left": 106, "top": 41, "width": 32, "height": 14 },
+    "directionLeft": { "left": 72, "top": 56, "width": 32, "height": 14 },
+    "directionUp": { "left": 106, "top": 56, "width": 32, "height": 14 },
+    "directionRight": { "left": 140, "top": 56, "width": 32, "height": 14 },
+    "directionDown": { "left": 72, "top": 71, "width": 32, "height": 14 },
+    "directionBack": { "left": 106, "top": 71, "width": 32, "height": 14 },
+    "offsetXMinus": { "left": 8, "top": 41, "width": 14, "height": 14 },
+    "offsetXPlus": { "left": 51, "top": 41, "width": 14, "height": 14 },
+    "offsetYMinus": { "left": 8, "top": 56, "width": 14, "height": 14 },
+    "offsetYPlus": { "left": 51, "top": 56, "width": 14, "height": 14 },
+    "offsetZMinus": { "left": 8, "top": 71, "width": 14, "height": 14 },
+    "offsetZPlus": { "left": 51, "top": 71, "width": 14, "height": 14 },
+    "resetOffsets": { "left": 8, "top": 88, "width": 52, "height": 14 },
+    "clearSelection": { "left": 62, "top": 88, "width": 52, "height": 14 },
+    "execute": { "left": 116, "top": 88, "width": 52, "height": 14 }
+  }
+}

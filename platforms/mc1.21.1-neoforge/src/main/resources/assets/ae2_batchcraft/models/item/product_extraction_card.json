@@ -1,0 +1,7 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "ae2:item/basic_card",
+    "layer1": "ae2_batchcraft:item/product_extraction_card_overlay"
+  }
+}

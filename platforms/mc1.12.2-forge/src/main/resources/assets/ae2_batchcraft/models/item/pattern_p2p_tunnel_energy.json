@@ -1,0 +1,4 @@
+{
+  "parent": "appliedenergistics2:item/part/p2p_tunnel",
+  "textures": { "type": "appliedenergistics2:blocks/energy_acceptor" }
+}

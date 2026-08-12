@@ -1,0 +1,51 @@
+{
+  "parent": "minecraft:block/block",
+  "textures": {
+    "glass": "ae2:block/glass/quartz_glass_a",
+    "particle": "ae2:block/glass/quartz_glass_a"
+  },
+  "elements": [
+    {
+      "from": [5, 5, 3.0625], "to": [11, 11, 3.125],
+      "faces": {
+        "north": {"texture": "#glass", "uv": [0, 0, 16, 16]},
+        "south": {"texture": "#glass", "uv": [0, 0, 16, 16]}
+      }
+    },
+    {
+      "from": [5, 5, 12.875], "to": [11, 11, 12.9375],
+      "faces": {
+        "north": {"texture": "#glass", "uv": [0, 0, 16, 16]},
+        "south": {"texture": "#glass", "uv": [0, 0, 16, 16]}
+      }
+    },
+    {
+      "from": [3.0625, 5, 5], "to": [3.125, 11, 11],
+      "faces": {
+        "east": {"texture": "#glass", "uv": [0, 0, 16, 16]},
+        "west": {"texture": "#glass", "uv": [0, 0, 16, 16]}
+      }
+    },
+    {
+      "from": [12.875, 5, 5], "to": [12.9375, 11, 11],
+      "faces": {
+        "east": {"texture": "#glass", "uv": [0, 0, 16, 16]},
+        "west": {"texture": "#glass", "uv": [0, 0, 16, 16]}
+      }
+    },
+    {
+      "from": [5, 3.0625, 5], "to": [11, 3.125, 11],
+      "faces": {
+        "up": {"texture": "#glass", "uv": [0, 0, 16, 16]},
+        "down": {"texture": "#glass", "uv": [0, 0, 16, 16]}
+      }
+    },
+    {
+      "from": [5, 12.875, 5], "to": [11, 12.9375, 11],
+      "faces": {
+        "up": {"texture": "#glass", "uv": [0, 0, 16, 16]},
+        "down": {"texture": "#glass", "uv": [0, 0, 16, 16]}
+      }
+    }
+  ]
+}

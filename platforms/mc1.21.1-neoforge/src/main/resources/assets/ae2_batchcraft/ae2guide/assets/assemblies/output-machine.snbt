@@ -1,0 +1,13 @@
+{
+  DataVersion: 3955,
+  size: [2, 1, 1],
+  data: [
+    {pos: [0, 0, 0], state: "ae2:cable_bus{light_level:0,waterlogged:false}", nbt: {cable: {id: "ae2:fluix_smart_cable", visual: {connections: ["east"], missingChannel: 0b, powered: 1b}}, hasRedstone: 2, id: "ae2:cable_bus", east: {freq: 10525s, id: "ae2_batchcraft:pattern_p2p_tunnel_output", output: 1b, visual: {missingChannel: 0b, powered: 1b}}, visual: {}}},
+    {pos: [1, 0, 0], state: "minecraft:furnace{facing:south,lit:false}", nbt: {BurnTime: 0s, CookTime: 0s, CookTimeTotal: 0s, Items: [], RecipesUsed: {}, id: "minecraft:furnace"}}
+  ],
+  entities: [],
+  palette: [
+    "ae2:cable_bus{light_level:0,waterlogged:false}",
+    "minecraft:furnace{facing:south,lit:false}"
+  ]
+}

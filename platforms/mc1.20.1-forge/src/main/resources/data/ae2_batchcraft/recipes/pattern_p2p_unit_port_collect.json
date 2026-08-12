@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "redstone",
+  "ingredients": [
+    {
+      "item": "ae2:import_bus"
+    },
+    {
+      "item": "ae2:logic_processor"
+    }
+  ],
+  "result": {
+    "count": 1,
+    "item": "ae2_batchcraft:pattern_p2p_unit_port_collect"
+  }
+}

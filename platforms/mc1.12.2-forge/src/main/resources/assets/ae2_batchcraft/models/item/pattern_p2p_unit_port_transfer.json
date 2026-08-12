@@ -1,0 +1,4 @@
+{
+  "parent": "appliedenergistics2:item/part/p2p_tunnel",
+  "textures": { "type": "ae2_batchcraft:part/p2p/unit_port_transfer" }
+}

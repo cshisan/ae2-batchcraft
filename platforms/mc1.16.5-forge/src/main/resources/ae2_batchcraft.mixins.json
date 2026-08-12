@@ -1,0 +1,21 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "cn.ae2bc.mixin",
+  "refmap": "ae2_batchcraft.refmap.json",
+  "compatibilityLevel": "JAVA_8",
+  "mixins": [
+    "CableBusContainerMixin",
+    "PatternP2PUnitManagerCableBusMixin",
+    "PartInfoProviderMixin",
+    "P2PStateInfoProviderMixin",
+    "EncodedPatternItemMixin",
+    "PatternEncodingTermMenuMixin"
+  ],
+  "client": [
+    "PatternEncodingTermScreenMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

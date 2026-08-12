@@ -1,0 +1,35 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "redstone",
+  "pattern": [
+    "IRI",
+    "ETE",
+    "IPI"
+  ],
+  "key": {
+    "I": {
+      "item": "minecraft:iron_ingot"
+    },
+    "R": {
+      "item": "minecraft:redstone"
+    },
+    "E": {
+      "item": "minecraft:ender_pearl"
+    },
+    "T": {
+      "item": "ae2:me_p2p_tunnel"
+    },
+    "P": [
+      {
+        "item": "ae2:pattern_provider"
+      },
+      {
+        "item": "ae2:cable_pattern_provider"
+      }
+    ]
+  },
+  "result": {
+    "count": 1,
+    "item": "ae2_batchcraft:pattern_p2p_tunnel_input"
+  }
+}

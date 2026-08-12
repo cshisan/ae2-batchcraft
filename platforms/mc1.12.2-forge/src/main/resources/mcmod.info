@@ -1,0 +1,10 @@
+[
+  {
+    "modid": "ae2_batchcraft",
+    "name": "AE2 BatchCraft",
+    "description": "AE2 BatchCraft platform adapter for Minecraft 1.12.2 Forge.",
+    "version": "${version}",
+    "mcversion": "${mcversion}",
+    "authorList": ["AE2BC"]
+  }
+]

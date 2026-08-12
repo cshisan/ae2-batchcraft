@@ -1,0 +1,22 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "redstone",
+  "ingredients": [
+    {
+      "type": "neoforge:difference",
+      "base": {
+        "tag": "ae2_batchcraft:pattern_p2p_unit_managers"
+      },
+      "subtracted": {
+        "item": "ae2_batchcraft:pattern_p2p_unit_manager"
+      }
+    },
+    {
+      "tag": "ae2:can_remove_color"
+    }
+  ],
+  "result": {
+    "count": 1,
+    "item": "ae2_batchcraft:pattern_p2p_unit_manager"
+  }
+}

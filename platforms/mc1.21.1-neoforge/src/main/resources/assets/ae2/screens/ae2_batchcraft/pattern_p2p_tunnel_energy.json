@@ -1,0 +1,41 @@
+{
+  "$schema": "../schema.json",
+  "includes": [
+    "../common/common.json"
+  ],
+  "generatedBackground": {
+    "width": 200,
+    "height": 109
+  },
+  "text": {
+    "dialog_title": {
+      "text": {
+        "translate": "item.ae2_batchcraft.pattern_p2p_tunnel_energy"
+      },
+      "position": {
+        "left": 8,
+        "top": 6
+      }
+    }
+  },
+  "widgets": {
+    "passive": {
+      "left": 12,
+      "top": 35,
+      "width": 85,
+      "height": 18
+    },
+    "active": {
+      "left": 103,
+      "top": 35,
+      "width": 85,
+      "height": 18
+    },
+    "energyDistributionMode": {
+      "left": 12,
+      "top": 77,
+      "width": 176,
+      "height": 18
+    }
+  }
+}

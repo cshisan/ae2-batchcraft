@@ -1,0 +1,52 @@
+buildscript {
+    repositories {
+        maven { url = 'https://maven.minecraftforge.net' }
+        mavenCentral()
+    }
+    dependencies {
+        classpath 'net.minecraftforge.gradle:ForgeGradle:2.3-SNAPSHOT'
+    }
+}
+
+apply plugin: 'net.minecraftforge.gradle.forge'
+
+version = mod_version
+group = mod_group_id
+archivesBaseName = "ae2-batchcraft-${minecraft_version}"
+
+sourceCompatibility = targetCompatibility = '1.8'
+
+minecraft {
+    version = "${minecraft_version}-${forge_version}"
+    runDir = 'run'
+    mappings = 'stable_39'
+}
+
+repositories {
+    maven { url = 'https://cursemaven.com' }
+}
+
+dependencies {
+    deobfCompile "curse.maven:applied-energistics-2-223794:${ae2_curse_file}"
+    testCompile 'junit:junit:4.13.2'
+}
+
+sourceSets.main.java.srcDir file('../../core/src/main/java')
+
+tasks.withType(JavaCompile) {
+    options.encoding = 'UTF-8'
+}
+
+jar {
+    archiveName = "ae2-batchcraft-${minecraft_version}-${mod_version}-forge.jar"
+    manifest {
+        attributes 'Specification-Title': mod_name,
+                'Specification-Vendor': 'AE2BC',
+                'Specification-Version': '1',
+                'Implementation-Title': project.name,
+                'Implementation-Version': project.version,
+                'Implementation-Vendor': 'AE2BC',
+                'FMLCorePlugin': 'cn.ae2bc.platform.Ae2bcCorePlugin',
+                'FMLCorePluginContainsFMLMod': 'true'
+    }
+}

@@ -1,0 +1,31 @@
+modLoader="javafml"
+loaderVersion="[47,)"
+license="GPL-3.0-only"
+
+[[mods]]
+modId="ae2_batchcraft"
+version="${file.jarVersion}"
+displayName="AE2 BatchCraft"
+authors="AE2BC"
+description='''AE2 BatchCraft platform adapter for Minecraft 1.20.1 Forge.'''
+
+[[dependencies.ae2_batchcraft]]
+modId="forge"
+mandatory=true
+versionRange="[47.4,)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.ae2_batchcraft]]
+modId="minecraft"
+mandatory=true
+versionRange="[1.20.1,1.20.2)"
+ordering="NONE"
+side="BOTH"
+
+[[dependencies.ae2_batchcraft]]
+modId="ae2"
+mandatory=true
+versionRange="[15.4.0,16.0.0)"
+ordering="AFTER"
+side="BOTH"

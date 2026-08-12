@@ -1,0 +1,8 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    { "item": "ae2_batchcraft:pattern_p2p_tunnel_output" },
+    { "item": "appliedenergistics2:material", "data": 24 }
+  ],
+  "result": { "item": "ae2_batchcraft:pattern_p2p_unit_manager", "data": 0, "count": 1 }
+}
