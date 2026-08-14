@@ -27,6 +27,11 @@ public abstract class EncodedPatternItemMixin {
     private void ae2bc$appendMaterialOutputConfig(ItemStack stack, Item.TooltipContext context,
                                                    List<Component> lines, TooltipFlag flags,
                                                    CallbackInfo ci) {
+        Long batchCount = stack.get(ModContent.PATTERN_BATCH_COUNT.get());
+        if (batchCount != null && batchCount > 1) {
+            lines.add(Component.translatable("tooltip.ae2_batchcraft.pattern_batch_count", batchCount)
+                    .withStyle(ChatFormatting.GRAY));
+        }
         MaterialOutputConfigData config = stack.get(ModContent.MATERIAL_OUTPUT_CONFIG.get());
         if (config == null || config.isEmpty() || Minecraft.getInstance().level == null) {
             return;

@@ -31,7 +31,7 @@ import cn.ae2bc.logic.RemoteReturnInventory;
 import cn.ae2bc.logic.PatternP2PUnitIdentityColors;
 import cn.ae2bc.logic.PatternP2PUnitDimensions;
 import cn.ae2bc.logic.PatternP2PUnitManagerLogic;
-import cn.ae2bc.logic.PatternP2PUnitPortType;
+import cn.ae2bc.core.unit.UnitPortType;
 import cn.ae2bc.logic.PatternP2PTopologyGridService;
 import cn.ae2bc.client.model.PatternP2PUnitModelData;
 import cn.ae2bc.menu.PatternP2PUnitManagerMenu;
@@ -164,7 +164,7 @@ public final class PatternP2PUnitManagerPart extends CablePart implements Patter
             return;
         }
         for (PatternP2PUnitPortPart port : grid.getService(PatternP2PTopologyGridService.class)
-                .getPorts(patternP2PUnitId, PatternP2PUnitPortType.EXTRACT)) {
+                .getPorts(patternP2PUnitId, UnitPortType.EXTRACT)) {
             port.alertTicking();
         }
     }

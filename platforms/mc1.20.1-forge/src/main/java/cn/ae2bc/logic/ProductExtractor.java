@@ -8,6 +8,7 @@ import appeng.api.stacks.GenericStack;
 import appeng.api.stacks.KeyCounter;
 import appeng.api.storage.MEStorage;
 import cn.ae2bc.Ae2bcMod;
+import cn.ae2bc.core.extraction.ProductExtractionLimits;
 
 import java.util.Collection;
 import java.util.Objects;
@@ -33,15 +34,18 @@ public final class ProductExtractor {
         }
 
         int moved = 0;
+        int transferredEntries = 0;
         internal.beginBatch();
         try {
             for (var source : sources) {
-                if (moved >= settings.amount()) {
+                if (moved >= settings.amount()
+                        || transferredEntries >= ProductExtractionLimits.MAX_TRANSFER_ENTRIES_PER_RUN) {
                     break;
                 }
                 KeyCounter available = source.storage().getAvailableStacks();
                 for (var entry : available) {
-                    if (moved >= settings.amount()) {
+                    if (moved >= settings.amount()
+                            || transferredEntries >= ProductExtractionLimits.MAX_TRANSFER_ENTRIES_PER_RUN) {
                         break;
                     }
                     AEKey key = entry.getKey();
@@ -68,7 +72,11 @@ public final class ProductExtractor {
                     }
                     long inserted = Numbers.clamp(destination.insert(key, extracted,
                             Actionable.MODULATE, actionSource), 0, extracted);
-                    moved = Math.min(settings.amount(), moved + operationsFor(inserted, unit));
+                    moved = (int) Math.min((long) settings.amount(),
+                            (long) moved + operationsFor(inserted, unit));
+                    if (inserted > 0) {
+                        transferredEntries++;
+                    }
 
                     long remainder = extracted - inserted;
                     if (remainder > 0) {

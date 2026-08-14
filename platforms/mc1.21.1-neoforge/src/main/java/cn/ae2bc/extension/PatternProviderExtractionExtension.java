@@ -3,6 +3,7 @@ package cn.ae2bc.extension;
 import appeng.api.upgrades.IUpgradeInventory;
 import appeng.helpers.externalstorage.GenericStackInv;
 import cn.ae2bc.logic.ProductExtractionSettings;
+import cn.ae2bc.logic.ProductExtractionBudget;
 import cn.ae2bc.logic.ProductExtractionTask;
 import cn.ae2bc.logic.ProductExtractionTickState;
 
@@ -25,6 +26,8 @@ public interface PatternProviderExtractionExtension extends ProductExtractionTas
 
     ProductExtractionTickState ae2bc$tickProductExtraction();
 
+    ProductExtractionTickState ae2bc$tickProductExtraction(ProductExtractionBudget budget);
+
     @Override
     default boolean hasProductExtractionWork() {
         return ae2bc$hasProductExtractionWork();
@@ -38,5 +41,10 @@ public interface PatternProviderExtractionExtension extends ProductExtractionTas
     @Override
     default ProductExtractionTickState tickProductExtraction() {
         return ae2bc$tickProductExtraction();
+    }
+
+    @Override
+    default ProductExtractionTickState tickProductExtraction(ProductExtractionBudget budget) {
+        return ae2bc$tickProductExtraction(budget);
     }
 }

@@ -37,13 +37,6 @@ ordering = "AFTER"
 side = "BOTH"
 
 [[dependencies.ae2_batchcraft]]
-modId = "appmek"
-type = "optional"
-versionRange = "[1.6.0,)"
-ordering = "AFTER"
-side = "BOTH"
-
-[[dependencies.ae2_batchcraft]]
 modId = "guideme"
 type = "optional"
 versionRange = "[21.1.16,)"

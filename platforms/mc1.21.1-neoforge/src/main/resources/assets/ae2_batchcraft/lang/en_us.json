@@ -166,5 +166,18 @@
   "tooltip.ae2_batchcraft.task_state.working": "Working",
   "tooltip.ae2_batchcraft.unit.unbound": "Unbound",
   "tooltip.ae2_batchcraft.material_output_config": "Output Configuration",
-  "tooltip.ae2_batchcraft.material_output_config.entry": "%1$s: %2$s · %3$s"
+  "tooltip.ae2_batchcraft.material_output_config.entry": "%1$s: %2$s · %3$s",
+  "gui.ae2_batchcraft.pattern_batch_config": "Ctrl+Middle Click: Batch Configuration",
+  "gui.ae2_batchcraft.pattern_batch_config.title": "Batch Configuration",
+  "gui.ae2_batchcraft.pattern_batch_count": "Batch Count",
+  "gui.ae2_batchcraft.pattern_batch_count.tooltip": "Only applies in Batch Distribution mode\nThe system only checks whether the pattern quantities are divisible;\nit cannot validate the machine's actual recipe ratio\n\nExample:\nMachine recipe: 2A + 2B → 2C\nEncoded pattern: 4A + 4B → 4C\nWith a batch count of 4, the system dispatches 1A + 1B → 1C,\nwhich may not start the machine and can stall crafting\n\nEnsure each batch satisfies the machine's minimum recipe",
+  "gui.ae2_batchcraft.pattern_batch_count.maximum": "Maximum batches: %s",
+  "gui.ae2_batchcraft.pattern_batch_count.confirm": "Confirm",
+  "gui.ae2_batchcraft.pattern_batch_count.corrected_maximum": "Above maximum. Adjusted to %s.",
+  "gui.ae2_batchcraft.pattern_batch_count.corrected_one": "Invalid or not divisible. Adjusted to 1.",
+  "gui.ae2_batchcraft.dispatch_mode": "Task Dispatch Mode",
+  "gui.ae2_batchcraft.dispatch_mode.full_dispatch": "Full Dispatch",
+  "gui.ae2_batchcraft.dispatch_mode.batch_distribution": "Batch Distribution",
+  "gui.ae2_batchcraft.dispatch_mode.switch.tooltip": "Current: %1$s\nClick to switch to %2$s",
+  "tooltip.ae2_batchcraft.pattern_batch_count": "Batch count: %s"
 }

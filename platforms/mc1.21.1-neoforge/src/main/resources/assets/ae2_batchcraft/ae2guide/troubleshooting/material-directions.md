@@ -7,7 +7,14 @@ navigation:
 
 # Material Output Directions
 
-In processing-pattern mode in an AE2 Pattern Encoding Terminal, hover an input ingredient and press `Ctrl + Middle Mouse Button` to choose its output form and direction. The values are stored in the encoded pattern and appear in its tooltip.
+In processing-pattern mode in an AE2 Pattern Encoding Terminal, `Ctrl + Middle Mouse Button` has two targets:
+
+| Hovered slot | Configuration |
+| --- | --- |
+| Input ingredient | Output form and direction |
+| Primary output | Batch count |
+
+Both values are stored in the encoded pattern and appear in its tooltip. Batch count only affects the Input's Batch Distribution mode.
 
 | Output form | Unit destination |
 | --- | --- |
@@ -17,6 +24,8 @@ In processing-pattern mode in an AE2 Pattern Encoding Terminal, hover an input i
 
 **Automatic direction** uses the face through which the relevant endpoint connects to the machine. An absolute direction such as Up or North uses only that world direction and does not fall back to the connected face.
 
-If the encoded pattern tooltip lacks the configuration, first confirm the terminal was in processing-pattern mode, then configure the ingredient again before pressing **Encode Pattern**. If another mod opens an upload screen after encoding, the configuration still belongs to the generated encoded pattern; inspect the final pattern item rather than the upload screen's temporary stack.
+If the encoded pattern tooltip lacks the configuration, confirm that the terminal was in processing-pattern mode, configure the intended slot again, and then press **Encode Pattern**. Inspect the final encoded pattern before inserting it into an AE2 Pattern Provider.
 
 Standard Pattern Providers ignore BatchCraft's output-form extension. It is interpreted by Pattern P2P Outputs and Unit material ports.
+
+See [Batch Distribution](../pattern-p2p/batch-distribution.md) for batch-count validation and delivery behavior.

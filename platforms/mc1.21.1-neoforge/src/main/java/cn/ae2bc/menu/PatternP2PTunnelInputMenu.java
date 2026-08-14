@@ -8,6 +8,7 @@ import cn.ae2bc.logic.ReturnMode;
 import cn.ae2bc.logic.RedstoneOutputMode;
 import cn.ae2bc.logic.PatternP2PUnitConfiguration;
 import cn.ae2bc.logic.ProductExtractionSettings;
+import cn.ae2bc.logic.PatternDispatchMode;
 import cn.ae2bc.part.PatternP2PTunnelPart;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
@@ -24,6 +25,7 @@ public final class PatternP2PTunnelInputMenu extends AEBaseMenu {
     private static final String SET_PRODUCT_EXTRACTION_INTERVAL = "setProductExtractionInterval";
     private static final String SET_PRODUCT_EXTRACTION_AMOUNT = "setProductExtractionAmount";
     private static final String RESET_TASK_STATE = "resetTaskState";
+    private static final String SET_DISPATCH_MODE = "setDispatchMode";
 
     public static final MenuType<PatternP2PTunnelInputMenu> TYPE = MenuTypeBuilder
             .create(PatternP2PTunnelInputMenu::new, PatternP2PTunnelPart.class)
@@ -43,6 +45,7 @@ public final class PatternP2PTunnelInputMenu extends AEBaseMenu {
     @GuiSync(6) public boolean productExtractionEnabled;
     @GuiSync(7) public int productExtractionInterval = ProductExtractionSettings.DEFAULT_INTERVAL;
     @GuiSync(8) public int productExtractionAmount = ProductExtractionSettings.DEFAULT_AMOUNT;
+    @GuiSync(9) public PatternDispatchMode dispatchMode = PatternDispatchMode.FULL_DISPATCH;
 
     public PatternP2PTunnelInputMenu(int id, Inventory playerInventory, PatternP2PTunnelPart host) {
         super(TYPE, id, playerInventory, host);
@@ -65,6 +68,7 @@ public final class PatternP2PTunnelInputMenu extends AEBaseMenu {
         registerClientAction(SET_PRODUCT_EXTRACTION_AMOUNT, Integer.class,
                 this::handleSetProductExtractionAmount);
         registerClientAction(RESET_TASK_STATE, this::handleResetTaskState);
+        registerClientAction(SET_DISPATCH_MODE, PatternDispatchMode.class, this::handleSetDispatchMode);
     }
 
     @Override
@@ -77,6 +81,7 @@ public final class PatternP2PTunnelInputMenu extends AEBaseMenu {
             productExtractionEnabled = extraction.enabled();
             productExtractionInterval = extraction.interval();
             productExtractionAmount = extraction.amount();
+            dispatchMode = logic.getDispatchMode();
         }
         super.broadcastChanges();
     }
@@ -121,6 +126,13 @@ public final class PatternP2PTunnelInputMenu extends AEBaseMenu {
         sendClientAction(RESET_TASK_STATE);
     }
 
+    public void setDispatchMode(PatternDispatchMode mode) {
+        if (mode != null) {
+            dispatchMode = mode;
+            sendClientAction(SET_DISPATCH_MODE, mode);
+        }
+    }
+
     private void handleSetReturnMode(ReturnMode mode) {
         if (isServerSide() && !host.isOutput() && mode != null) {
             host.getInputLogic().setReturnMode(mode);
@@ -130,6 +142,12 @@ public final class PatternP2PTunnelInputMenu extends AEBaseMenu {
     private void handleResetTaskState() {
         if (isServerSide() && !host.isOutput()) {
             host.getInputLogic().resetAllTaskStates();
+        }
+    }
+
+    private void handleSetDispatchMode(PatternDispatchMode mode) {
+        if (isServerSide() && !host.isOutput() && mode != null) {
+            host.getInputLogic().setDispatchMode(mode);
         }
     }
 

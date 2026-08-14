@@ -8,7 +8,7 @@ navigation:
 
 # 样板 P2P 单元
 
-一个单元由一个管理器和任意数量的直属功能端口组成。管理器接收一个完整处理任务；端口负责发送材料、与世界交互、返回产物、输出红石或输送 FE。
+一个单元由一个管理器和任意数量的直属功能端口组成。完整下发时管理器接收整次推送，批次分发时接收分配到的整数份材料；端口负责发送材料、与世界交互、返回产物、输出红石或输送 FE。
 
 <GameScene zoom="3.5" interactive={true}>
   <ImportStructure src="../assets/assemblies/unit-overview.snbt" />

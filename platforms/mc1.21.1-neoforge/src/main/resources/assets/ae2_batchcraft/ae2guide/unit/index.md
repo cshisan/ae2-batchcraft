@@ -8,7 +8,7 @@ navigation:
 
 # Pattern P2P Unit
 
-A Unit combines one Manager with any number of directly listed functional ports. The Manager receives one complete processing job; its ports route materials, interact with the world, return products, produce redstone, or deliver FE.
+A Unit combines one Manager with any number of directly listed functional ports. The Manager receives a complete push in Full Dispatch or an assigned integer share in Batch Distribution; its ports route materials, interact with the world, return products, produce redstone, or deliver FE.
 
 <GameScene zoom="3.5" interactive={true}>
   <ImportStructure src="../assets/assemblies/unit-overview.snbt" />

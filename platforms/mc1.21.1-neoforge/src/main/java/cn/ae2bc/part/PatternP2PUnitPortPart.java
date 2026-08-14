@@ -41,10 +41,11 @@ import appeng.util.Platform;
 import cn.ae2bc.Ae2bcMod;
 import cn.ae2bc.logic.RedstoneOutputMode;
 import cn.ae2bc.logic.PatternP2PUnitIdentityColors;
-import cn.ae2bc.logic.PatternP2PUnitPortType;
+import cn.ae2bc.core.unit.UnitPortType;
 import cn.ae2bc.logic.PatternP2PEnergyGridService;
 import cn.ae2bc.logic.PatternP2PTopologyGridService;
 import cn.ae2bc.logic.ProductExtractionTickState;
+import cn.ae2bc.logic.ProductExtractionBudget;
 import cn.ae2bc.logic.ProductExtractionGridService;
 import cn.ae2bc.logic.ProductExtractionTask;
 import cn.ae2bc.logic.ProductExtractionSettings;
@@ -88,9 +89,9 @@ public final class PatternP2PUnitPortPart extends AEBasePart implements IGridTic
     private static final String BOUND_FREQUENCY_TAG = "BoundFrequency";
     private static final ResourceLocation IDENTITY_MODEL = ResourceLocation.fromNamespaceAndPath(
             Ae2bcMod.MOD_ID, "part/p2p/pattern_p2p_unit_port_identity");
-    private static final Map<PatternP2PUnitPortType, PatternP2PUnitPortModels> MODELS = createModels();
+    private static final Map<UnitPortType, PatternP2PUnitPortModels> MODELS = createModels();
 
-    private final PatternP2PUnitPortType type;
+    private final UnitPortType type;
     private final IActionSource actionSource = new MachineSource(this);
     private final PortReturnInventory returnInventory = new PortReturnInventory();
     private final IItemHandler returnItemHandler = new GenericStackItemStorage(returnInventory);
@@ -109,16 +110,16 @@ public final class PatternP2PUnitPortPart extends AEBasePart implements IGridTic
     private boolean redstoneWorldStateDirty = true;
     private long taskStartTick = Long.MIN_VALUE;
 
-    public PatternP2PUnitPortPart(IPartItem<?> partItem, PatternP2PUnitPortType type) {
+    public PatternP2PUnitPortPart(IPartItem<?> partItem, UnitPortType type) {
         super(partItem);
         this.type = type;
         this.productExtractionRecovery = new ExtractionRecoveryQueue(() -> getHost().markForSave());
         getMainNode().addService(IGridTickable.class, this);
     }
 
-    private static Map<PatternP2PUnitPortType, PatternP2PUnitPortModels> createModels() {
-        Map<PatternP2PUnitPortType, PatternP2PUnitPortModels> result = new EnumMap<>(PatternP2PUnitPortType.class);
-        for (PatternP2PUnitPortType type : PatternP2PUnitPortType.values()) {
+    private static Map<UnitPortType, PatternP2PUnitPortModels> createModels() {
+        Map<UnitPortType, PatternP2PUnitPortModels> result = new EnumMap<>(UnitPortType.class);
+        for (UnitPortType type : UnitPortType.values()) {
             ResourceLocation front = ResourceLocation.fromNamespaceAndPath(
                     Ae2bcMod.MOD_ID, "part/p2p/pattern_p2p_unit_port_" + type.name().toLowerCase());
             result.put(type, new PatternP2PUnitPortModels(front));
@@ -133,7 +134,7 @@ public final class PatternP2PUnitPortPart extends AEBasePart implements IGridTic
                 .toList());
     }
 
-    public PatternP2PUnitPortType getType() {
+    public UnitPortType getType() {
         return type;
     }
 
@@ -160,7 +161,7 @@ public final class PatternP2PUnitPortPart extends AEBasePart implements IGridTic
     public long insertInput(PatternP2PUnitManagerPart manager, GenericStack stack,
                             MaterialOutputForm form, Actionable mode) {
         if (!isBoundTo(manager) || stack == null || stack.amount() <= 0
-                || PatternP2PUnitPortType.forOutputForm(form) != type || !form.supports(stack.what())) {
+                || UnitPortType.forOutputFormId(form.getId()) != type || !form.supports(stack.what())) {
             return 0;
         }
         // Admission probes happen before task activation; world mutation does not.
@@ -169,7 +170,7 @@ public final class PatternP2PUnitPortPart extends AEBasePart implements IGridTic
         }
         return switch (type) {
             case DROP, PLACE -> getPlacementStrategy().placeInWorld(
-                    stack.what(), stack.amount(), mode, type == PatternP2PUnitPortType.DROP);
+                    stack.what(), stack.amount(), mode, type == UnitPortType.DROP);
             case TRANSFER -> insertIntoTarget(stack.what(), stack.amount(), mode);
             default -> 0;
         };
@@ -180,7 +181,7 @@ public final class PatternP2PUnitPortPart extends AEBasePart implements IGridTic
         if (strategy == null) {
             return 0;
         }
-        MEStorage storage = strategy.createWrapper(false, this::wake);
+        MEStorage storage = strategy.createWrapper(false, this::wakeForTargetChange);
         return storage == null ? 0 : storage.insert(what, amount, mode, actionSource);
     }
 
@@ -332,7 +333,7 @@ public final class PatternP2PUnitPortPart extends AEBasePart implements IGridTic
 
     @Override
     public boolean hasProductExtractionWork() {
-        if (type != PatternP2PUnitPortType.EXTRACT) {
+        if (type != UnitPortType.EXTRACT) {
             return false;
         }
         var manager = getManager();
@@ -349,6 +350,13 @@ public final class PatternP2PUnitPortPart extends AEBasePart implements IGridTic
 
     @Override
     public ProductExtractionTickState tickProductExtraction() {
+        ProductExtractionBudget budget = new ProductExtractionBudget();
+        budget.beginEndpoint();
+        return tickProductExtraction(budget);
+    }
+
+    @Override
+    public ProductExtractionTickState tickProductExtraction(ProductExtractionBudget budget) {
         var manager = getManager();
         if (manager == null || !(getLevel() instanceof ServerLevel level)) {
             return ProductExtractionTickState.DISABLED;
@@ -365,11 +373,18 @@ public final class PatternP2PUnitPortPart extends AEBasePart implements IGridTic
         var configuration = manager.getLogic().getEffectiveConfiguration();
         int interval = configuration.productExtractionInterval();
         int amount = configuration.productExtractionAmount();
-        int moved = ProductExtractor.extract(ExtractionSource.fromTypeMap(resolveExtractionSources(level)),
+        ProductExtractor.Result result = ProductExtractor.extract(
+                ExtractionSource.fromTypeMap(resolveExtractionSources(level)),
                 returnInventory,
                 new ProductExtractionSettings(true, interval, amount, false, java.util.Set.of()),
-                actionSource, productExtractionRecovery::queue);
-        return moved > 0 || recoveryProgress
+                actionSource, productExtractionRecovery::queue, budget);
+        if (result.budgetExhausted()) {
+            return ProductExtractionTickState.BUDGET_EXHAUSTED;
+        }
+        if (result.destinationBlocked()) {
+            return ProductExtractionTickState.NO_PROGRESS;
+        }
+        return result.moved() > 0 || recoveryProgress
                 ? ProductExtractionTickState.PROGRESSED : ProductExtractionTickState.NO_PROGRESS;
     }
 
@@ -396,7 +411,7 @@ public final class PatternP2PUnitPortPart extends AEBasePart implements IGridTic
             return result;
         }
         for (var entry : getExternalStrategies().entrySet()) {
-            MEStorage wrapper = entry.getValue().createWrapper(false, this::wake);
+            MEStorage wrapper = entry.getValue().createWrapper(false, this::wakeForTargetChange);
             if (wrapper != null) {
                 result.put(entry.getKey(), wrapper);
             }
@@ -409,7 +424,7 @@ public final class PatternP2PUnitPortPart extends AEBasePart implements IGridTic
     }
 
     private void setRedstonePower(int power) {
-        if (type != PatternP2PUnitPortType.REDSTONE) {
+        if (type != UnitPortType.REDSTONE) {
             redstonePower = 0;
             redstoneWorldStateDirty = false;
             return;
@@ -429,7 +444,7 @@ public final class PatternP2PUnitPortPart extends AEBasePart implements IGridTic
         taskStartTick = Long.MIN_VALUE;
         redstoneWorldStateDirty = true;
         setRedstonePower(0);
-        wake();
+        wakeForTargetChange();
     }
 
     @Override
@@ -463,7 +478,7 @@ public final class PatternP2PUnitPortPart extends AEBasePart implements IGridTic
             }
             default -> false;
         };
-        if (type == PatternP2PUnitPortType.EXTRACT) {
+        if (type == UnitPortType.EXTRACT) {
             return TickRateModulation.SLEEP;
         }
         return changed ? TickRateModulation.URGENT : TickRateModulation.SLOWER;
@@ -504,11 +519,11 @@ public final class PatternP2PUnitPortPart extends AEBasePart implements IGridTic
     }
 
     public boolean isReturnPort() {
-        return type == PatternP2PUnitPortType.RETURN || type == PatternP2PUnitPortType.COLLECT;
+        return type == UnitPortType.RETURN || type == UnitPortType.COLLECT;
     }
 
     private boolean canReturnProductsInternally() {
-        return isReturnPort() || type == PatternP2PUnitPortType.EXTRACT;
+        return isReturnPort() || type == UnitPortType.EXTRACT;
     }
 
     public GenericInternalInventory getReturnInventory() {
@@ -529,12 +544,12 @@ public final class PatternP2PUnitPortPart extends AEBasePart implements IGridTic
 
     @Override
     public boolean canConnectRedstone() {
-        return type == PatternP2PUnitPortType.REDSTONE;
+        return type == UnitPortType.REDSTONE;
     }
 
     @Override
     public int isProvidingStrongPower() {
-        return type == PatternP2PUnitPortType.REDSTONE ? redstonePower : 0;
+        return type == UnitPortType.REDSTONE ? redstonePower : 0;
     }
 
     @Override
@@ -623,10 +638,18 @@ public final class PatternP2PUnitPortPart extends AEBasePart implements IGridTic
     private void wake() {
         getMainNode().ifPresent((grid, node) -> {
             grid.getTickManager().alertDevice(node);
-            if (type == PatternP2PUnitPortType.EXTRACT) {
+            if (type == UnitPortType.EXTRACT) {
                 grid.getService(ProductExtractionGridService.class).wake(node, this);
             }
         });
+    }
+
+    private void wakeForTargetChange() {
+        wake();
+        PatternP2PUnitManagerPart manager = getManager();
+        if (manager != null) {
+            manager.getLogic().alertPendingRetry();
+        }
     }
 
     public void alertTicking() {
@@ -637,7 +660,7 @@ public final class PatternP2PUnitPortPart extends AEBasePart implements IGridTic
     protected void onMainNodeStateChanged(IGridNodeListener.State reason) {
         cachedManager = null;
         super.onMainNodeStateChanged(reason);
-        wake();
+        wakeForTargetChange();
     }
 
     @Override
@@ -659,7 +682,7 @@ public final class PatternP2PUnitPortPart extends AEBasePart implements IGridTic
         if (grid != null && type.acceptsExternalEnergy()) {
             grid.getService(PatternP2PEnergyGridService.class).demandChanged();
         }
-        wake();
+        wakeForTargetChange();
     }
 
     @Override

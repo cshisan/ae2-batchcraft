@@ -21,6 +21,7 @@ import appeng.tile.powersink.IExternalPowerSink;
 import cn.ae2bc.logic.FairEnergyDistributor;
 import cn.ae2bc.logic.EnergyDistributionMode;
 import cn.ae2bc.logic.PrioritizedEnergyDistributor;
+import cn.ae2bc.logic.PatternP2PTopologyGridService;
 import cn.ae2bc.core.energy.EnergyEndpoint;
 import cn.ae2bc.Ae2bcMod;
 import appeng.me.GridAccessException;
@@ -75,6 +76,14 @@ public final class PatternP2PTunnelEnergyPart extends PartBasicState
             else getProxy().getTick().sleepDevice(getGridNode());
         } catch (GridAccessException ignored) {
         }
+    }
+
+    @Override
+    public void gridChanged() {
+        super.gridChanged();
+        PatternP2PTopologyGridService.invalidate(getGridNode());
+        outputCacheTick = Long.MIN_VALUE;
+        demandCacheTick = Long.MIN_VALUE;
     }
 
     @Override
@@ -234,16 +243,8 @@ public final class PatternP2PTunnelEnergyPart extends PartBasicState
         long tick = getTile().getWorld() == null ? Long.MIN_VALUE
                 : getTile().getWorld().getTotalWorldTime();
         if (outputCacheTick == tick) return outputCache;
-        List<EnergyEndpoint> result = new ArrayList<EnergyEndpoint>();
         IGridNode ownNode = getGridNode();
-        if (ownNode == null || ownNode.getGrid() == null) return result;
-        for (IGridNode node : ownNode.getGrid().getNodes()) {
-            Object machine = node.getMachine();
-            if (machine instanceof EnergyEndpoint
-                    && ((EnergyEndpoint) machine).isEnergyEndpointAvailable()) {
-                result.add((EnergyEndpoint) machine);
-            }
-        }
+        List<EnergyEndpoint> result = PatternP2PTopologyGridService.findEnergyEndpoints(ownNode);
         outputCache = result;
         outputCacheTick = tick;
         return outputCache;

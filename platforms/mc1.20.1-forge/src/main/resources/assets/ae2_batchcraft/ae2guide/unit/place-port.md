@@ -23,4 +23,4 @@ Places supported block items or fluids encoded with the **Place** output form in
 
 The Manager rejects a task when the resource does not support world placement or no compatible Place Port can accept it. If the target position is temporarily occupied or otherwise invalid, the material remains pending and is retried.
 
-World placement uses the owning player's automation context. Protection mods or claim rules may therefore block it.
+World placement uses the owning player's automation context. If placement is rejected, the material remains pending and is retried.

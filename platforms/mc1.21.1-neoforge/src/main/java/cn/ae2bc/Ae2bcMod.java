@@ -70,7 +70,8 @@ public final class Ae2bcMod {
                 (part, side) -> part.isStandardOutput() ? part.getReturnInventory() : null,
                 PatternP2PTunnelPart.class);
         event.register(AECapabilities.ME_STORAGE,
-                (part, side) -> part.isStandardOutput() ? part.getReturnInventory() : null,
+                (part, side) -> part.isStandardOutput()
+                        ? part.getReturnInventory() : part.getInputLogic().getBatchStorage(),
                 PatternP2PTunnelPart.class);
         event.register(Capabilities.ItemHandler.BLOCK,
                 (part, side) -> part.isStandardOutput() ? part.getReturnItemHandler() : null,

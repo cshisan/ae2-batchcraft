@@ -82,6 +82,7 @@ public final class PatternP2PTunnelPart
     private boolean extractionEnabled;
     private int extractionInterval = ProductExtractionLimits.DEFAULT_INTERVAL;
     private int extractionAmount = ProductExtractionLimits.DEFAULT_AMOUNT;
+    private long unitConfigurationRevision;
     private ReturnMode returnMode = ReturnMode.UNBLOCKED;
     private boolean breakRecovery = true;
     private RedstoneOutputMode redstoneMode = RedstoneOutputMode.SINGLE_TRIGGER;
@@ -218,6 +219,7 @@ public final class PatternP2PTunnelPart
                     frequency = getProxy().getP2P().newFrequency();
                 }
                 getProxy().getP2P().updateFreq(this, frequency);
+                PatternP2PTopologyGridService.invalidate(getGridNode());
                 CompoundNBT data = ModContent.PATTERN_P2P_INPUT.get().getDefaultInstance()
                         .save(new CompoundNBT());
                 data.putShort("freq", frequency);
@@ -234,6 +236,7 @@ public final class PatternP2PTunnelPart
                     return true;
                 }
                 getProxy().getP2P().updateFreq(this, data.getShort("freq"));
+                PatternP2PTopologyGridService.invalidate(getGridNode());
                 onTunnelNetworkChange();
                 getHost().markForSave();
                 card.notifyUser(player, MemoryCardMessages.SETTINGS_LOADED);
@@ -265,32 +268,72 @@ public final class PatternP2PTunnelPart
         return false;
     }
 
+    @Override
+    public void addToWorld() {
+        super.addToWorld();
+        PatternP2PTopologyGridService.invalidate(getGridNode());
+        refreshConfigurationConsumers();
+    }
+
+    @Override
+    public void removeFromWorld() {
+        PatternP2PTopologyGridService.invalidate(getGridNode());
+        super.removeFromWorld();
+    }
+
+    @Override
+    public void onTunnelConfigChange() {
+        super.onTunnelConfigChange();
+        PatternP2PTopologyGridService.invalidate(getGridNode());
+        refreshConfigurationConsumers();
+    }
+
+    @Override
+    public void onTunnelNetworkChange() {
+        super.onTunnelNetworkChange();
+        PatternP2PTopologyGridService.invalidate(getGridNode());
+        refreshConfigurationConsumers();
+    }
+
+    private void refreshConfigurationConsumers() {
+        if (getTile() == null || getTile().getLevel() == null
+                || getTile().getLevel().isClientSide) return;
+        extractionDeadline.wake();
+        if (output) {
+            wakeSelf();
+        } else {
+            synchronizeUnitManagers();
+            wakeOutputs();
+        }
+    }
+
     public PatternP2PUnitSettings getUnitSettings() {
         return new PatternP2PUnitSettings(returnMode, breakRecovery, extractionInterval,
                 extractionAmount, redstoneMode, redstoneStrength, pulseWidthTicks, pulsePeriodTicks);
     }
 
+    public long getUnitConfigurationRevision() { return unitConfigurationRevision; }
+
     public void setInputSettings(boolean enabled, PatternP2PUnitSettings settings) {
         if (output || settings == null) return;
+        boolean unitChanged = !sameSettings(getUnitSettings(), settings);
+        boolean extractionChanged = extractionEnabled != enabled;
+        if (!unitChanged && !extractionChanged) return;
         extractionEnabled = enabled;
         applySettings(settings);
+        if (unitChanged) unitConfigurationRevision++;
         extractionDeadline.wake();
         getHost().markForSave();
         getHost().markForUpdate();
-        synchronizeUnitManagers();
-        wakeOutputs();
+        if (unitChanged) synchronizeUnitManagers();
+        if (unitChanged || extractionChanged) wakeOutputs();
     }
 
     private void synchronizeUnitManagers() {
-        if (output || getGridNode() == null || getGridNode().getGrid() == null) return;
-        for (IGridNode node : getGridNode().getGrid().getNodes()) {
-            Object machine = node.getMachine();
-            if (machine instanceof PatternP2PUnitManagerPart) {
-                PatternP2PUnitManagerPart manager = (PatternP2PUnitManagerPart) machine;
-                if (manager.getFrequency() == getFrequency()) {
-                    manager.applyMainConfiguration(getUnitSettings());
-                }
-            }
+        if (output) return;
+        for (PatternP2PUnitManagerPart manager
+                : PatternP2PTopologyGridService.findAllByFrequency(getGridNode(), getFrequency())) {
+            manager.applyMainConfiguration(getUnitSettings(), unitConfigurationRevision);
         }
     }
 
@@ -318,13 +361,9 @@ public final class PatternP2PTunnelPart
         for (PatternP2PTunnelPart endpoint : outputs()) {
             endpoint.clearOutputReturnBatch();
         }
-        if (getGridNode() == null || getGridNode().getGrid() == null) return;
-        for (IGridNode node : getGridNode().getGrid().getNodes()) {
-            Object machine = node.getMachine();
-            if (machine instanceof PatternP2PUnitManagerPart
-                    && ((PatternP2PUnitManagerPart) machine).getFrequency() == getFrequency()) {
-                ((PatternP2PUnitManagerPart) machine).resetTaskState();
-            }
+        for (PatternP2PUnitManagerPart manager
+                : PatternP2PTopologyGridService.findAllByFrequency(getGridNode(), getFrequency())) {
+            manager.resetTaskState();
         }
     }
 
@@ -352,16 +391,34 @@ public final class PatternP2PTunnelPart
     }
 
     public void setExtractionSettings(boolean enabled, int interval, int amount) {
+        int clampedInterval = ProductExtractionLimits.clampInterval(interval);
+        int clampedAmount = ProductExtractionLimits.clampAmount(amount);
+        boolean unitChanged = extractionInterval != clampedInterval || extractionAmount != clampedAmount;
+        boolean extractionChanged = extractionEnabled != enabled;
+        if (!unitChanged && !extractionChanged) return;
         extractionEnabled = enabled;
-        extractionInterval = ProductExtractionLimits.clampInterval(interval);
-        extractionAmount = ProductExtractionLimits.clampAmount(amount);
+        extractionInterval = clampedInterval;
+        extractionAmount = clampedAmount;
+        if (unitChanged) unitConfigurationRevision++;
         extractionDeadline.wake();
         getHost().markForSave();
         getHost().markForUpdate();
         if (!output) {
-            synchronizeUnitManagers();
+            if (unitChanged) synchronizeUnitManagers();
             wakeOutputs();
         }
+    }
+
+    private static boolean sameSettings(PatternP2PUnitSettings left, PatternP2PUnitSettings right) {
+        return left != null && right != null
+                && left.getReturnMode() == right.getReturnMode()
+                && left.isBreakRecovery() == right.isBreakRecovery()
+                && left.getExtractionInterval() == right.getExtractionInterval()
+                && left.getExtractionAmount() == right.getExtractionAmount()
+                && left.getRedstoneMode() == right.getRedstoneMode()
+                && left.getRedstoneStrength() == right.getRedstoneStrength()
+                && left.getPulseWidthTicks() == right.getPulseWidthTicks()
+                && left.getPulsePeriodTicks() == right.getPulsePeriodTicks();
     }
 
     public boolean isExtractionEnabled() {
@@ -405,6 +462,7 @@ public final class PatternP2PTunnelPart
         extractionAmount = data.contains(EXTRACTION_AMOUNT)
                 ? ProductExtractionLimits.clampAmount(data.getInt(EXTRACTION_AMOUNT))
                 : ProductExtractionLimits.DEFAULT_AMOUNT;
+        unitConfigurationRevision = data.getLong("Ae2bcUnitConfigurationRevision");
         returnMode = data.contains("Ae2bcReturnMode")
                 ? ReturnMode.fromId(data.getInt("Ae2bcReturnMode")) : ReturnMode.UNBLOCKED;
         breakRecovery = !data.contains("Ae2bcBreakRecovery") || data.getBoolean("Ae2bcBreakRecovery");
@@ -427,6 +485,7 @@ public final class PatternP2PTunnelPart
         data.putBoolean(EXTRACTION_ENABLED, extractionEnabled);
         data.putInt(EXTRACTION_INTERVAL, extractionInterval);
         data.putInt(EXTRACTION_AMOUNT, extractionAmount);
+        data.putLong("Ae2bcUnitConfigurationRevision", unitConfigurationRevision);
         data.putInt("Ae2bcReturnMode", returnMode.getId());
         data.putBoolean("Ae2bcBreakRecovery", breakRecovery);
         data.putInt("Ae2bcRedstoneMode", redstoneMode.getId());
@@ -441,7 +500,7 @@ public final class PatternP2PTunnelPart
     @Nonnull
     @Override
     public TickingRequest getTickingRequest(@Nonnull IGridNode node) {
-        return new TickingRequest(1, ProductExtractionLimits.MAX_INTERVAL, false, false);
+        return new TickingRequest(1, ProductExtractionLimits.MAX_INTERVAL, false, true);
     }
 
     @Nonnull
@@ -906,7 +965,7 @@ public final class PatternP2PTunnelPart
         for (PatternP2PTunnelPart output : outputs()) {
             output.extractionDeadline.wake();
             try {
-                getProxy().getTick().wakeDevice(output.getGridNode());
+                getProxy().getTick().alertDevice(output.getGridNode());
             } catch (GridAccessException ignored) {
                 // Other outputs on the frequency may still be available.
             }
@@ -927,7 +986,9 @@ public final class PatternP2PTunnelPart
             return 0;
         }
         int moved = 0;
-        for (int slot = 0; slot < source.getSlots() && moved < amount; slot++) {
+        int transferredSlots = 0;
+        for (int slot = 0; slot < source.getSlots() && moved < amount
+                && transferredSlots < ProductExtractionLimits.MAX_TRANSFER_ENTRIES_PER_RUN; slot++) {
             ItemStack candidate = source.extractItem(slot, amount - moved, true);
             if (candidate.isEmpty()) {
                 continue;
@@ -939,7 +1000,11 @@ public final class PatternP2PTunnelPart
             }
             ItemStack extracted = source.extractItem(slot, accepted, false);
             ItemStack unexpectedRemainder = returnOutputProduct(extracted, false);
-            moved += extracted.getCount() - unexpectedRemainder.getCount();
+            int transferred = extracted.getCount() - unexpectedRemainder.getCount();
+            moved = (int) Math.min((long) amount, (long) moved + transferred);
+            if (transferred > 0) {
+                transferredSlots++;
+            }
             if (!unexpectedRemainder.isEmpty()) {
                 ItemHandlerHelper.insertItem(source, unexpectedRemainder, false);
             }

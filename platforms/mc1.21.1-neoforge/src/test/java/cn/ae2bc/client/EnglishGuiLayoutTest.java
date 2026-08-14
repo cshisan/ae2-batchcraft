@@ -39,6 +39,9 @@ class EnglishGuiLayoutTest {
         assertFits("gui.ae2_batchcraft.pattern_p2p_unit.redstone_mode.single_trigger", 44);
         assertFits("gui.ae2_batchcraft.pattern_p2p_unit.redstone_mode.periodic_pulse", 44);
         assertFits("gui.ae2_batchcraft.pattern_p2p_unit.redstone_mode.continuous", 44);
+        assertFits("gui.ae2_batchcraft.dispatch_mode.full_dispatch", 148);
+        assertFits("gui.ae2_batchcraft.dispatch_mode.batch_distribution", 148);
+        assertFits("gui.ae2_batchcraft.pattern_batch_count.confirm", 48);
     }
 
     @Test
@@ -93,6 +96,21 @@ class EnglishGuiLayoutTest {
         String offsetValue = ENGLISH.get("gui.ae2_batchcraft.component_placer.offset_value")
                 .replaceFirst("%s", "X").replaceFirst("%s", "-16");
         assertTrue(width(offsetValue) <= 29);
+    }
+
+    @Test
+    void wrappedBatchMessagesHaveNoUnbreakableOverflow() {
+        assertWordsFit("gui.ae2_batchcraft.pattern_batch_count.maximum", 152);
+        assertWordsFit("gui.ae2_batchcraft.pattern_batch_count.corrected_maximum", 152);
+        assertWordsFit("gui.ae2_batchcraft.pattern_batch_count.corrected_one", 152);
+    }
+
+    private static void assertWordsFit(String key, int availableWidth) {
+        for (String word : ENGLISH.get(key).replace("%s", "9223372036854775807").split("\\s+")) {
+            assertTrue(width(word) <= availableWidth,
+                    () -> key + " contains an unbreakable " + width(word)
+                            + " px word, available: " + availableWidth);
+        }
     }
 
     private static void assertFits(String key, int availableWidth) {

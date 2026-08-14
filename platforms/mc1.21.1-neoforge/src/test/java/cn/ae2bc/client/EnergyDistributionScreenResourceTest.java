@@ -41,7 +41,11 @@ class EnergyDistributionScreenResourceTest {
         assertTrue(input.contains("\"productExtraction\": {\"left\": 128, \"top\": 79"));
         assertTrue(input.contains("\"extraction_interval\""));
         assertTrue(input.contains("\"extraction_amount\""));
-        assertTrue(input.contains("\"resetTask\": {\"left\": 12, \"top\": 154"));
+        assertTrue(input.contains(
+                "\"dispatchMode\": {\"left\": 12, \"top\": 153, \"width\": 152"));
+        org.junit.jupiter.api.Assertions.assertFalse(input.contains("\"dispatchFull\""));
+        org.junit.jupiter.api.Assertions.assertFalse(input.contains("\"dispatchBatch\""));
+        assertTrue(input.contains("\"resetTask\": {\"left\": 12, \"top\": 196"));
         String inputSource = resourceSource("src/main/java/cn/ae2bc/client/PatternP2PTunnelInputScreen.java");
         assertTrue(inputSource.contains(
                 "DashedSectionRenderer.trailingContentX(imageWidth, productExtractionWidth)"));

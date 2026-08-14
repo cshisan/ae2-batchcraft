@@ -12,14 +12,14 @@ item_ids:
 
 <RecipeFor id="ae2_batchcraft:pattern_p2p_tunnel_input" />
 
-Receives complete processing jobs from the Pattern Provider in front of it and distributes them among normal outputs and Unit Managers on the same frequency.
+Receives processing jobs from the AE2 Pattern Provider in front of it and distributes them among normal Outputs and Unit Managers on the same frequency.
 
 | Property | Value |
 | --- | --- |
 | AE channels | `1` |
 | Frequency | Required; `0000` is disabled |
 | Adjacent block | Pattern Provider output face |
-| Job splitting | Between complete jobs only |
+| Dispatch mode | Full Dispatch or Batch Distribution |
 
 <GameScene zoom="6" background="transparent">
   <ImportStructure src="../assets/assemblies/input-provider.snbt" />
@@ -28,13 +28,16 @@ Receives complete processing jobs from the Pattern Provider in front of it and d
 
 ## Task Distribution
 
-For each job, the input walks the available endpoints in round-robin order. It skips endpoints that are offline, unloaded, busy, not on the same grid, or unable to accept the complete material plan. A selected endpoint receives the full quantities of that processing push.
+In **Full Dispatch**, the input walks available endpoints in round-robin order. It skips endpoints that are offline, unloaded, busy, on another AE grid, or unable to accept the complete material plan. One selected endpoint receives the full processing push.
+
+In **Batch Distribution**, the input requests only the next planned share from the adjacent AE2 Pattern Provider and distributes integer multiples of the configured smallest share. Unsent materials remain in the Pattern Provider until endpoint capacity becomes available. See [Batch Distribution](batch-distribution.md) before enabling this mode.
 
 ## General Configuration
 
 The input provides defaults for:
 
 - Product return mode.
+- Full Dispatch or Batch Distribution.
 - Whether normal outputs may actively extract products.
 - Extraction interval and amount for outputs and Unit Extraction Ports.
 - Unit break recovery and redstone behavior.
@@ -47,4 +50,4 @@ Reset from the input affects loaded normal outputs and Unit Managers on its curr
 
 > Reset permanently destroys ingredients still waiting inside those endpoints. Unloaded endpoints cannot be reset remotely.
 
-See [Pattern P2P Output](output.md), [Unit Manager](../unit/manager.md), and [Product Return and Extraction](../product-return/index.md).
+See [Batch Distribution](batch-distribution.md), [Pattern P2P Output](output.md), [Unit Manager](../unit/manager.md), and [Product Return and Extraction](../product-return/index.md).

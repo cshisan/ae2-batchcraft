@@ -9,11 +9,12 @@ import appeng.api.networking.ticking.IGridTickable;
 import appeng.api.networking.ticking.TickRateModulation;
 import appeng.api.networking.ticking.TickingRequest;
 import appeng.api.stacks.AEKey;
+import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.GenericStack;
 import appeng.api.stacks.KeyCounter;
-import appeng.core.settings.TickRates;
 import appeng.crafting.pattern.AEProcessingPattern;
 import appeng.me.helpers.MachineSource;
+import cn.ae2bc.core.unit.UnitPortType;
 import cn.ae2bc.part.PatternP2PUnitManagerPart;
 import cn.ae2bc.part.PatternP2PUnitPortPart;
 import cn.ae2bc.pattern.MaterialOutputForm;
@@ -29,6 +30,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 
 /** Owns one durable unit task and gates every bound port while that task is active. */
 public final class PatternP2PUnitManagerLogic implements IGridTickable {
@@ -42,6 +44,8 @@ public final class PatternP2PUnitManagerLogic implements IGridTickable {
     private static final String REMAINING_PRIMARY = "PatternP2PUnitRemainingPrimary";
     private static final String PENDING_INPUTS = "PatternP2PUnitPendingInputs";
     private static final String OUTPUT_FORM = "OutputForm";
+    private static final String ACTIVE_PATTERN = "PatternP2PUnitActivePattern";
+    private static final String BATCH_SESSION_ID = "PatternP2PUnitBatchSessionId";
 
     private final IManagedGridNode mainNode;
     private final PatternP2PUnitManagerPart manager;
@@ -56,7 +60,11 @@ public final class PatternP2PUnitManagerLogic implements IGridTickable {
     private boolean taskActive;
     private EnergyDistributionMode energyDistributionMode = EnergyDistributionMode.EVEN;
     private @Nullable AEKey primaryKey;
+    private @Nullable AEItemKey activePattern;
+    private @Nullable UUID batchSessionId;
     private long remainingPrimary;
+    private int pendingRetryFailures;
+    private long pendingNextRetryTick;
 
     public PatternP2PUnitManagerLogic(IManagedGridNode mainNode, PatternP2PUnitManagerPart manager) {
         this.mainNode = mainNode;
@@ -66,7 +74,7 @@ public final class PatternP2PUnitManagerLogic implements IGridTickable {
     }
 
     public boolean canAcceptTask() {
-        return !isTaskActive() && pendingInputs.isEmpty() && mainNode.isActive()
+        return (!isTaskActive() || batchSessionId != null) && pendingInputs.isEmpty() && mainNode.isActive()
                 && manager.hasConfiguredFrequency();
     }
 
@@ -76,6 +84,10 @@ public final class PatternP2PUnitManagerLogic implements IGridTickable {
 
     public boolean hasTaskState() {
         return isTaskActive() || !pendingInputs.isEmpty();
+    }
+
+    public boolean hasActiveBatchSession(UUID sessionId) {
+        return sessionId != null && taskActive && sessionId.equals(batchSessionId);
     }
 
     public boolean isTaskOperational() {
@@ -88,9 +100,12 @@ public final class PatternP2PUnitManagerLogic implements IGridTickable {
             return;
         }
         pendingInputs.clear();
+        resetPendingRetryBackoff();
         declaredOutputs.clear();
         taskActive = false;
         primaryKey = null;
+        activePattern = null;
+        batchSessionId = null;
         remainingPrimary = 0;
         changed();
         invalidatePortRuntimeState();
@@ -160,82 +175,139 @@ public final class PatternP2PUnitManagerLogic implements IGridTickable {
 
     public boolean tryAcceptPattern(IPatternDetails pattern, PatternDispatchMetadata metadata,
                                     KeyCounter[] inputHolders) {
-        if (!canAcceptTask() || !metadata.isValid()) {
+        return tryAcceptPattern(pattern, metadata, inputHolders, 1, 1, false, null);
+    }
+
+    private boolean tryAcceptPattern(IPatternDetails pattern, PatternDispatchMetadata metadata,
+                                     KeyCounter[] inputHolders, long divisor, long atomicUnits,
+                                     boolean retainCompleteRemainder, @Nullable UUID sessionId) {
+        if (!metadata.isValid() || !canAcceptTask(pattern, metadata, sessionId)) {
             return false;
         }
-        List<PendingMaterial> plan = collectInputs(pattern, metadata, inputHolders);
+        List<PendingMaterial> plan = collectInputs(pattern, metadata, inputHolders,
+                divisor, atomicUnits);
         if (plan == null || plan.isEmpty()) {
             return false;
         }
-        Map<PatternP2PUnitPortType, List<PatternP2PUnitPortPart>> boundPorts = getBoundPortsByType();
+        Map<UnitPortType, List<PatternP2PUnitPortPart>> boundPorts = getBoundPortsByType();
         for (PendingMaterial material : plan) {
             PatternP2PUnitPortPart port = findPort(portsFor(boundPorts, material.form()),
                     material.stack(), material.form());
-            if (port == null) {
+            if (port == null && !retainCompleteRemainder) {
                 return false;
             }
         }
 
-        declaredOutputs.clear();
-        declaredOutputs.putAll(metadata.declaredOutputs());
-        taskActive = true;
-        primaryKey = metadata.primaryOutput().what();
-        remainingPrimary = metadata.primaryOutput().amount();
+        if (taskActive) {
+            metadata.declaredOutputs().forEach((key, amount) ->
+                    declaredOutputs.merge(key, amount, PatternP2PUnitManagerLogic::saturatingAdd));
+            remainingPrimary += metadata.primaryOutput().amount();
+        } else {
+            declaredOutputs.clear();
+            declaredOutputs.putAll(metadata.declaredOutputs());
+            taskActive = true;
+            primaryKey = metadata.primaryOutput().what();
+            activePattern = pattern.getDefinition();
+            batchSessionId = sessionId;
+            remainingPrimary = metadata.primaryOutput().amount();
+        }
         pendingInputs.clear();
         pendingInputs.addAll(plan);
+        resetPendingRetryBackoff();
         changed();
         invalidatePortRuntimeState();
         manager.notifyInputAvailabilityChanged();
         return true;
     }
 
-    private @Nullable List<PendingMaterial> collectInputs(IPatternDetails pattern, PatternDispatchMetadata metadata,
-                                                           KeyCounter[] inputHolders) {
-        if (pattern instanceof AEProcessingPattern processingPattern) {
-            KeyCounter available = new KeyCounter();
-            for (KeyCounter holder : inputHolders) {
-                available.addAll(holder);
+    public long getMaximumAcceptedAtomicUnits(IPatternDetails pattern, PatternDispatchMetadata atomicMetadata,
+                                               KeyCounter[] atomicInputs, long upperBound, UUID sessionId) {
+        if (upperBound <= 0 || !atomicMetadata.isValid()) {
+            return 0;
+        }
+        return AtomicTaskCapacityProbe.findMaximum(upperBound,
+                units -> canAcceptAtomicUnits(pattern, atomicMetadata, atomicInputs, units, sessionId));
+    }
+
+    public boolean tryAcceptPatternAtomicUnits(IPatternDetails pattern, PatternDispatchMetadata atomicMetadata,
+                                               KeyCounter[] atomicInputs, long units, UUID sessionId) {
+        KeyCounter[] scaledInputs = PatternInputScaling.multiply(atomicInputs, units);
+        PatternDispatchMetadata scaledMetadata = atomicMetadata.forAtomicUnits(units);
+        return scaledInputs != null && scaledMetadata.isValid()
+                && tryAcceptPattern(pattern, scaledMetadata, scaledInputs,
+                        atomicMetadata.batchCount(), units, true, sessionId);
+    }
+
+    private boolean canAcceptAtomicUnits(IPatternDetails pattern, PatternDispatchMetadata atomicMetadata,
+                                         KeyCounter[] atomicInputs, long units, UUID sessionId) {
+        KeyCounter[] scaledInputs = PatternInputScaling.multiply(atomicInputs, units);
+        PatternDispatchMetadata scaledMetadata = atomicMetadata.forAtomicUnits(units);
+        if (scaledInputs == null || !scaledMetadata.isValid()
+                || !canAcceptTask(pattern, scaledMetadata, sessionId)) {
+            return false;
+        }
+        List<PendingMaterial> plan = collectInputs(pattern, scaledMetadata, scaledInputs,
+                scaledMetadata.batchCount(), units);
+        if (plan == null || plan.isEmpty()) {
+            return false;
+        }
+        Map<UnitPortType, List<PatternP2PUnitPortPart>> boundPorts = getBoundPortsByType();
+        for (PendingMaterial material : plan) {
+            if (findPort(portsFor(boundPorts, material.form()), material.stack(), material.form()) == null) {
+                return false;
             }
-            var sparse = processingPattern.getSparseInputs();
+        }
+        return true;
+    }
+
+    private @Nullable List<PendingMaterial> collectInputs(IPatternDetails pattern, PatternDispatchMetadata metadata,
+                                                           KeyCounter[] inputHolders,
+                                                           long divisor, long units) {
+        AEProcessingPattern processingPattern = PatternDispatchMetadata.decodeProcessingPattern(pattern, manager.getLevel());
+        if (processingPattern != null) {
+            List<ProcessingInputMapper.SlotInput> mapped = ProcessingInputMapper.map(
+                    processingPattern, inputHolders, manager.getLevel(), divisor, units);
+            if (mapped == null) {
+                return metadata.materialOutputConfig().isEmpty()
+                        ? collectDefaultInputs(inputHolders) : null;
+            }
             List<PendingMaterial> result = new ArrayList<>();
-            for (int slot = 0; slot < sparse.size(); slot++) {
-                GenericStack input = sparse.get(slot);
-                if (input == null || input.amount() <= 0) {
-                    continue;
-                }
-                if (available.get(input.what()) < input.amount()) {
+            for (ProcessingInputMapper.SlotInput input : mapped) {
+                MaterialOutputForm form = metadata.materialOutputConfig().getOutputForm(input.slot());
+                if (!form.supports(input.stack().what())) {
                     return null;
                 }
-                MaterialOutputForm form = metadata.materialOutputConfig().getOutputForm(slot);
-                if (!form.supports(input.what())) {
-                    return null;
-                }
-                available.remove(input.what(), input.amount());
-                result.add(new PendingMaterial(input, form));
+                result.add(new PendingMaterial(input.stack(), form));
             }
             return result;
         }
 
+        return collectDefaultInputs(inputHolders);
+    }
+
+    private List<PendingMaterial> collectDefaultInputs(KeyCounter[] inputHolders) {
         List<PendingMaterial> result = new ArrayList<>();
-        try {
-            pattern.pushInputsToExternalInventory(inputHolders, (what, amount) -> {
-                if (amount > 0) {
-                    result.add(new PendingMaterial(new GenericStack(what, amount), MaterialOutputForm.NORMAL));
+        for (KeyCounter holder : inputHolders) {
+            if (holder == null) {
+                continue;
+            }
+            for (var entry : holder) {
+                if (entry.getLongValue() > 0) {
+                    result.add(new PendingMaterial(
+                            new GenericStack(entry.getKey(), entry.getLongValue()), MaterialOutputForm.NORMAL));
                 }
-            });
-        } catch (RuntimeException ignored) {
-            return null;
+            }
         }
         return result;
     }
 
-    private Map<PatternP2PUnitPortType, List<PatternP2PUnitPortPart>> getBoundPortsByType() {
+    private Map<UnitPortType, List<PatternP2PUnitPortPart>> getBoundPortsByType() {
         var grid = mainNode.getGrid();
         if (grid == null) {
             return Map.of();
         }
-        Map<PatternP2PUnitPortType, List<PatternP2PUnitPortPart>> result = new EnumMap<>(PatternP2PUnitPortType.class);
-        for (PatternP2PUnitPortType type : PatternP2PUnitPortType.values()) {
+        Map<UnitPortType, List<PatternP2PUnitPortPart>> result = new EnumMap<>(UnitPortType.class);
+        for (UnitPortType type : UnitPortType.values()) {
             List<PatternP2PUnitPortPart> ports = grid.getService(PatternP2PTopologyGridService.class)
                     .getPorts(manager.getPatternP2PUnitId(), type);
             if (!ports.isEmpty()) {
@@ -246,8 +318,8 @@ public final class PatternP2PUnitManagerLogic implements IGridTickable {
     }
 
     private static List<PatternP2PUnitPortPart> portsFor(
-            Map<PatternP2PUnitPortType, List<PatternP2PUnitPortPart>> boundPorts, MaterialOutputForm form) {
-        return boundPorts.getOrDefault(PatternP2PUnitPortType.forOutputForm(form), List.of());
+            Map<UnitPortType, List<PatternP2PUnitPortPart>> boundPorts, MaterialOutputForm form) {
+        return boundPorts.getOrDefault(UnitPortType.forOutputFormId(form.getId()), List.of());
     }
 
     private @Nullable PatternP2PUnitPortPart findPort(List<PatternP2PUnitPortPart> boundPorts, GenericStack stack,
@@ -262,7 +334,7 @@ public final class PatternP2PUnitManagerLogic implements IGridTickable {
 
     private boolean dispatchPending() {
         boolean changed = false;
-        Map<PatternP2PUnitPortType, List<PatternP2PUnitPortPart>> boundPorts = getBoundPortsByType();
+        Map<UnitPortType, List<PatternP2PUnitPortPart>> boundPorts = getBoundPortsByType();
         for (var iterator = pendingInputs.listIterator(); iterator.hasNext(); ) {
             PendingMaterial pending = iterator.next();
             PatternP2PUnitPortPart port = findPort(portsFor(boundPorts, pending.form()),
@@ -346,9 +418,12 @@ public final class PatternP2PUnitManagerLogic implements IGridTickable {
     private void finishTask() {
         taskActive = false;
         primaryKey = null;
+        activePattern = null;
+        batchSessionId = null;
         remainingPrimary = 0;
         declaredOutputs.clear();
         pendingInputs.clear();
+        resetPendingRetryBackoff();
         changed();
         invalidatePortRuntimeState();
         manager.notifyInputAvailabilityChanged();
@@ -384,9 +459,15 @@ public final class PatternP2PUnitManagerLogic implements IGridTickable {
         });
     }
 
+    public void alertPendingRetry() {
+        resetPendingRetryBackoff();
+        mainNode.ifPresent((grid, node) -> grid.getTickManager().alertDevice(node));
+        manager.notifyInputAvailabilityChanged();
+    }
+
     @Override
     public TickingRequest getTickingRequest(IGridNode node) {
-        return new TickingRequest(1, TickRates.Interface.getMax(), false, 5);
+        return new TickingRequest(1, DispatchBackoffPolicy.MAX_PENDING_DELAY, false, 5);
     }
 
     @Override
@@ -394,10 +475,26 @@ public final class PatternP2PUnitManagerLogic implements IGridTickable {
         if (!isTaskOperational()) {
             return TickRateModulation.IDLE;
         }
-        return dispatchPending() ? TickRateModulation.URGENT : TickRateModulation.SLOWER;
+        if (pendingInputs.isEmpty()) {
+            resetPendingRetryBackoff();
+            return TickRateModulation.IDLE;
+        }
+        long now = getGameTime();
+        if (now < pendingNextRetryTick) {
+            return TickRateModulation.SLOWER;
+        }
+        if (dispatchPending()) {
+            resetPendingRetryBackoff();
+            return TickRateModulation.URGENT;
+        }
+        pendingRetryFailures = Math.min(Integer.MAX_VALUE, pendingRetryFailures + 1);
+        pendingNextRetryTick = saturatingAdd(now,
+                DispatchBackoffPolicy.pendingDelay(pendingRetryFailures));
+        return TickRateModulation.SLOWER;
     }
 
     public void readFromNBT(CompoundTag data, HolderLookup.Provider registries) {
+        resetPendingRetryBackoff();
         energyDistributionMode = data.contains(ENERGY_DISTRIBUTION_MODE)
                 ? EnergyDistributionMode.fromId(data.getByte(ENERGY_DISTRIBUTION_MODE))
                 : EnergyDistributionMode.EVEN;
@@ -407,6 +504,10 @@ public final class PatternP2PUnitManagerLogic implements IGridTickable {
         cachedMainConfiguration = PatternP2PUnitConfiguration.read(data.getCompound(MAIN_CONFIGURATION));
         cachedMainRevision = data.getLong(MAIN_REVISION);
         taskActive = data.getBoolean(TASK_ACTIVE);
+        activePattern = taskActive && data.contains(ACTIVE_PATTERN, Tag.TAG_COMPOUND)
+                ? AEItemKey.fromTag(registries, data.getCompound(ACTIVE_PATTERN)) : null;
+        batchSessionId = taskActive && data.hasUUID(BATCH_SESSION_ID)
+                ? data.getUUID(BATCH_SESSION_ID) : null;
         declaredOutputs.clear();
         for (var stack : readStacks(data.getList(ACTIVE_OUTPUTS, Tag.TAG_COMPOUND), registries)) {
             declaredOutputs.merge(stack.what(), stack.amount(), PatternP2PUnitManagerLogic::saturatingAdd);
@@ -434,6 +535,16 @@ public final class PatternP2PUnitManagerLogic implements IGridTickable {
         data.put(MAIN_CONFIGURATION, cachedMainConfiguration.write());
         data.putLong(MAIN_REVISION, cachedMainRevision);
         data.putBoolean(TASK_ACTIVE, taskActive);
+        if (taskActive && activePattern != null) {
+            data.put(ACTIVE_PATTERN, activePattern.toTag(registries));
+        } else {
+            data.remove(ACTIVE_PATTERN);
+        }
+        if (taskActive && batchSessionId != null) {
+            data.putUUID(BATCH_SESSION_ID, batchSessionId);
+        } else {
+            data.remove(BATCH_SESSION_ID);
+        }
         data.remove("PatternP2PUnitActiveReturnMode");
         List<GenericStack> outputs = declaredOutputs.entrySet().stream()
                 .map(entry -> new GenericStack(entry.getKey(), entry.getValue())).toList();
@@ -462,9 +573,12 @@ public final class PatternP2PUnitManagerLogic implements IGridTickable {
 
     public void clearContent() {
         pendingInputs.clear();
+        resetPendingRetryBackoff();
         declaredOutputs.clear();
         taskActive = false;
         primaryKey = null;
+        activePattern = null;
+        batchSessionId = null;
         remainingPrimary = 0;
     }
 
@@ -489,6 +603,40 @@ public final class PatternP2PUnitManagerLogic implements IGridTickable {
 
     private static long saturatingAdd(long left, long right) {
         return left > Long.MAX_VALUE - right ? Long.MAX_VALUE : left + right;
+    }
+
+    private boolean canAcceptTask(IPatternDetails pattern, PatternDispatchMetadata metadata,
+                                  @Nullable UUID sessionId) {
+        if (!pendingInputs.isEmpty()) {
+            return false;
+        }
+        if (!taskActive) {
+            return canAcceptTask();
+        }
+        if (sessionId == null || !sessionId.equals(batchSessionId)
+                || !Objects.equals(activePattern, pattern.getDefinition())
+                || !Objects.equals(primaryKey, metadata.primaryOutput().what())
+                || !declaredOutputs.keySet().equals(metadata.declaredOutputs().keySet())
+                || remainingPrimary > Long.MAX_VALUE - metadata.primaryOutput().amount()) {
+            return false;
+        }
+        for (var entry : metadata.declaredOutputs().entrySet()) {
+            long current = declaredOutputs.getOrDefault(entry.getKey(), 0L);
+            if (entry.getValue() <= 0 || current > Long.MAX_VALUE - entry.getValue()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    private void resetPendingRetryBackoff() {
+        pendingRetryFailures = 0;
+        pendingNextRetryTick = 0;
+    }
+
+    private long getGameTime() {
+        var level = manager.getLevel();
+        return level == null ? 0 : level.getGameTime();
     }
 
     private record PendingMaterial(GenericStack stack, MaterialOutputForm form) {

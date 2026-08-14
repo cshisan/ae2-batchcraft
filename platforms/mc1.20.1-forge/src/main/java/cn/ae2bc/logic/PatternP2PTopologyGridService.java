@@ -5,6 +5,7 @@ import appeng.api.networking.IGridNode;
 import appeng.api.networking.IGridService;
 import appeng.api.networking.IGridServiceProvider;
 import cn.ae2bc.Ae2bcMod;
+import cn.ae2bc.core.unit.UnitPortType;
 import cn.ae2bc.part.PatternP2PTunnelPart;
 import cn.ae2bc.part.PatternP2PUnitManagerPart;
 import cn.ae2bc.part.PatternP2PUnitPortPart;
@@ -34,7 +35,7 @@ public final class PatternP2PTopologyGridService implements IGridService, IGridS
     private final Map<Short, List<PatternP2PTunnelPart>> outputs = new HashMap<>();
     private final Map<Short, List<PatternP2PUnitManagerPart>> managersByFrequency = new HashMap<>();
     private final Map<UUID, PatternP2PUnitManagerPart> managersById = new HashMap<>();
-    private final Map<UUID, Map<PatternP2PUnitPortType, List<PatternP2PUnitPortPart>>> portsByUnit = new HashMap<>();
+    private final Map<UUID, Map<UnitPortType, List<PatternP2PUnitPortPart>>> portsByUnit = new HashMap<>();
     private boolean dirty = true;
 
     public PatternP2PTopologyGridService(IGrid grid) {
@@ -75,7 +76,7 @@ public final class PatternP2PTopologyGridService implements IGridService, IGridS
         return id == null ? null : managersById.get(id);
     }
 
-    public List<PatternP2PUnitPortPart> getPorts(UUID unitId, PatternP2PUnitPortType type) {
+    public List<PatternP2PUnitPortPart> getPorts(UUID unitId, UnitPortType type) {
         rebuildIfNeeded();
         return portsByUnit.getOrDefault(unitId, Map.of()).getOrDefault(type, List.of());
     }
@@ -91,7 +92,7 @@ public final class PatternP2PTopologyGridService implements IGridService, IGridS
         return result;
     }
 
-    public List<PatternP2PUnitPortPart> getPortsForFrequency(short frequency, PatternP2PUnitPortType type) {
+    public List<PatternP2PUnitPortPart> getPortsForFrequency(short frequency, UnitPortType type) {
         rebuildIfNeeded();
         List<PatternP2PUnitPortPart> result = new ArrayList<>();
         for (var manager : managersByFrequency.getOrDefault(frequency, List.of())) {
@@ -148,7 +149,7 @@ public final class PatternP2PTopologyGridService implements IGridService, IGridS
         for (var port : grid.getMachines(PatternP2PUnitPortPart.class)) {
             UUID id = port.getBoundPatternP2PUnitId();
             if (id != null) {
-                portsByUnit.computeIfAbsent(id, ignored -> new EnumMap<>(PatternP2PUnitPortType.class))
+                portsByUnit.computeIfAbsent(id, ignored -> new EnumMap<>(UnitPortType.class))
                         .computeIfAbsent(port.getType(), ignored -> new ArrayList<>()).add(port);
             }
         }

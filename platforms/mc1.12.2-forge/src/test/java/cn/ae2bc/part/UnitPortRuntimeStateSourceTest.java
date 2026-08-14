@@ -36,6 +36,46 @@ public final class UnitPortRuntimeStateSourceTest {
         assertTrue(port.contains("setRedstonePower(0);"));
     }
 
+    @Test
+    public void networkRecoveryWakesPortsEvenWhenConfigurationIsUnchanged() throws Exception {
+        String manager = read("PatternP2PUnitManagerPart.java");
+        String port = read("PatternP2PUnitPortPart.java");
+
+        String managerGrid = section(manager, "@Override public void gridChanged()",
+                "@MENetworkEventSubscribe");
+        assertTrue(managerGrid.contains("wakeBoundPorts();"));
+
+        String managerPower = section(manager, "public void onPowerStatusChanged",
+                "@MENetworkEventSubscribe");
+        assertTrue(managerPower.contains("wakeBoundPorts();"));
+
+        String managerChannels = section(manager, "public void onChannelsChanged",
+                "private void refreshModelState");
+        assertTrue(managerChannels.contains("wakeBoundPorts();"));
+
+        String portGrid = section(port, "public void gridChanged()", "@MENetworkEventSubscribe");
+        assertTrue(portGrid.contains("cachedManager = null;"));
+        assertTrue(portGrid.contains("redstoneWorldStateDirty = true;"));
+        assertTrue(portGrid.contains("alertTicking();"));
+
+        String portPower = section(port, "public void onPowerStatusChanged",
+                "private void refreshModelState");
+        assertTrue(portPower.contains("cachedManager = null;"));
+        assertTrue(portPower.contains("redstoneWorldStateDirty = true;"));
+        assertTrue(portPower.contains("alertTicking();"));
+    }
+
+    @Test
+    public void taskAdmissionAlreadyRefreshesReturnConfiguration() throws Exception {
+        String manager = read("PatternP2PUnitManagerPart.java");
+
+        String admission = section(manager, "public boolean canAcceptTask()", "public boolean isTaskActive()");
+        assertTrue(admission.contains("synchronizeFromInput();"));
+
+        String apply = section(manager, "public void applyMainConfiguration", "public void resetTaskState");
+        assertTrue(apply.contains("sameSettings(mainConfiguration, settings)"));
+    }
+
     private static String read(String name) throws Exception {
         byte[] bytes = Files.readAllBytes(Paths.get("src/main/java/cn/ae2bc/part", name));
         return new String(bytes, StandardCharsets.UTF_8);

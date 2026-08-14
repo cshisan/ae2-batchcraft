@@ -18,6 +18,7 @@ import appeng.parts.automation.StackWorldBehaviors;
 import cn.ae2bc.extension.PatternProviderExtractionExtension;
 import cn.ae2bc.extension.ImmediatePatternProviderReturnInventory;
 import cn.ae2bc.logic.ProductExtractionSettings;
+import cn.ae2bc.logic.ProductExtractionBudget;
 import cn.ae2bc.logic.ProductExtractionGridService;
 import cn.ae2bc.logic.ExtractionSource;
 import cn.ae2bc.logic.ExtractionRecoveryQueue;
@@ -189,6 +190,14 @@ public abstract class PatternProviderLogicMixin implements PatternProviderExtrac
     @Override
     @Unique
     public ProductExtractionTickState ae2bc$tickProductExtraction() {
+        ProductExtractionBudget budget = new ProductExtractionBudget();
+        budget.beginEndpoint();
+        return ae2bc$tickProductExtraction(budget);
+    }
+
+    @Override
+    @Unique
+    public ProductExtractionTickState ae2bc$tickProductExtraction(ProductExtractionBudget budget) {
         if (!mainNode.isActive() || !(host.getBlockEntity().getLevel() instanceof ServerLevel level)) {
             return ProductExtractionTickState.DISABLED;
         }
@@ -219,10 +228,21 @@ public abstract class PatternProviderLogicMixin implements PatternProviderExtrac
             int remaining = base.amount() - moved;
             ae2bc$productExtractionBypass = true;
             try {
-                moved += ProductExtractor.extract(ExtractionSource.fromTypeMap(target), returnInv,
+                ProductExtractor.Result result = ProductExtractor.extract(
+                        ExtractionSource.fromTypeMap(target), returnInv,
                         new ProductExtractionSettings(true, base.interval(), remaining,
                                 base.whitelist(), base.markers()),
-                        actionSource, ae2bc$extractionRecovery::queue);
+                        actionSource, ae2bc$extractionRecovery::queue, budget,
+                        this::ae2bc$requestReturnInventoryFlush);
+                moved += result.moved();
+                if (result.budgetExhausted()) {
+                    ae2bc$directionCursor = (start + 1) % directions.size();
+                    return ProductExtractionTickState.BUDGET_EXHAUSTED;
+                }
+                if (result.destinationBlocked()) {
+                    ae2bc$directionCursor = (start + 1) % directions.size();
+                    return ProductExtractionTickState.NO_PROGRESS;
+                }
             } finally {
                 ae2bc$productExtractionBypass = false;
             }
@@ -230,6 +250,12 @@ public abstract class PatternProviderLogicMixin implements PatternProviderExtrac
         ae2bc$directionCursor = (start + 1) % directions.size();
         return moved > 0 || recoveryProgress
                 ? ProductExtractionTickState.PROGRESSED : ProductExtractionTickState.NO_PROGRESS;
+    }
+
+    @Unique
+    private void ae2bc$requestReturnInventoryFlush() {
+        ((ImmediatePatternProviderReturnInventory) returnInv)
+                .ae2bc$requestImmediateFlush(this::ae2bc$alertProductExtraction);
     }
 
     @Unique

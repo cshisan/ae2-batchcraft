@@ -8,6 +8,7 @@ import java.io.InputStream;
 
 import org.junit.Test;
 import org.objectweb.asm.ClassReader;
+import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.AbstractInsnNode;
 import org.objectweb.asm.tree.ClassNode;
 import org.objectweb.asm.tree.FieldInsnNode;
@@ -38,6 +39,16 @@ public final class PatternP2PTunnelSettingsSyncTest {
                 "getProductExtractionSettingsFromInput"));
         assertTrue(hasCallNamed(method(tunnel, "onTunnelNetworkChange"),
                 "refreshExtractionEndpoints"));
+    }
+
+    @Test
+    public void extractionSettingsAlertEveryOutputImmediately() throws Exception {
+        ClassNode tunnel = readClass("/cn/ae2bc/part/PatternP2PTunnelPart.class");
+        assertTrue(hasAlertableTickingRequest(method(tunnel, "getTickingRequest")));
+        MethodNode wakeOutputs = method(tunnel, "wakeOutputs");
+        assertTrue(hasCallNamed(wakeOutputs, "wake"));
+        assertTrue(hasCallNamed(wakeOutputs, "alertDevice"));
+        assertFalse(hasCallNamed(wakeOutputs, "wakeDevice"));
     }
 
     @Test
@@ -123,6 +134,25 @@ public final class PatternP2PTunnelSettingsSyncTest {
                     && name.equals(((MethodInsnNode) instruction).name)) return true;
         }
         return false;
+    }
+
+    private static boolean hasAlertableTickingRequest(MethodNode method) {
+        for (AbstractInsnNode instruction = method.instructions.getFirst();
+                instruction != null; instruction = instruction.getNext()) {
+            if (!(instruction instanceof MethodInsnNode)) continue;
+            MethodInsnNode call = (MethodInsnNode) instruction;
+            if (!"appeng/api/networking/ticking/TickingRequest".equals(call.owner)
+                    || !"<init>".equals(call.name)) continue;
+            AbstractInsnNode canBeAlerted = previousInstruction(instruction);
+            return canBeAlerted != null && canBeAlerted.getOpcode() == Opcodes.ICONST_1;
+        }
+        return false;
+    }
+
+    private static AbstractInsnNode previousInstruction(AbstractInsnNode instruction) {
+        AbstractInsnNode previous = instruction.getPrevious();
+        while (previous != null && previous.getOpcode() < 0) previous = previous.getPrevious();
+        return previous;
     }
 
     private static boolean hasFieldNamed(ClassNode type, String name) {

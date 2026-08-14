@@ -7,6 +7,7 @@ import appeng.util.ConfigInventory;
 import appeng.util.inv.AppEngInternalInventory;
 import cn.ae2bc.pattern.MaterialOutputConfigData;
 import cn.ae2bc.pattern.MaterialOutputEncodingContext;
+import cn.ae2bc.logic.PatternBatchCount;
 import cn.ae2bc.registry.ModContent;
 import cn.ae2bc.extension.PatternEncodingLogicExtension;
 import net.minecraft.core.HolderLookup;
@@ -27,6 +28,8 @@ import java.util.Objects;
 public abstract class PatternEncodingLogicMixin implements PatternEncodingLogicExtension {
     @Unique
     private static final String AE2BC_MATERIAL_OUTPUT_CONFIG_NBT = "MaterialOutputConfig";
+    @Unique
+    private static final String AE2BC_PATTERN_BATCH_COUNT_NBT = "PatternBatchCount";
 
     @Shadow
     @Final
@@ -34,10 +37,16 @@ public abstract class PatternEncodingLogicMixin implements PatternEncodingLogicE
 
     @Shadow
     @Final
+    private ConfigInventory encodedOutputInv;
+
+    @Shadow
+    @Final
     private AppEngInternalInventory encodedPatternInv;
 
     @Unique
     private MaterialOutputConfigData ae2bc$materialOutputConfig = MaterialOutputConfigData.EMPTY;
+    @Unique
+    private long ae2bc$patternBatchCount = PatternBatchCount.DEFAULT;
     @Unique
     private final AEKey[] ae2bc$inputKeys = new AEKey[AEProcessingPattern.MAX_INPUT_SLOTS];
 
@@ -60,6 +69,12 @@ public abstract class PatternEncodingLogicMixin implements PatternEncodingLogicE
         } else {
             pattern.set(ModContent.MATERIAL_OUTPUT_CONFIG.get(), config);
         }
+        long batchCount = ae2bc$validatedPatternBatchCount(ae2bc$patternBatchCount);
+        if (batchCount == PatternBatchCount.DEFAULT) {
+            pattern.remove(ModContent.PATTERN_BATCH_COUNT.get());
+        } else {
+            pattern.set(ModContent.PATTERN_BATCH_COUNT.get(), batchCount);
+        }
     }
 
     @Inject(method = "<init>", at = @At("RETURN"))
@@ -78,12 +93,19 @@ public abstract class PatternEncodingLogicMixin implements PatternEncodingLogicE
             }
         }
         ae2bc$materialOutputConfig = updated;
+        ae2bc$patternBatchCount = ae2bc$validatedPatternBatchCount(ae2bc$patternBatchCount);
+    }
+
+    @Inject(method = "onEncodedOutputChanged", at = @At("TAIL"))
+    private void ae2bc$validateBatchCountForOutputs(CallbackInfo ci) {
+        ae2bc$patternBatchCount = ae2bc$validatedPatternBatchCount(ae2bc$patternBatchCount);
     }
 
     @Inject(method = "loadEncodedPattern", at = @At("HEAD"))
     private void ae2bc$resetBeforeLoadingPattern(ItemStack pattern, CallbackInfo ci) {
         if (!pattern.isEmpty()) {
             ae2bc$materialOutputConfig = MaterialOutputConfigData.EMPTY;
+            ae2bc$patternBatchCount = PatternBatchCount.DEFAULT;
         }
     }
 
@@ -92,6 +114,8 @@ public abstract class PatternEncodingLogicMixin implements PatternEncodingLogicE
         ae2bc$materialOutputConfig = Objects.requireNonNullElse(
                 pattern.getDefinition().get(ModContent.MATERIAL_OUTPUT_CONFIG.get()),
                 MaterialOutputConfigData.EMPTY);
+        ae2bc$patternBatchCount = ae2bc$validatedPatternBatchCount(Objects.requireNonNullElse(
+                pattern.getDefinition().get(ModContent.PATTERN_BATCH_COUNT.get()), PatternBatchCount.DEFAULT));
         ae2bc$snapshotInputKeys();
     }
 
@@ -99,6 +123,9 @@ public abstract class PatternEncodingLogicMixin implements PatternEncodingLogicE
     private void ae2bc$readMaterialOutputConfig(CompoundTag data, HolderLookup.Provider registries, CallbackInfo ci) {
         ae2bc$materialOutputConfig = MaterialOutputConfigData.fromPacked(
                 data.getLongArray(AE2BC_MATERIAL_OUTPUT_CONFIG_NBT));
+        ae2bc$patternBatchCount = ae2bc$validatedPatternBatchCount(
+                data.contains(AE2BC_PATTERN_BATCH_COUNT_NBT)
+                        ? data.getLong(AE2BC_PATTERN_BATCH_COUNT_NBT) : PatternBatchCount.DEFAULT);
         ae2bc$snapshotInputKeys();
     }
 
@@ -108,6 +135,11 @@ public abstract class PatternEncodingLogicMixin implements PatternEncodingLogicE
             data.remove(AE2BC_MATERIAL_OUTPUT_CONFIG_NBT);
         } else {
             data.putLongArray(AE2BC_MATERIAL_OUTPUT_CONFIG_NBT, ae2bc$materialOutputConfig.toPacked());
+        }
+        if (ae2bc$patternBatchCount == PatternBatchCount.DEFAULT) {
+            data.remove(AE2BC_PATTERN_BATCH_COUNT_NBT);
+        } else {
+            data.putLong(AE2BC_PATTERN_BATCH_COUNT_NBT, ae2bc$patternBatchCount);
         }
     }
 
@@ -120,6 +152,37 @@ public abstract class PatternEncodingLogicMixin implements PatternEncodingLogicE
     public void ae2bc$setMaterialOutputConfig(MaterialOutputConfigData config) {
         ae2bc$materialOutputConfig = Objects.requireNonNullElse(config, MaterialOutputConfigData.EMPTY);
         ((PatternEncodingLogic) (Object) this).saveChanges();
+    }
+
+    @Override
+    public long ae2bc$getPatternBatchCount() {
+        return ae2bc$patternBatchCount;
+    }
+
+    @Override
+    public void ae2bc$setPatternBatchCount(long batchCount) {
+        ae2bc$patternBatchCount = ae2bc$validatedPatternBatchCount(batchCount);
+        ((PatternEncodingLogic) (Object) this).saveChanges();
+    }
+
+    @Unique
+    private long ae2bc$validatedPatternBatchCount(long requested) {
+        long[] amounts = new long[encodedInputInv.size() + encodedOutputInv.size()];
+        int index = 0;
+        for (int slot = 0; slot < encodedInputInv.size(); slot++) {
+            var stack = encodedInputInv.getStack(slot);
+            if (stack != null && stack.amount() > 0) {
+                amounts[index++] = stack.amount();
+            }
+        }
+        for (int slot = 0; slot < encodedOutputInv.size(); slot++) {
+            var stack = encodedOutputInv.getStack(slot);
+            if (stack != null && stack.amount() > 0) {
+                amounts[index++] = stack.amount();
+            }
+        }
+        return PatternBatchCount.validate(requested,
+                PatternBatchCount.maximum(Arrays.copyOf(amounts, index))).getValue();
     }
 
     @Unique

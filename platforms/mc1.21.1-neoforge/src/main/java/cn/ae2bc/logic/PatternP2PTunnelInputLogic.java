@@ -1,21 +1,37 @@
 package cn.ae2bc.logic;
 
 import appeng.api.crafting.IPatternDetails;
+import appeng.api.config.Actionable;
+import appeng.api.networking.IGridNode;
 import appeng.api.networking.IManagedGridNode;
 import appeng.api.networking.security.IActionSource;
+import appeng.api.stacks.AEKey;
 import appeng.api.stacks.KeyCounter;
+import appeng.api.storage.MEStorage;
+import appeng.api.networking.ticking.IGridTickable;
+import appeng.api.networking.ticking.TickRateModulation;
+import appeng.api.networking.ticking.TickingRequest;
+import appeng.core.settings.TickRates;
+import appeng.helpers.patternprovider.PatternProviderLogicHost;
 import appeng.me.helpers.MachineSource;
 import cn.ae2bc.core.dispatch.RoundRobinPolicy;
 import cn.ae2bc.core.dispatch.RoundRobinSelector;
+import cn.ae2bc.core.unit.UnitPortType;
 import cn.ae2bc.part.PatternP2PTunnelPart;
 import cn.ae2bc.part.PatternTaskEndpoint;
 import cn.ae2bc.part.PatternP2PUnitManagerPart;
 import cn.ae2bc.part.PatternP2PUnitPortPart;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.Tag;
+import net.minecraft.network.chat.Component;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import appeng.parts.AEBasePart;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 
 /**
  * Owns the main-side task admission and round-robin dispatch.
@@ -29,11 +45,14 @@ public final class PatternP2PTunnelInputLogic {
     private static final String PRODUCT_EXTRACTION_INTERVAL = "ProductExtractionInterval";
     private static final String PRODUCT_EXTRACTION_AMOUNT = "ProductExtractionAmount";
     private static final String PRODUCT_EXTRACTION_REVISION = "ProductExtractionRevision";
+    private static final String DISPATCH_MODE = "PatternDispatchMode";
+    private static final String BATCH_CONTEXT = "BatchDispatchContext";
+    private static final String BATCH_SERIES = "BatchDispatchSeries";
 
     private final IManagedGridNode mainNode;
     private final PatternP2PTunnelPart input;
     private final IActionSource actionSource;
-    private final PatternMetadataCache patternMetadataCache = new PatternMetadataCache();
+    private final MEStorage batchStorage = new BatchStorage();
     private List<PatternP2PTunnelPart> outputSnapshot = List.of();
     private boolean outputSnapshotDirty = true;
     private boolean outputAvailabilityDirty = true;
@@ -44,11 +63,18 @@ public final class PatternP2PTunnelInputLogic {
     private PatternP2PUnitConfiguration patternP2PUnitConfiguration = PatternP2PUnitConfiguration.DEFAULT;
     private long patternP2PUnitConfigurationRevision;
     private EndpointProductExtractionSettings productExtractionSettings = EndpointProductExtractionSettings.DEFAULT;
+    private PatternDispatchMode dispatchMode = PatternDispatchMode.FULL_DISPATCH;
+    private BatchDispatchContext batchContext;
+    private BatchDispatchSeries batchSeries;
+    private int batchRetryFailures;
+    private long batchNextRetryTick;
+    private IGridNode batchProviderNode;
 
     public PatternP2PTunnelInputLogic(IManagedGridNode mainNode, PatternP2PTunnelPart input) {
         this.mainNode = mainNode;
         this.input = input;
         this.actionSource = new MachineSource(mainNode::getNode);
+        mainNode.addService(IGridTickable.class, new BatchTicker());
     }
 
     public boolean hasAvailableOutput() {
@@ -91,6 +117,19 @@ public final class PatternP2PTunnelInputLogic {
 
     public EndpointProductExtractionSettings getProductExtractionSettings() {
         return productExtractionSettings;
+    }
+
+    public PatternDispatchMode getDispatchMode() {
+        return dispatchMode;
+    }
+
+    public void setDispatchMode(PatternDispatchMode mode) {
+        Objects.requireNonNull(mode, "mode");
+        if (dispatchMode != mode) {
+            dispatchMode = mode;
+            alertBatchRetry();
+            input.getHost().markForSave();
+        }
     }
 
     public void setProductExtractionEnabled(boolean enabled) {
@@ -157,7 +196,7 @@ public final class PatternP2PTunnelInputLogic {
         }
         short frequency = input.getFrequency();
         for (var port : grid.getService(PatternP2PTopologyGridService.class)
-                .getPortsForFrequency(frequency, PatternP2PUnitPortType.EXTRACT)) {
+                .getPortsForFrequency(frequency, UnitPortType.EXTRACT)) {
             port.alertTicking();
         }
     }
@@ -165,10 +204,12 @@ public final class PatternP2PTunnelInputLogic {
     public void invalidateOutputs() {
         outputSnapshotDirty = true;
         outputAvailabilityDirty = true;
+        alertBatchRetry();
     }
 
     public void invalidateOutputAvailability() {
         outputAvailabilityDirty = true;
+        alertBatchRetry();
     }
 
     public void resetAllTaskStates() {
@@ -184,6 +225,13 @@ public final class PatternP2PTunnelInputLogic {
         for (var manager : topology.getManagers(frequency)) {
             manager.resetTaskState();
         }
+        if (batchContext != null) {
+            batchContext.clearHeld();
+            batchContext = null;
+            input.getHost().markForSave();
+        }
+        batchSeries = null;
+        batchProviderNode = null;
         invalidateOutputAvailability();
     }
 
@@ -197,17 +245,55 @@ public final class PatternP2PTunnelInputLogic {
         return count;
     }
 
+    public boolean canAcceptPlans() {
+        return batchContext == null && hasAvailableOutput();
+    }
+
+    public MEStorage getBatchStorage() {
+        return batchStorage;
+    }
+
     public boolean pushPattern(IPatternDetails pattern, KeyCounter[] inputs) {
-        if (!mainNode.isActive() || !input.hasConfiguredFrequency()) {
+        if (!mainNode.isActive() || !input.hasConfiguredFrequency() || batchContext != null) {
             return false;
         }
 
         List<PatternTaskEndpoint> outputs = getTaskEndpoints();
         int size = outputs.size();
-        var metadata = patternMetadataCache.get(pattern);
+        var metadata = PatternDispatchMetadata.create(pattern, input.getLevel());
         if (!metadata.isValid()) {
             return false;
         }
+        if (dispatchMode == PatternDispatchMode.BATCH_DISTRIBUTION && metadata.batchCount() > 1) {
+            UUID sessionId = batchSeries == null ? UUID.randomUUID() : batchSeries.sessionId();
+            BatchDispatchContext context = BatchDispatchContext.create(pattern, inputs, input.getLevel(), sessionId);
+            if (context != null) {
+                if (batchSeries != null && !batchSeries.matches(context)) {
+                    if (hasActiveBatchSession(batchSeries.sessionId())) {
+                        return false;
+                    }
+                    batchProviderNode = null;
+                    context = BatchDispatchContext.create(pattern, inputs, input.getLevel(), UUID.randomUUID());
+                    if (context == null) {
+                        return false;
+                    }
+                    batchSeries = null;
+                }
+                if (batchSeries == null) {
+                    batchSeries = BatchDispatchSeries.from(context);
+                }
+                batchContext = context;
+                planNextRound();
+                input.getHost().markForSave();
+                alertBatchRetry();
+                return false;
+            }
+        }
+        return pushPatternComplete(pattern, metadata, inputs, outputs, size);
+    }
+
+    private boolean pushPatternComplete(IPatternDetails pattern, PatternDispatchMetadata metadata,
+                                        KeyCounter[] inputs, List<PatternTaskEndpoint> outputs, int size) {
         int acceptedIndex = RoundRobinSelector.select(roundRobinCursor, size, index -> {
             var output = outputs.get(index);
             if (!output.isOperationalTaskEndpoint() || !output.canAcceptTask()) {
@@ -221,6 +307,130 @@ public final class PatternP2PTunnelInputLogic {
             return true;
         }
         return false;
+    }
+
+    private boolean planNextRound() {
+        BatchDispatchContext context = batchContext;
+        if (context == null || context.roundUnits() > 0 || context.remainingUnits() <= 0) {
+            return false;
+        }
+        IPatternDetails pattern = context.decodePattern(input.getLevel());
+        PatternDispatchMetadata atomicMetadata = context.dispatchMetadata(input.getLevel());
+        if (pattern == null || atomicMetadata == null || !atomicMetadata.isValid()) {
+            return false;
+        }
+        List<PatternTaskEndpoint> endpoints = getTaskEndpoints();
+        int size = endpoints.size();
+        long[] capacities = new long[size];
+        for (int offset = 0; offset < size; offset++) {
+            int index = Math.floorMod(roundRobinCursor + offset, size);
+            PatternTaskEndpoint endpoint = endpoints.get(index);
+            if (endpoint.isOperationalTaskEndpoint()) {
+                capacities[index] = endpoint.getMaximumAcceptedAtomicUnits(
+                        pattern, atomicMetadata, context.atomicInputs(), context.remainingUnits(),
+                        context.sessionId(), actionSource);
+            }
+        }
+        long[] allocations = BatchDistributionPlanner.distribute(
+                context.remainingUnits(), capacities, roundRobinCursor);
+        long plannedUnits = sum(allocations);
+        if (plannedUnits <= 0) {
+            return false;
+        }
+        java.util.Map<String, Long> roundPlan = new java.util.LinkedHashMap<>();
+        for (int i = 0; i < allocations.length; i++) {
+            if (allocations[i] > 0) {
+                roundPlan.merge(endpoints.get(i).getDispatchId(), allocations[i], PatternP2PTunnelInputLogic::saturatingAdd);
+            }
+        }
+        if (!context.startRound(roundPlan)) {
+            return false;
+        }
+        input.getHost().markForSave();
+        alertBatchProvider();
+        return true;
+    }
+
+    private boolean dispatchReadyRound() {
+        BatchDispatchContext context = batchContext;
+        if (context == null || !context.isRoundReady()) {
+            return false;
+        }
+        IPatternDetails pattern = context.decodePattern(input.getLevel());
+        PatternDispatchMetadata atomicMetadata = context.dispatchMetadata(input.getLevel());
+        if (pattern == null || atomicMetadata == null || !atomicMetadata.isValid()) {
+            return false;
+        }
+        List<PatternTaskEndpoint> endpoints = getTaskEndpoints();
+        int size = endpoints.size();
+        java.util.Map<String, PatternTaskEndpoint> endpointsById = new java.util.LinkedHashMap<>();
+        endpoints.forEach(endpoint -> endpointsById.put(endpoint.getDispatchId(), endpoint));
+        int lastAccepted = -1;
+        for (var allocation : context.roundAllocations().entrySet()) {
+            PatternTaskEndpoint endpoint = endpointsById.get(allocation.getKey());
+            long units = allocation.getValue();
+            if (endpoint == null || !endpoint.isOperationalTaskEndpoint()) {
+                continue;
+            }
+            long accepted = endpoint.getMaximumAcceptedAtomicUnits(
+                    pattern, atomicMetadata, context.atomicInputs(), units, context.sessionId(), actionSource);
+            if (accepted < units || !endpoint.tryAcceptPatternAtomicUnits(
+                    pattern, atomicMetadata, context.atomicInputs(), units, context.sessionId(), actionSource)) {
+                continue;
+            }
+            context.dispatched(allocation.getKey(), units);
+            lastAccepted = endpoints.indexOf(endpoint);
+        }
+        if (lastAccepted < 0) {
+            return false;
+        }
+        context.finishRoundIfEmpty();
+        roundRobinCursor = RoundRobinPolicy.advance(lastAccepted, size);
+        markCursorForSave();
+        if (context.isComplete()) {
+            batchContext = null;
+        } else {
+            planNextRound();
+        }
+        input.getHost().markForSave();
+        return true;
+    }
+
+    public void addDrops(List<ItemStack> drops) {
+        if (batchContext != null) {
+            var grid = mainNode.getGrid();
+            if (grid != null) {
+                batchContext.returnHeldTo(grid.getStorageService().getInventory(), actionSource);
+            }
+            batchContext.addHeldDrops(drops, input.getLevel(), input.getBlockEntity().getBlockPos());
+        }
+    }
+
+    public void clearContent() {
+        if (batchContext != null) {
+            batchContext.clearHeld();
+            batchContext = null;
+        }
+        batchSeries = null;
+        batchProviderNode = null;
+        resetBatchRetryBackoff();
+    }
+
+    private long getGameTime() {
+        var level = input.getLevel();
+        return level == null ? 0 : level.getGameTime();
+    }
+
+    private static long saturatingAdd(long left, long right) {
+        return left > Long.MAX_VALUE - right ? Long.MAX_VALUE : left + right;
+    }
+
+    private static long sum(long[] values) {
+        long result = 0;
+        for (long value : values) {
+            result = saturatingAdd(result, Math.max(0, value));
+        }
+        return result;
     }
 
     private List<PatternP2PTunnelPart> getOutputSnapshot() {
@@ -262,6 +472,10 @@ public final class PatternP2PTunnelInputLogic {
     }
 
     public void readFromNBT(CompoundTag data, HolderLookup.Provider registries) {
+        resetBatchRetryBackoff();
+        dispatchMode = data.contains(DISPATCH_MODE)
+                ? PatternDispatchMode.fromId(data.getByte(DISPATCH_MODE))
+                : PatternDispatchMode.FULL_DISPATCH;
         roundRobinCursor = data.getInt(ROUND_ROBIN_CURSOR);
         returnMode = data.contains(RETURN_MODE)
                 ? ReturnMode.fromId(data.getByte(RETURN_MODE)) : ReturnMode.UNBLOCKED;
@@ -283,9 +497,17 @@ public final class PatternP2PTunnelInputLogic {
             patternP2PUnitConfiguration = patternP2PUnitConfiguration.withProductExtraction(
                     productExtractionSettings.interval(), productExtractionSettings.amount());
         }
+        batchContext = data.contains(BATCH_CONTEXT, Tag.TAG_COMPOUND)
+                ? BatchDispatchContext.read(data.getCompound(BATCH_CONTEXT), registries) : null;
+        batchSeries = data.contains(BATCH_SERIES, Tag.TAG_COMPOUND)
+                ? BatchDispatchSeries.read(data.getCompound(BATCH_SERIES), registries) : null;
+        if (batchContext != null && (batchSeries == null || !batchSeries.matches(batchContext))) {
+            batchSeries = BatchDispatchSeries.from(batchContext);
+        }
     }
 
     public void writeToNBT(CompoundTag data, HolderLookup.Provider registries) {
+        data.putByte(DISPATCH_MODE, (byte) dispatchMode.ordinal());
         data.putInt(ROUND_ROBIN_CURSOR, roundRobinCursor);
         data.putByte(RETURN_MODE, (byte) returnMode.getId());
         data.put(PATTERN_P2P_UNIT_CONFIGURATION, patternP2PUnitConfiguration.write());
@@ -294,5 +516,143 @@ public final class PatternP2PTunnelInputLogic {
         data.putInt(PRODUCT_EXTRACTION_INTERVAL, productExtractionSettings.interval());
         data.putInt(PRODUCT_EXTRACTION_AMOUNT, productExtractionSettings.amount());
         data.putLong(PRODUCT_EXTRACTION_REVISION, productExtractionSettings.revision());
+        if (batchContext != null) {
+            data.put(BATCH_CONTEXT, batchContext.write(registries));
+        } else {
+            data.remove(BATCH_CONTEXT);
+        }
+        if (batchSeries != null) {
+            data.put(BATCH_SERIES, batchSeries.write(registries));
+        } else {
+            data.remove(BATCH_SERIES);
+        }
+    }
+
+    public void alertBatchRetry() {
+        resetBatchRetryBackoff();
+        mainNode.ifPresent((grid, node) -> {
+            if (batchContext != null) {
+                grid.getTickManager().alertDevice(node);
+            }
+        });
+    }
+
+    private void resetBatchRetryBackoff() {
+        batchRetryFailures = 0;
+        batchNextRetryTick = 0;
+    }
+
+    private boolean retryBatchDispatch() {
+        if (batchContext == null || !mainNode.isActive()) {
+            return false;
+        }
+        if (batchContext.isRoundReady()) {
+            return dispatchReadyRound();
+        }
+        return batchContext.roundUnits() == 0 && planNextRound();
+    }
+
+    private IGridNode getAdjacentBatchProviderNode(IActionSource source) {
+        if (batchContext == null || !mainNode.isActive() || !input.hasConfiguredFrequency()
+                || batchContext.roundUnits() <= 0 || batchContext.isRoundReady()) {
+            return null;
+        }
+        return source.machine()
+                .map(appeng.api.networking.security.IActionHost::getActionableNode)
+                .filter(Objects::nonNull)
+                .filter(node -> node.getOwner() instanceof PatternProviderLogicHost)
+                .filter(node -> isAdjacentProvider(node.getOwner()))
+                .orElse(null);
+    }
+
+    private boolean hasActiveBatchSession(UUID sessionId) {
+        for (PatternTaskEndpoint endpoint : getTaskEndpoints()) {
+            if (endpoint.hasActiveBatchSession(sessionId)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    private void alertBatchProvider() {
+        IGridNode providerNode = batchProviderNode;
+        if (providerNode == null) {
+            return;
+        }
+        var grid = providerNode.getGrid();
+        if (grid == null || grid != mainNode.getGrid() || !isAdjacentProvider(providerNode.getOwner())) {
+            batchProviderNode = null;
+            return;
+        }
+        grid.getTickManager().alertDevice(providerNode);
+    }
+
+    private boolean isAdjacentProvider(Object owner) {
+        var side = input.getSide();
+        if (side == null) {
+            return false;
+        }
+        var expected = input.getBlockEntity().getBlockPos().relative(side);
+        if (owner instanceof BlockEntity blockEntity) {
+            return blockEntity.getBlockPos().equals(expected);
+        }
+        return owner instanceof AEBasePart part
+                && part.getHost().getBlockEntity().getBlockPos().equals(expected);
+    }
+
+    private final class BatchStorage implements MEStorage {
+        @Override
+        public long insert(AEKey what, long amount, Actionable mode, IActionSource source) {
+            MEStorage.checkPreconditions(what, amount, mode, source);
+            IGridNode providerNode = getAdjacentBatchProviderNode(source);
+            if (providerNode == null) {
+                return 0;
+            }
+            long accepted = batchContext.insert(what, amount, mode, source);
+            if (accepted > 0 && mode == Actionable.MODULATE) {
+                batchProviderNode = providerNode;
+                input.getHost().markForSave();
+                if (batchContext.isRoundReady()) {
+                    alertBatchRetry();
+                }
+            }
+            return accepted;
+        }
+
+        @Override
+        public Component getDescription() {
+            return input.getPartItem().asItem().getDescription();
+        }
+    }
+
+    private final class BatchTicker implements IGridTickable {
+        @Override
+        public TickingRequest getTickingRequest(IGridNode node) {
+            return new TickingRequest(1, 20, false, TickRates.Interface.getMax());
+        }
+
+        @Override
+        public TickRateModulation tickingRequest(IGridNode node, int ticksSinceLastCall) {
+            if (batchContext == null || !mainNode.isActive()) {
+                resetBatchRetryBackoff();
+                return TickRateModulation.SLEEP;
+            }
+            if (batchContext.roundUnits() == 0 && batchContext.remainingUnits() > 0) {
+                resetBatchRetryBackoff();
+                planNextRound();
+                return TickRateModulation.URGENT;
+            }
+            long now = getGameTime();
+            if (now < batchNextRetryTick) {
+                return TickRateModulation.SLOWER;
+            }
+            if (retryBatchDispatch()) {
+                resetBatchRetryBackoff();
+                return TickRateModulation.URGENT;
+            }
+            batchRetryFailures = Math.min(Integer.MAX_VALUE, batchRetryFailures + 1);
+            batchNextRetryTick = saturatingAdd(now, DispatchBackoffPolicy.pendingDelay(batchRetryFailures));
+            return TickRateModulation.SLOWER;
+        }
     }
 }

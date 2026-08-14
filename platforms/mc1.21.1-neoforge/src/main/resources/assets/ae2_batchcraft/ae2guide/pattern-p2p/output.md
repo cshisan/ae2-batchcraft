@@ -33,6 +33,8 @@ With automatic direction, material enters through the machine face touching the 
 
 If the target accepts only part of a resource, the remainder stays pending and is retried. The endpoint is not available for an incompatible new task while pending material remains.
 
+Full Dispatch requires this endpoint to accept the complete processing push. In Batch Distribution, the Input assigns an integer number of configured shares based on current capacity; this endpoint receives that assignment as one aggregated delivery.
+
 ## Product Return
 
 Machines and pipes can push products into the output's insertion-only return capability. Active extraction can also pull from the adjacent machine when enabled on the input. Both paths apply the task's return configuration.
@@ -43,4 +45,4 @@ The output follows the input's return mode by default. Disable synchronization t
 
 A configured, active output also acts as a continuous FE destination for a Pattern P2P Energy Tunnel. It does not need an active crafting task to power the adjacent machine.
 
-See [Material Output Directions](../troubleshooting/material-directions.md) and [Output Extraction](../product-return/endpoint-extraction.md).
+See [Batch Distribution](batch-distribution.md), [Material Output Directions](../troubleshooting/material-directions.md), and [Output Extraction](../product-return/endpoint-extraction.md).

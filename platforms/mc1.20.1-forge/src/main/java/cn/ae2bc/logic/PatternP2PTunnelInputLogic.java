@@ -7,6 +7,7 @@ import appeng.api.stacks.KeyCounter;
 import appeng.me.helpers.MachineSource;
 import cn.ae2bc.core.dispatch.RoundRobinPolicy;
 import cn.ae2bc.core.dispatch.RoundRobinSelector;
+import cn.ae2bc.core.unit.UnitPortType;
 import cn.ae2bc.part.PatternP2PTunnelPart;
 import cn.ae2bc.part.PatternTaskEndpoint;
 import cn.ae2bc.part.PatternP2PUnitManagerPart;
@@ -157,7 +158,7 @@ public final class PatternP2PTunnelInputLogic {
         }
         short frequency = input.getFrequency();
         for (var port : grid.getService(PatternP2PTopologyGridService.class)
-                .getPortsForFrequency(frequency, PatternP2PUnitPortType.EXTRACT)) {
+                .getPortsForFrequency(frequency, UnitPortType.EXTRACT)) {
             port.alertTicking();
         }
     }

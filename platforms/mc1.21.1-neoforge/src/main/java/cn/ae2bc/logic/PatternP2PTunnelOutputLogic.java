@@ -42,6 +42,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 
 /**
  * Owns one output-side task batch, return policy, retry state, and input-side configuration.
@@ -54,6 +55,7 @@ public final class PatternP2PTunnelOutputLogic implements ProductExtractionTask 
     private static final String REMAINING_PRIMARY_OUTPUT = "RemainingPrimaryOutput";
     private static final String ACTIVE_PATTERN = "ActivePattern";
     private static final String ACTIVE_TASK_COUNT = "ActiveTaskCount";
+    private static final String BATCH_SESSION_ID = "BatchSessionId";
     private static final String SYNC_INPUT_SETTINGS = "SyncInputSettings";
     private static final String ENERGY_DISTRIBUTION_MODE = "EnergyDistributionMode";
     private static final String PRODUCT_EXTRACTION_RECOVERY = "ProductExtractionRecovery";
@@ -68,6 +70,9 @@ public final class PatternP2PTunnelOutputLogic implements ProductExtractionTask 
     private ReturnMode returnMode = ReturnMode.UNBLOCKED;
     private boolean syncInputSettings = true;
     private EnergyDistributionMode energyDistributionMode = EnergyDistributionMode.EVEN;
+    private int pendingRetryFailures;
+    private long pendingNextRetryTick;
+    private @Nullable UUID batchSessionId;
 
     public PatternP2PTunnelOutputLogic(IManagedGridNode mainNode, PatternP2PTunnelPart output) {
         this.mainNode = mainNode;
@@ -86,6 +91,10 @@ public final class PatternP2PTunnelOutputLogic implements ProductExtractionTask 
 
     public boolean isTaskActive() {
         return !pendingInputs.isEmpty() || returnBatch.isActive();
+    }
+
+    public boolean hasActiveBatchSession(UUID sessionId) {
+        return sessionId != null && returnBatch.isActive() && sessionId.equals(batchSessionId);
     }
 
     public EnergyDistributionMode getEnergyDistributionMode() {
@@ -117,7 +126,9 @@ public final class PatternP2PTunnelOutputLogic implements ProductExtractionTask 
         }
         boolean wasAvailable = canAcceptTask();
         pendingInputs.clear();
+        resetPendingRetryBackoff();
         returnBatch.clear();
+        batchSessionId = null;
         persistStateChange(wasAvailable);
     }
 
@@ -169,7 +180,10 @@ public final class PatternP2PTunnelOutputLogic implements ProductExtractionTask 
         }
         boolean wasAvailable = canAcceptTask();
         long expectedPrimaryBefore = returnBatch.getExpectedPrimary();
-        returnBatch.returned(stack.what(), stack.amount());
+        boolean completed = returnBatch.returned(stack.what(), stack.amount());
+        if (completed) {
+            batchSessionId = null;
+        }
         if (returnBatch.getExpectedPrimary() != expectedPrimaryBefore) {
             persistStateChange(wasAvailable);
         }
@@ -177,10 +191,17 @@ public final class PatternP2PTunnelOutputLogic implements ProductExtractionTask 
 
     public boolean tryAcceptPattern(IPatternDetails pattern, PatternDispatchMetadata metadata,
                                     KeyCounter[] inputs, IActionSource source) {
+        return tryAcceptPattern(pattern, metadata, inputs, source, true, 1, 1, false, null);
+    }
+
+    private boolean tryAcceptPattern(IPatternDetails pattern, PatternDispatchMetadata metadata,
+                                     KeyCounter[] inputs, IActionSource source,
+                                     boolean allowCraftingMachine, long divisor, long atomicUnits,
+                                     boolean retainCompleteRemainder, @Nullable UUID sessionId) {
         if (!mainNode.isActive() || !output.hasConfiguredFrequency()) {
             return false;
         }
-        if (!metadata.isValid() || !canAcceptTask(pattern, metadata)) {
+        if (!metadata.isValid() || !canAcceptTask(pattern, metadata, sessionId)) {
             return false;
         }
         boolean wasAvailable = canAcceptTask();
@@ -196,10 +217,10 @@ public final class PatternP2PTunnelOutputLogic implements ProductExtractionTask 
         TargetCache targets = getTargetCache(level, targetPos);
 
         // The crafting-machine API has only one ejection face and cannot represent per-material routing.
-        if (!metadata.hasExplicitDirections()) {
+        if (allowCraftingMachine && !metadata.hasExplicitDirections()) {
             var machine = targets.get(automaticFace).getCraftingMachine();
             if (machine != null && machine.acceptsPlans()) {
-                if (!beginTask(pattern, metadata)) {
+                if (!beginTask(pattern, metadata, sessionId)) {
                     return false;
                 }
                 if (machine.pushPattern(pattern, inputs, automaticFace)) {
@@ -208,7 +229,7 @@ public final class PatternP2PTunnelOutputLogic implements ProductExtractionTask 
                     }
                     return true;
                 }
-                cancelTask(metadata);
+                cancelTask(metadata, sessionId);
             }
         }
 
@@ -216,10 +237,14 @@ public final class PatternP2PTunnelOutputLogic implements ProductExtractionTask 
             return false;
         }
         List<RoutedInput> selected = metadata.hasExplicitDirections()
-                ? reconstructProcessingInputs((AEProcessingPattern) pattern, inputs, metadata.outputDirections())
+                ? reconstructProcessingInputs(PatternDispatchMetadata.decodeProcessingPattern(pattern, level), inputs, metadata.outputDirections(),
+                        divisor, atomicUnits)
                 : null;
+        if (selected == null && metadata.hasExplicitDirections()) {
+            return false;
+        }
         if (selected == null) {
-            selected = collectAutomaticInputs(pattern, inputs);
+            selected = collectCounterInputs(inputs);
         }
         if (selected.isEmpty()) {
             return false;
@@ -229,18 +254,27 @@ public final class PatternP2PTunnelOutputLogic implements ProductExtractionTask 
         StorageCache storages = new StorageCache(targets);
         List<PlannedInsert> plan = buildPlan(storages, automaticFace, selected, source, true);
         if (plan == null) {
-            return false;
+            if (!retainCompleteRemainder || !beginTask(pattern, metadata, sessionId)) {
+                return false;
+            }
+            pendingInputs.clear();
+            for (RoutedInput routed : selected) {
+                pendingInputs.add(new PendingInput(routed.stack(), routed.face()));
+            }
+            resetPendingRetryBackoff();
+            persistStateChange(wasAvailable);
+            wakeRetryIfNeeded();
+            return true;
         }
 
-        if (!beginTask(pattern, metadata)) {
+        if (!beginTask(pattern, metadata, sessionId)) {
             return false;
         }
         boolean insertedAny = false;
         List<PendingInput> remainder = new ArrayList<>(plan.size());
         for (var planned : plan) {
             GenericStack stack = planned.input().stack();
-            long inserted = planned.storage().insert(stack.what(), stack.amount(),
-                    Actionable.MODULATE, source);
+            long inserted = planned.insert(source);
             insertedAny |= inserted > 0;
             if (inserted < stack.amount()) {
                 remainder.add(new PendingInput(new GenericStack(stack.what(),
@@ -248,11 +282,18 @@ public final class PatternP2PTunnelOutputLogic implements ProductExtractionTask 
             }
         }
         if (!insertedAny) {
-            cancelTask(metadata);
-            return false;
+            if (!retainCompleteRemainder) {
+                cancelTask(metadata, sessionId);
+                return false;
+            }
+            remainder.clear();
+            for (var planned : plan) {
+                remainder.add(new PendingInput(planned.input().stack(), planned.input().face()));
+            }
         }
         pendingInputs.clear();
         pendingInputs.addAll(remainder);
+        resetPendingRetryBackoff();
         if (returnBatch.isActive() || !pendingInputs.isEmpty()) {
             persistStateChange(wasAvailable);
         }
@@ -260,46 +301,84 @@ public final class PatternP2PTunnelOutputLogic implements ProductExtractionTask 
         return true;
     }
 
+    public long getMaximumAcceptedAtomicUnits(IPatternDetails pattern, PatternDispatchMetadata atomicMetadata,
+                                               KeyCounter[] atomicInputs, long upperBound, UUID sessionId,
+                                               IActionSource source) {
+        if (upperBound <= 0 || !mainNode.isActive() || !output.hasConfiguredFrequency()
+                || !atomicMetadata.isValid()) {
+            return 0;
+        }
+        return AtomicTaskCapacityProbe.findMaximum(upperBound,
+                units -> canAcceptAtomicUnits(pattern, atomicMetadata, atomicInputs, units, sessionId, source));
+    }
+
+    public boolean tryAcceptPatternAtomicUnits(IPatternDetails pattern, PatternDispatchMetadata atomicMetadata,
+                                               KeyCounter[] atomicInputs, long units, UUID sessionId,
+                                               IActionSource source) {
+        KeyCounter[] scaledInputs = PatternInputScaling.multiply(atomicInputs, units);
+        PatternDispatchMetadata scaledMetadata = atomicMetadata.forAtomicUnits(units);
+        return scaledInputs != null && scaledMetadata.isValid()
+                && tryAcceptPattern(pattern, scaledMetadata, scaledInputs, source, false,
+                        atomicMetadata.batchCount(), units, true, sessionId);
+    }
+
+    private boolean canAcceptAtomicUnits(IPatternDetails pattern, PatternDispatchMetadata atomicMetadata,
+                                         KeyCounter[] atomicInputs, long units, UUID sessionId,
+                                         IActionSource source) {
+        KeyCounter[] scaledInputs = PatternInputScaling.multiply(atomicInputs, units);
+        PatternDispatchMetadata scaledMetadata = atomicMetadata.forAtomicUnits(units);
+        if (scaledInputs == null || !scaledMetadata.isValid()
+                || !canAcceptTask(pattern, scaledMetadata, sessionId)
+                || !(output.getLevel() instanceof ServerLevel level)) {
+            return false;
+        }
+        Direction outputSide = output.getSide();
+        if (outputSide == null || !pattern.supportsPushInputsToExternalInventory()) {
+            return false;
+        }
+        Direction automaticFace = outputSide.getOpposite();
+        TargetCache targets = getTargetCache(level, output.getBlockEntity().getBlockPos().relative(outputSide));
+        List<RoutedInput> selected = scaledMetadata.hasExplicitDirections()
+                ? reconstructProcessingInputs(PatternDispatchMetadata.decodeProcessingPattern(pattern, level), scaledInputs,
+                        scaledMetadata.outputDirections(), scaledMetadata.batchCount(), units)
+                : collectCounterInputs(scaledInputs);
+        if (selected == null || selected.isEmpty()) {
+            return false;
+        }
+        return buildPlan(new StorageCache(targets), automaticFace,
+                condenseInputs(selected), source, true) != null;
+    }
+
     private @Nullable List<RoutedInput> reconstructProcessingInputs(AEProcessingPattern pattern,
                                                                      KeyCounter[] inputHolders,
-                                                                     InputDirectionData directions) {
+                                                                     InputDirectionData directions,
+                                                                     long divisor, long units) {
         try {
-            KeyCounter available = new KeyCounter();
-            for (KeyCounter holder : inputHolders) {
-                available.addAll(holder);
+            List<ProcessingInputMapper.SlotInput> mapped = ProcessingInputMapper.map(
+                    pattern, inputHolders, output.getLevel(), divisor, units);
+            if (mapped == null) {
+                return null;
             }
-            var sparseInputs = pattern.getSparseInputs();
-            List<RoutedInput> result = new ArrayList<>(sparseInputs.size());
-            for (int slot = 0; slot < sparseInputs.size(); slot++) {
-                GenericStack input = sparseInputs.get(slot);
-                if (input == null || input.amount() <= 0) {
-                    continue;
-                }
-                if (available.get(input.what()) < input.amount()) {
-                    return null;
-                }
-                available.remove(input.what(), input.amount());
-                result.add(new RoutedInput(input, directions.getDirection(slot)));
+            List<RoutedInput> result = new ArrayList<>(mapped.size());
+            for (ProcessingInputMapper.SlotInput input : mapped) {
+                result.add(new RoutedInput(input.stack(), directions.getDirection(input.slot())));
             }
             return result;
         } catch (RuntimeException exception) {
-            Ae2bcMod.LOGGER.warn("Unable to reconstruct processing inputs with direction metadata; using automatic routing",
-                    exception);
+            Ae2bcMod.LOGGER.warn("Unable to map runtime processing inputs to configured directions", exception);
             return null;
         }
     }
 
-    private List<RoutedInput> collectAutomaticInputs(IPatternDetails pattern, KeyCounter[] inputHolders) {
+    private List<RoutedInput> collectCounterInputs(KeyCounter[] inputHolders) {
         List<RoutedInput> selected = new ArrayList<>(inputHolders.length);
-        try {
-            pattern.pushInputsToExternalInventory(inputHolders, (what, amount) -> {
-                if (amount > 0) {
-                    selected.add(new RoutedInput(new GenericStack(what, amount), null));
+        for (KeyCounter holder : inputHolders) {
+            for (var entry : holder) {
+                if (entry.getLongValue() > 0) {
+                    selected.add(new RoutedInput(
+                            new GenericStack(entry.getKey(), entry.getLongValue()), null));
                 }
-            });
-        } catch (RuntimeException exception) {
-            Ae2bcMod.LOGGER.warn("Unable to collect processing-pattern inputs", exception);
-            selected.clear();
+            }
         }
         return selected;
     }
@@ -355,27 +434,57 @@ public final class PatternP2PTunnelOutputLogic implements ProductExtractionTask 
 
         private Map<AEKeyType, MEStorage> get(Direction face) {
             return byFace.computeIfAbsent(face,
-                    key -> targets.get(key).resolveStorages(PatternP2PTunnelOutputLogic.this::alertRetry));
+                    key -> targets.get(key).resolveStorages(PatternP2PTunnelOutputLogic.this::onTargetChanged));
         }
     }
 
-    private boolean canAcceptTask(IPatternDetails pattern, PatternDispatchMetadata metadata) {
+    private boolean canAcceptTask(IPatternDetails pattern, PatternDispatchMetadata metadata,
+                                  @Nullable UUID sessionId) {
         if (!pendingInputs.isEmpty()) {
             return false;
         }
         GenericStack primary = metadata.primaryOutput();
+        if (sessionId != null && returnBatch.isActive()) {
+            return sessionId.equals(batchSessionId)
+                    && returnBatch.canAppend(pattern.getDefinition(), metadata.declaredOutputs(),
+                    primary.what(), primary.amount());
+        }
+        if (sessionId == null && batchSessionId != null) {
+            return false;
+        }
         return returnBatch.canAccept(pattern.getDefinition(), metadata.declaredOutputs(),
                 primary.what(), primary.amount());
     }
 
-    private boolean beginTask(IPatternDetails pattern, PatternDispatchMetadata metadata) {
+    private boolean beginTask(IPatternDetails pattern, PatternDispatchMetadata metadata,
+                              @Nullable UUID sessionId) {
         GenericStack primary = metadata.primaryOutput();
-        return returnBatch.begin(pattern.getDefinition(), metadata.declaredOutputs(),
+        if (sessionId != null && returnBatch.isActive()) {
+            return sessionId.equals(batchSessionId)
+                    && returnBatch.append(pattern.getDefinition(), metadata.declaredOutputs(),
+                    primary.what(), primary.amount());
+        }
+        if (sessionId == null && batchSessionId != null) {
+            return false;
+        }
+        boolean begun = returnBatch.begin(pattern.getDefinition(), metadata.declaredOutputs(),
                 primary.what(), primary.amount());
+        if (begun) {
+            batchSessionId = sessionId;
+        }
+        return begun;
     }
 
-    private void cancelTask(PatternDispatchMetadata metadata) {
-        returnBatch.rollback(metadata.primaryOutput().amount());
+    private void cancelTask(PatternDispatchMetadata metadata, @Nullable UUID sessionId) {
+        if (sessionId != null && returnBatch.isActive() && sessionId.equals(batchSessionId)
+                && returnBatch.getTaskCount() == 1) {
+            returnBatch.rollbackAppend(metadata.declaredOutputs(), metadata.primaryOutput().amount());
+        } else {
+            returnBatch.rollback(metadata.primaryOutput().amount());
+        }
+        if (!returnBatch.isActive()) {
+            batchSessionId = null;
+        }
     }
 
     private TargetCache getTargetCache(ServerLevel level, BlockPos targetPos) {
@@ -407,8 +516,7 @@ public final class PatternP2PTunnelOutputLogic implements ProductExtractionTask 
                 continue;
             }
             var planned = plan.getFirst();
-            long inserted = planned.storage().insert(stack.what(), stack.amount(),
-                    Actionable.MODULATE, retryActionSource);
+            long inserted = planned.insert(retryActionSource);
             if (inserted >= stack.amount()) {
                 it.remove();
                 progressed = true;
@@ -424,6 +532,7 @@ public final class PatternP2PTunnelOutputLogic implements ProductExtractionTask 
     }
 
     public void readFromNBT(CompoundTag data, HolderLookup.Provider registries) {
+        resetPendingRetryBackoff();
         energyDistributionMode = data.contains(ENERGY_DISTRIBUTION_MODE)
                 ? EnergyDistributionMode.fromId(data.getByte(ENERGY_DISTRIBUTION_MODE))
                 : EnergyDistributionMode.EVEN;
@@ -439,6 +548,8 @@ public final class PatternP2PTunnelOutputLogic implements ProductExtractionTask 
         returnBatch.load(loadedPattern, loadedTaskCount, loadedDeclaredOutputs,
                 loadedRemainingPrimary == null ? null : loadedRemainingPrimary.what(),
                 loadedRemainingPrimary == null ? 0 : loadedRemainingPrimary.amount());
+        batchSessionId = returnBatch.isActive() && data.hasUUID(BATCH_SESSION_ID)
+                ? data.getUUID(BATCH_SESSION_ID) : null;
         pendingInputs.clear();
         var list = data.getList(PENDING_INPUTS, Tag.TAG_COMPOUND);
         for (int i = 0; i < list.size(); i++) {
@@ -484,6 +595,11 @@ public final class PatternP2PTunnelOutputLogic implements ProductExtractionTask 
             }
             list.add(entry);
         }
+        if (returnBatch.isActive() && batchSessionId != null) {
+            data.putUUID(BATCH_SESSION_ID, batchSessionId);
+        } else {
+            data.remove(BATCH_SESSION_ID);
+        }
         data.put(PENDING_INPUTS, list);
         productExtractionRecovery.write(data, PRODUCT_EXTRACTION_RECOVERY, registries);
     }
@@ -498,8 +614,10 @@ public final class PatternP2PTunnelOutputLogic implements ProductExtractionTask 
 
     public void clearContent() {
         pendingInputs.clear();
+        resetPendingRetryBackoff();
         productExtractionRecovery.clear();
         returnBatch.clear();
+        batchSessionId = null;
     }
 
     private static Map<AEKey, Long> readCounter(CompoundTag data, String key,
@@ -543,12 +661,19 @@ public final class PatternP2PTunnelOutputLogic implements ProductExtractionTask 
     }
 
     public void alertRetry() {
+        resetPendingRetryBackoff();
         mainNode.ifPresent((grid, node) -> {
             if (!pendingInputs.isEmpty()) {
                 grid.getTickManager().alertDevice(node);
             }
             grid.getService(ProductExtractionGridService.class).wake(node, this);
         });
+    }
+
+    public void onTargetChanged() {
+        targetCache = null;
+        alertRetry();
+        output.notifyInputAvailabilityChanged();
     }
 
     @Override
@@ -565,6 +690,13 @@ public final class PatternP2PTunnelOutputLogic implements ProductExtractionTask 
 
     @Override
     public ProductExtractionTickState tickProductExtraction() {
+        ProductExtractionBudget budget = new ProductExtractionBudget();
+        budget.beginEndpoint();
+        return tickProductExtraction(budget);
+    }
+
+    @Override
+    public ProductExtractionTickState tickProductExtraction(ProductExtractionBudget budget) {
         if (!mainNode.isActive() || !(output.getLevel() instanceof ServerLevel level)) {
             return ProductExtractionTickState.DISABLED;
         }
@@ -577,7 +709,8 @@ public final class PatternP2PTunnelOutputLogic implements ProductExtractionTask 
             return productExtractionRecovery.isEmpty()
                     ? ProductExtractionTickState.DISABLED : ProductExtractionTickState.WAITING;
         }
-        var settings = endpointSettings.toExtractionSettings();
+        var settings = new ProductExtractionSettings(true, endpointSettings.interval(),
+                endpointSettings.amount(), false, java.util.Set.of());
         Direction side = output.getSide();
         if (side == null) {
             return recoveryProgress
@@ -585,11 +718,17 @@ public final class PatternP2PTunnelOutputLogic implements ProductExtractionTask 
         }
         var targetPos = output.getBlockEntity().getBlockPos().relative(side);
         Direction targetSide = side.getOpposite();
-        var sources = getTargetCache(level, targetPos).get(targetSide).resolveStorages(this::alertRetry);
-        int moved = ProductExtractor.extract(ExtractionSource.fromTypeMap(sources),
+        var sources = getTargetCache(level, targetPos).get(targetSide).resolveStorages(this::onTargetChanged);
+        ProductExtractor.Result result = ProductExtractor.extract(ExtractionSource.fromTypeMap(sources),
                 output.getReturnInventory(), settings, retryActionSource,
-                productExtractionRecovery::queue);
-        return moved > 0 || recoveryProgress
+                productExtractionRecovery::queue, budget);
+        if (result.budgetExhausted()) {
+            return ProductExtractionTickState.BUDGET_EXHAUSTED;
+        }
+        if (result.destinationBlocked()) {
+            return ProductExtractionTickState.NO_PROGRESS;
+        }
+        return result.moved() > 0 || recoveryProgress
                 ? ProductExtractionTickState.PROGRESSED : ProductExtractionTickState.NO_PROGRESS;
     }
 
@@ -613,7 +752,23 @@ public final class PatternP2PTunnelOutputLogic implements ProductExtractionTask 
     private record PendingInput(GenericStack stack, @Nullable Direction face) {
     }
 
-    private record PlannedInsert(RoutedInput input, MEStorage storage) {
+    private final class PlannedInsert {
+        private final RoutedInput input;
+        private final MEStorage storage;
+
+        private PlannedInsert(RoutedInput input, MEStorage storage) {
+            this.input = input;
+            this.storage = storage;
+        }
+
+        private RoutedInput input() {
+            return input;
+        }
+
+        private long insert(IActionSource source) {
+            return storage.insert(input.stack().what(), input.stack().amount(),
+                    Actionable.MODULATE, source);
+        }
     }
 
     private final class TargetCache {
@@ -675,7 +830,7 @@ public final class PatternP2PTunnelOutputLogic implements ProductExtractionTask 
     }
 
     private void onTargetCapabilityInvalidated() {
-        alertRetry();
+        onTargetChanged();
     }
 
     private final class RetryTicker implements IGridTickable {
@@ -686,11 +841,34 @@ public final class PatternP2PTunnelOutputLogic implements ProductExtractionTask 
 
         @Override
         public TickRateModulation tickingRequest(IGridNode node, int ticksSinceLastCall) {
-            boolean retryProgress = !pendingInputs.isEmpty() && mainNode.isActive() && retryPending();
+            if (pendingInputs.isEmpty()) {
+                resetPendingRetryBackoff();
+                return TickRateModulation.SLEEP;
+            }
+            long now = getGameTime();
+            if (now < pendingNextRetryTick) {
+                return TickRateModulation.SLOWER;
+            }
+            boolean retryProgress = mainNode.isActive() && retryPending();
             if (retryProgress) {
+                resetPendingRetryBackoff();
                 return TickRateModulation.URGENT;
             }
-            return pendingInputs.isEmpty() ? TickRateModulation.SLEEP : TickRateModulation.SLOWER;
+            pendingRetryFailures = Math.min(Integer.MAX_VALUE, pendingRetryFailures + 1);
+            pendingNextRetryTick = saturatingAdd(now,
+                    DispatchBackoffPolicy.pendingDelay(pendingRetryFailures));
+            return TickRateModulation.SLOWER;
         }
     }
+
+    private void resetPendingRetryBackoff() {
+        pendingRetryFailures = 0;
+        pendingNextRetryTick = 0;
+    }
+
+    private long getGameTime() {
+        var level = output.getLevel();
+        return level == null ? 0 : level.getGameTime();
+    }
+
 }

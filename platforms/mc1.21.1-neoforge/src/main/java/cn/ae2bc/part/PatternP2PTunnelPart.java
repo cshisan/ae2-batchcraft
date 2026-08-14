@@ -158,6 +158,11 @@ public final class PatternP2PTunnelPart extends P2PTunnelPart<PatternP2PTunnelPa
     }
 
     @Override
+    public boolean hasActiveBatchSession(java.util.UUID sessionId) {
+        return outputLogic != null && outputLogic.hasActiveBatchSession(sessionId);
+    }
+
+    @Override
     public boolean tryAcceptPattern(IPatternDetails pattern, cn.ae2bc.logic.PatternDispatchMetadata metadata,
                                     KeyCounter[] inputs, appeng.api.networking.security.IActionSource source) {
         return outputLogic != null && outputLogic.tryAcceptPattern(pattern, metadata, inputs, source);
@@ -172,6 +177,33 @@ public final class PatternP2PTunnelPart extends P2PTunnelPart<PatternP2PTunnelPa
 
     public RemoteReturnInventory getReturnInventory() {
         return returnInventory;
+    }
+
+    @Override
+    public String getDispatchId() {
+        Direction side = getSide();
+        return "output:" + getBlockEntity().getBlockPos().asLong() + ":"
+                + (side == null ? "none" : side.getName());
+    }
+
+    @Override
+    public long getMaximumAcceptedAtomicUnits(IPatternDetails pattern,
+                                               cn.ae2bc.logic.PatternDispatchMetadata atomicMetadata,
+                                               KeyCounter[] atomicInputs, long upperBound,
+                                               java.util.UUID sessionId,
+                                               appeng.api.networking.security.IActionSource source) {
+        return outputLogic == null ? 0 : outputLogic.getMaximumAcceptedAtomicUnits(
+                pattern, atomicMetadata, atomicInputs, upperBound, sessionId, source);
+    }
+
+    @Override
+    public boolean tryAcceptPatternAtomicUnits(IPatternDetails pattern,
+                                               cn.ae2bc.logic.PatternDispatchMetadata atomicMetadata,
+                                               KeyCounter[] atomicInputs, long units,
+                                               java.util.UUID sessionId,
+                                               appeng.api.networking.security.IActionSource source) {
+        return outputLogic != null && outputLogic.tryAcceptPatternAtomicUnits(
+                pattern, atomicMetadata, atomicInputs, units, sessionId, source);
     }
 
     private void alertReturnProducer() {
@@ -244,7 +276,7 @@ public final class PatternP2PTunnelPart extends P2PTunnelPart<PatternP2PTunnelPa
 
     @Override
     public boolean acceptsPlans() {
-        return inputLogic != null && inputLogic.hasAvailableOutput();
+        return inputLogic != null && inputLogic.canAcceptPlans();
     }
 
     @Override
@@ -277,6 +309,9 @@ public final class PatternP2PTunnelPart extends P2PTunnelPart<PatternP2PTunnelPa
     @Override
     public void addAdditionalDrops(List<ItemStack> drops, boolean wrenched) {
         super.addAdditionalDrops(drops, wrenched);
+        if (inputLogic != null) {
+            inputLogic.addDrops(drops);
+        }
         if (outputLogic != null) {
             outputLogic.addDrops(drops);
         }
@@ -285,6 +320,9 @@ public final class PatternP2PTunnelPart extends P2PTunnelPart<PatternP2PTunnelPa
     @Override
     public void clearContent() {
         super.clearContent();
+        if (inputLogic != null) {
+            inputLogic.clearContent();
+        }
         if (outputLogic != null) {
             outputLogic.clearContent();
         }
@@ -410,6 +448,9 @@ public final class PatternP2PTunnelPart extends P2PTunnelPart<PatternP2PTunnelPa
         var grid = getMainNode().getGrid();
         if (grid != null) {
             grid.getService(PatternP2PEnergyGridService.class).demandChanged();
+        }
+        if (outputLogic != null) {
+            outputLogic.onTargetChanged();
         }
     }
 

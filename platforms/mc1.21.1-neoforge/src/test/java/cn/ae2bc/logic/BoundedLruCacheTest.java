@@ -26,9 +26,4 @@ class BoundedLruCacheTest {
         assertEquals("two-new", cache.computeIfAbsent("second", ignored -> "two-new"));
         assertEquals(2, cache.size());
     }
-
-    @Test
-    void patternMetadataCacheIsLimitedToSixtyFourEntries() {
-        assertEquals(64, PatternMetadataCache.MAX_ENTRIES);
-    }
 }

@@ -39,6 +39,10 @@ class GuidePageResourceTest {
             "<ImportStructure\\s+src=\"([^\"]+\\.snbt)\"\\s*/>");
     private static final Pattern MARKDOWN_LINK = Pattern.compile("\\[[^]]+]\\(([^)#]+\\.md)(?:#[^)]+)?\\)");
     private static final Pattern HEADING = Pattern.compile("(?m)^(#{1,6})\\s+");
+    private static final Pattern EXTERNAL_MOD_CONTENT = Pattern.compile(
+            "(?i)\\b(?:minecraft|forge|neoforge|guideme|mekanism|extendedae|waila|jade|jei)\\b"
+                    + "|inventory tweaks|other mod|third-party|protection mod|claim (?:rule|protection)"
+                    + "|其他模组|第三方模组|保护模组|领地");
     private static final Set<String> UNIT_PORT_PAGES = Set.of(
             "unit/transfer-port.md",
             "unit/drop-port.md",
@@ -206,6 +210,45 @@ class GuidePageResourceTest {
                 assertFalse(lower.contains("only while a job is active"), path);
                 assertFalse(page.contains("仅在任务活动时供能"), path);
             });
+        }
+    }
+
+    @Test
+    void guideDocumentsBatchDistributionAndTheExtractionSafetyBudgets() throws Exception {
+        var english = readEnglishGuideTree();
+        var chinese = readGuideTree(CHINESE_GUIDE_ROOT);
+
+        assertEquals(Set.of("pattern-p2p/batch-distribution.md"),
+                childPagesOf(english, "pattern-p2p/input.md"));
+        String englishBatch = english.get("pattern-p2p/batch-distribution.md");
+        String chineseBatch = chinese.get("pattern-p2p/batch-distribution.md");
+        assertNotNull(englishBatch);
+        assertNotNull(chineseBatch);
+        assertTrue(englishBatch.contains("Full Dispatch"));
+        assertTrue(englishBatch.contains("Batch Distribution"));
+        assertTrue(englishBatch.contains("primary output"));
+        assertTrue(englishBatch.contains("Ctrl + Middle Mouse Button"));
+        assertTrue(englishBatch.contains("cannot prove the smallest recipe"));
+        assertTrue(chineseBatch.contains("完整下发"));
+        assertTrue(chineseBatch.contains("批次分发"));
+        assertTrue(chineseBatch.contains("主产物"));
+        assertTrue(chineseBatch.contains("不能证明相邻库存实际接受的最小配方"));
+
+        String englishExtraction = english.get("product-return/endpoint-extraction.md");
+        String chineseExtraction = chinese.get("product-return/endpoint-extraction.md");
+        assertTrue(englishExtraction.contains("`64` successful return-inventory rounds"));
+        assertTrue(englishExtraction.contains("`256` successful rounds per tick"));
+        assertTrue(englishExtraction.contains("not a promise that the whole amount moves in one tick"));
+        assertTrue(chineseExtraction.contains("`64` 个成功返回库存轮次"));
+        assertTrue(chineseExtraction.contains("`256` 个成功轮次"));
+        assertTrue(chineseExtraction.contains("不承诺在一个 tick 内全部移动"));
+    }
+
+    @Test
+    void playerGuideContainsNoExternalModNamesOrContent() throws Exception {
+        for (var guide : List.of(readEnglishGuideTree(), readGuideTree(CHINESE_GUIDE_ROOT))) {
+            guide.forEach((path, page) -> assertFalse(EXTERNAL_MOD_CONTENT.matcher(page).find(),
+                    path + " references content outside AE2 and AE2 BatchCraft"));
         }
     }
 

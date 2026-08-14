@@ -31,6 +31,7 @@ import appeng.parts.networking.PartCable;
 import cn.ae2bc.core.frequency.FrequencyLimits;
 import cn.ae2bc.core.unit.PatternP2PUnitSettings;
 import cn.ae2bc.logic.PatternP2PUnitDimensions;
+import cn.ae2bc.logic.PatternP2PTopologyGridService;
 import cn.ae2bc.Ae2bcMod;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.player.EntityPlayer;
@@ -187,23 +188,18 @@ public final class PatternP2PUnitManagerPart extends PartCable
     }
 
     public cn.ae2bc.logic.EnergyDistributionMode getEnergyDistributionMode() {
-        if (getGridNode() != null && getGridNode().getGrid() != null) {
-            for (IGridNode node : getGridNode().getGrid().getNodes()) {
-                if (node.getMachine() instanceof PatternP2PTunnelEnergyPart) {
-                    return ((PatternP2PTunnelEnergyPart) node.getMachine()).getDistributionMode();
-                }
-            }
+        for (PatternP2PTunnelEnergyPart energy
+                : PatternP2PTopologyGridService.findEnergyParts(getGridNode())) {
+            return energy.getDistributionMode();
         }
         return cn.ae2bc.logic.EnergyDistributionMode.EVEN;
     }
 
     public void setEnergyDistributionMode(cn.ae2bc.logic.EnergyDistributionMode mode) {
-        if (mode == null || getGridNode() == null || getGridNode().getGrid() == null) return;
-        for (IGridNode node : getGridNode().getGrid().getNodes()) {
-            if (node.getMachine() instanceof PatternP2PTunnelEnergyPart) {
-                PatternP2PTunnelEnergyPart energy = (PatternP2PTunnelEnergyPart) node.getMachine();
-                energy.setSettings(energy.isPullEnabled(), mode);
-            }
+        if (mode == null) return;
+        for (PatternP2PTunnelEnergyPart energy
+                : PatternP2PTopologyGridService.findEnergyParts(getGridNode())) {
+            energy.setSettings(energy.isPullEnabled(), mode);
         }
     }
 
@@ -247,15 +243,10 @@ public final class PatternP2PUnitManagerPart extends PartCable
 
     private PatternP2PUnitPortPart findInputPort(ItemStack stack, cn.ae2bc.core.unit.UnitPortType targetType,
             boolean simulate) {
-        if (getGridNode() == null || getGridNode().getGrid() == null) return null;
-        for (IGridNode node : getGridNode().getGrid().getNodes()) {
-            Object machine = node.getMachine();
-            if (machine instanceof PatternP2PUnitPortPart) {
-                PatternP2PUnitPortPart port = (PatternP2PUnitPortPart) machine;
-                if (port.getPortType() == targetType
-                        && unitId.equals(port.getBoundManagerId())
-                        && port.insertTaskInput(this, stack, simulate) >= stack.getCount()) return port;
-            }
+        for (PatternP2PUnitPortPart port
+                : PatternP2PTopologyGridService.findPorts(getGridNode(), unitId)) {
+            if (port.getPortType() == targetType
+                    && port.insertTaskInput(this, stack, simulate) >= stack.getCount()) return port;
         }
         return null;
     }
@@ -298,21 +289,11 @@ public final class PatternP2PUnitManagerPart extends PartCable
     }
 
     private PatternP2PTunnelPart findInput() {
-        if (getGridNode() == null || getGridNode().getGrid() == null || getTile().getWorld() == null) return null;
+        if (getGridNode() == null || getTile().getWorld() == null) return null;
         long tick = getTile().getWorld().getTotalWorldTime();
         if (inputCacheTick == tick) return inputCache;
         inputCacheTick = tick;
-        inputCache = null;
-        for (IGridNode node : getGridNode().getGrid().getNodes()) {
-            Object machine = node.getMachine();
-            if (machine instanceof PatternP2PTunnelPart) {
-                PatternP2PTunnelPart part = (PatternP2PTunnelPart) machine;
-                if (!part.isOutput() && part.getFrequency() == frequency && node.isActive()) {
-                    inputCache = part;
-                    break;
-                }
-            }
-        }
+        inputCache = PatternP2PTopologyGridService.findInput(getGridNode(), frequency);
         return inputCache;
     }
 
@@ -369,24 +350,16 @@ public final class PatternP2PUnitManagerPart extends PartCable
     }
 
     private void wakeBoundPorts() {
-        if (getGridNode() == null || getGridNode().getGrid() == null) return;
-        for (IGridNode node : getGridNode().getGrid().getNodes()) {
-            Object machine = node.getMachine();
-            if (machine instanceof PatternP2PUnitPortPart) {
-                PatternP2PUnitPortPart port = (PatternP2PUnitPortPart) machine;
-                if (unitId.equals(port.getBoundManagerId())) port.alertTicking();
-            }
+        for (PatternP2PUnitPortPart port
+                : PatternP2PTopologyGridService.findPorts(getGridNode(), unitId)) {
+            port.alertTicking();
         }
     }
 
     private void invalidateBoundPortRuntimeState() {
-        if (getGridNode() == null || getGridNode().getGrid() == null) return;
-        for (IGridNode node : getGridNode().getGrid().getNodes()) {
-            Object machine = node.getMachine();
-            if (machine instanceof PatternP2PUnitPortPart) {
-                PatternP2PUnitPortPart port = (PatternP2PUnitPortPart) machine;
-                if (unitId.equals(port.getBoundManagerId())) port.invalidateTaskRuntimeState();
-            }
+        for (PatternP2PUnitPortPart port
+                : PatternP2PTopologyGridService.findPorts(getGridNode(), unitId)) {
+            port.invalidateTaskRuntimeState();
         }
     }
 
@@ -402,27 +375,33 @@ public final class PatternP2PUnitManagerPart extends PartCable
     @Override public void gridChanged() {
         super.gridChanged();
         if (getTile() == null || getTile().getWorld() == null || getTile().getWorld().isRemote) return;
+        PatternP2PTopologyGridService.invalidate(getGridNode());
         invalidateInputCache();
         synchronizeFromInput();
         refreshModelState();
         getHost().markForUpdate();
         wake();
+        wakeBoundPorts();
     }
 
     @MENetworkEventSubscribe
     public void onPowerStatusChanged(MENetworkPowerStatusChange event) {
+        PatternP2PTopologyGridService.invalidate(getGridNode());
         invalidateInputCache();
         synchronizeFromInput();
         refreshModelState();
         wake();
+        wakeBoundPorts();
     }
 
     @MENetworkEventSubscribe
     public void onChannelsChanged(MENetworkChannelsChanged event) {
+        PatternP2PTopologyGridService.invalidate(getGridNode());
         invalidateInputCache();
         synchronizeFromInput();
         getHost().markForUpdate();
         wake();
+        wakeBoundPorts();
     }
 
     private void refreshModelState() {
@@ -438,6 +417,7 @@ public final class PatternP2PUnitManagerPart extends PartCable
         short next = (short) FrequencyLimits.clamp(value);
         if (next == frequency) return;
         frequency = next;
+        PatternP2PTopologyGridService.invalidate(getGridNode());
         invalidateInputCache();
         saveChanges();
         getHost().markForUpdate();

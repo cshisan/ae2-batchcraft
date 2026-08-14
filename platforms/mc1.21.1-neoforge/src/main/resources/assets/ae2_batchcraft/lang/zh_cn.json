@@ -166,5 +166,18 @@
   "tooltip.ae2_batchcraft.task_state.working": "工作中",
   "tooltip.ae2_batchcraft.unit.unbound": "未绑定",
   "tooltip.ae2_batchcraft.material_output_config": "输出配置",
-  "tooltip.ae2_batchcraft.material_output_config.entry": "%1$s：%2$s · %3$s"
+  "tooltip.ae2_batchcraft.material_output_config.entry": "%1$s：%2$s · %3$s",
+  "gui.ae2_batchcraft.pattern_batch_config": "Ctrl+中键：批次配置",
+  "gui.ae2_batchcraft.pattern_batch_config.title": "批次配置",
+  "gui.ae2_batchcraft.pattern_batch_count": "批次数量",
+  "gui.ae2_batchcraft.pattern_batch_count.tooltip": "仅在“批次分发”模式下生效\n系统只检查样板数量能否整除，\n无法验证机器的实际配方比例\n\n示例：\n机器实际配方：2A + 2B → 2C\n编码样板：4A + 4B → 4C\n若批次数量设为 4，系统会按 1A + 1B → 1C 分发，\n机器可能无法启动，导致合成卡住\n\n请确保每批材料满足机器的最小配方",
+  "gui.ae2_batchcraft.pattern_batch_count.maximum": "最大批次数：%s",
+  "gui.ae2_batchcraft.pattern_batch_count.confirm": "确定",
+  "gui.ae2_batchcraft.pattern_batch_count.corrected_maximum": "超过最大值，已调整为 %s",
+  "gui.ae2_batchcraft.pattern_batch_count.corrected_one": "数量无效或不能整除，已调整为 1",
+  "gui.ae2_batchcraft.dispatch_mode": "任务分发模式",
+  "gui.ae2_batchcraft.dispatch_mode.full_dispatch": "完整下发",
+  "gui.ae2_batchcraft.dispatch_mode.batch_distribution": "批次分发",
+  "gui.ae2_batchcraft.dispatch_mode.switch.tooltip": "当前：%1$s\n点击切换为%2$s",
+  "tooltip.ae2_batchcraft.pattern_batch_count": "批次数量：%s"
 }

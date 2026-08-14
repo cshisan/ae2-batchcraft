@@ -19,7 +19,7 @@ navigation:
 | --- | --- |
 | Pattern Provider | Holds processing patterns and starts external processing |
 | Pattern P2P Input | Receives jobs from the Pattern Provider |
-| Pattern P2P Output | Sends one selected job to its adjacent machine |
+| Pattern P2P Output | Sends the assigned materials to its adjacent inventory |
 | AE subnet cable | Connects the input and outputs to the same AE grid |
 | Memory Card | Creates and copies the P2P frequency |
 
@@ -31,7 +31,7 @@ navigation:
 4. Bind all endpoints to one nonzero frequency.
 5. Insert a processing pattern into the Pattern Provider and request a job.
 
-The input checks outputs and Unit Managers on its frequency in round-robin order. Busy, offline, unloaded, or currently incompatible endpoints are skipped. Once accepted, the complete job belongs to that endpoint.
+The input checks Outputs and Unit Managers on its frequency in round-robin order. Busy, offline, unloaded, or currently incompatible endpoints are skipped. Full Dispatch assigns the complete push to one endpoint; Batch Distribution follows its separately configured share limits.
 
 ## First-Run Checklist
 
@@ -42,4 +42,4 @@ The input checks outputs and Unit Managers on its frequency in round-robin order
 - The processing pattern declares the actual product that will return.
 - ME storage has room for the returned product.
 
-See [Frequency Binding](frequency.md) if an endpoint does not join the group, and [Product Return Flow](return-flow.md) if ingredients move but products do not return.
+See [Frequency Binding](frequency.md) if an endpoint does not join the group, [Batch Distribution](../pattern-p2p/batch-distribution.md) before splitting a large pattern, and [Product Return Flow](return-flow.md) if ingredients move but products do not return.

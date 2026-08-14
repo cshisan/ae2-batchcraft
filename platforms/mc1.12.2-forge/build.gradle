@@ -31,7 +31,7 @@ dependencies {
     testCompile 'junit:junit:4.13.2'
 }
 
-sourceSets.main.java.srcDir file('../../core/src/main/java')
+sourceSets.main.java.srcDir file('../../shared/src/main/java')
 
 tasks.withType(JavaCompile) {
     options.encoding = 'UTF-8'

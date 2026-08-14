@@ -12,6 +12,20 @@ base {
 
 java.toolchain.languageVersion = JavaLanguageVersion.of(21)
 
+sourceSets {
+    performanceTest {
+        java.srcDir 'src/performanceTest/java'
+        resources.srcDir 'src/performanceTest/resources'
+        compileClasspath += sourceSets.main.output
+        runtimeClasspath += sourceSets.main.output
+    }
+}
+
+configurations {
+    performanceTestImplementation.extendsFrom implementation
+    performanceTestRuntimeOnly.extendsFrom runtimeOnly
+}
+
 repositories {
     exclusiveContent {
         forRepository { maven { url = 'https://modmaven.dev/' } }
@@ -29,6 +43,13 @@ neoForge {
     runs {
         client { client() }
         server { server(); programArgument '--nogui' }
+        performanceGameTestServer {
+            type = 'gameTestServer'
+            sourceSet = sourceSets.performanceTest
+            gameDirectory = file('run-performance')
+            systemProperty 'neoforge.enabledGameTestNamespaces', mod_id
+            jvmArgument "-XX:StartFlightRecording=filename=${file('run-performance/results/ae2bc-1.21.1.jfr').absolutePath},settings=profile,dumponexit=true"
+        }
         data {
             data()
             programArguments.addAll '--mod', mod_id, '--all', '--output', file('src/generated/resources').absolutePath,
@@ -38,8 +59,14 @@ neoForge {
 
     mods {
         "${mod_id}" { sourceSet sourceSets.main }
+        "${mod_id}_performance" {
+            sourceSet sourceSets.main
+            sourceSet sourceSets.performanceTest
+        }
     }
 }
+
+neoForge.addModdingDependenciesTo(sourceSets.performanceTest)
 
 dependencies {
     implementation "maven.modrinth:ae2:${ae2_version}"
@@ -52,8 +79,8 @@ dependencies {
 }
 
 sourceSets.main.resources { srcDir 'src/generated/resources' }
-sourceSets.main.java { srcDir '../../core/src/main/java' }
-sourceSets.test.java { srcDir '../../core/src/test/java' }
+sourceSets.main.java { srcDir '../../shared/src/main/java' }
+sourceSets.test.java { srcDir '../../shared/src/test/java' }
 
 tasks.named('test', Test) { useJUnitPlatform() }
 

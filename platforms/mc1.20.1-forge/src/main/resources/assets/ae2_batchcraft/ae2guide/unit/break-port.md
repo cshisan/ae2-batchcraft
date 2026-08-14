@@ -23,4 +23,4 @@ Uses AE2 world collect strategies to break blocks or collect source fluids in fr
 
 With **Recover broken items** enabled, accepted drops return through the Manager. With it disabled, item drops are spawned into the world in front of the port. Source fluids always return directly because they cannot be represented as world item drops.
 
-The return rule and available return capacity are checked before a collect is committed. Claim protection can prevent world interaction.
+The return rule and available return capacity are checked before a collect is committed. A rejected interaction leaves the task available for a later retry.

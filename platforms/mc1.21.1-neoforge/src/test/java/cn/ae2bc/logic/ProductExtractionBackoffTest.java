@@ -27,5 +27,6 @@ class ProductExtractionBackoffTest {
                 backoff.nextDelay(ProductExtractionTickState.NO_PROGRESS, 1));
         assertEquals(40, backoff.nextDelay(ProductExtractionTickState.NO_PROGRESS, 40));
         assertEquals(1, backoff.nextDelay(ProductExtractionTickState.WAITING, 40));
+        assertEquals(1, backoff.nextDelay(ProductExtractionTickState.BUDGET_EXHAUSTED, 40));
     }
 }

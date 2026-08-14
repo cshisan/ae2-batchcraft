@@ -27,6 +27,7 @@ class PatternP2PTooltipResourceTest {
             assertTrue(text.contains("tooltip.ae2_batchcraft.unit_frequency"));
             assertTrue(text.contains("tooltip.ae2_batchcraft.task_state"));
             assertFalse(text.contains("tooltip.ae2_batchcraft.task_state.active_count"));
+            assertTrue(text.contains("tooltip.ae2_batchcraft.pattern_batch_count"));
         }
     }
 

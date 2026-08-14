@@ -18,8 +18,14 @@ Endpoint extraction lets BatchCraft pull products from the inventory or resource
 
 The switch therefore controls only whether normal Outputs have extraction capability. The interval and amount affect both endpoint types. A Unit Extraction Port still requires its Manager's task to be operational.
 
-At each configured deadline, the endpoint performs up to the configured number of extraction operations. Empty attempts add a gradual backoff of at most `20` ticks. Inventory capability changes and recovered return capacity can wake a waiting extractor early, while a successful extraction still respects the configured minimum interval.
+The configured amount is the maximum resource-operation budget for one scheduled pass. It is not a promise that the whole amount moves in one tick. A small inventory may provide less, while a large amount may require later ticks.
+
+During one tick, each extraction endpoint may complete at most `64` successful return-inventory rounds. All extraction endpoints on one AE grid share a limit of `256` successful rounds per tick. A round may move many units of one resource; these limits count successful rounds, not individual items or fluid units.
+
+After a successful round enters the AE network, the return inventory can be reused during the same tick. If ME storage or the return inventory cannot accept another resource, extraction stops instead of pulling more. Anything already in the return inventory remains there and is retried. Endpoints deferred by the shared limit continue on a later tick.
+
+Empty attempts add a gradual backoff of at most `20` ticks. Inventory changes and recovered return capacity can wake a waiting extractor early, while a successful extraction still respects the configured minimum interval.
 
 Extraction may start before every input material has been dispatched. This is intentional: the task remains active until the pending-material queue is empty. If a resource was pulled but cannot immediately enter the return path, it is held in a recovery queue and retried rather than silently discarded.
 
-Use the machine's native push behavior when it is reliable. Enable endpoint extraction when a machine cannot push, has several incompatible output faces, or benefits from the configured pull rate.
+Use direct return when the adjacent inventory already sends products reliably. Enable endpoint extraction when products must be pulled or when a configured pull rate is useful.

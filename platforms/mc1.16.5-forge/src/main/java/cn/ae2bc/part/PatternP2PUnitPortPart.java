@@ -24,6 +24,7 @@ import appeng.parts.AEBasePart;
 import appeng.parts.PartModel;
 import appeng.client.render.cablebus.P2PTunnelFrequencyModelData;
 import cn.ae2bc.client.model.PatternP2PUnitModelData;
+import cn.ae2bc.core.extraction.ProductExtractionLimits;
 import cn.ae2bc.logic.PatternP2PUnitIdentityColors;
 import cn.ae2bc.core.unit.UnitPortType;
 import cn.ae2bc.core.energy.EnergyEndpoint;
@@ -248,7 +249,9 @@ public final class PatternP2PUnitPortPart extends AEBasePart
     private int extractFromAdjacent(PatternP2PUnitManagerPart manager, int amount) {
         IItemHandler source = adjacentItemHandler();
         int moved = 0;
-        for (int slot = 0; slot < source.getSlots() && moved < amount && manager.isTaskActive(); slot++) {
+        int transferredSlots = 0;
+        for (int slot = 0; slot < source.getSlots() && moved < amount && manager.isTaskActive()
+                && transferredSlots < ProductExtractionLimits.MAX_TRANSFER_ENTRIES_PER_RUN; slot++) {
             ItemStack candidate = source.extractItem(slot, amount - moved, true);
             if (candidate.isEmpty()) continue;
             ItemStack simulatedRemainder = manager.returnProduct(candidate, true);
@@ -256,7 +259,9 @@ public final class PatternP2PUnitPortPart extends AEBasePart
             if (accepted <= 0) continue;
             ItemStack extracted = source.extractItem(slot, accepted, false);
             ItemStack unexpected = manager.returnProduct(extracted, false);
-            moved += extracted.getCount() - unexpected.getCount();
+            int transferred = extracted.getCount() - unexpected.getCount();
+            moved = (int) Math.min((long) amount, (long) moved + transferred);
+            if (transferred > 0) transferredSlots++;
             if (!unexpected.isEmpty()) ItemHandlerHelper.insertItem(source, unexpected, false);
         }
         return moved;
@@ -451,6 +456,7 @@ public final class PatternP2PUnitPortPart extends AEBasePart
         boundManagerId = requestedId;
         boundFrequency = requestedFrequency;
         cachedManager = null;
+        PatternP2PTopologyGridService.invalidate(getGridNode());
         getHost().markForSave();
         getHost().markForUpdate();
         card.notifyUser(player, MemoryCardMessages.SETTINGS_LOADED);
@@ -460,11 +466,19 @@ public final class PatternP2PUnitPortPart extends AEBasePart
     @Override
     public void gridChanged() {
         super.gridChanged();
+        cachedManager = null;
+        PatternP2PTopologyGridService.invalidate(getGridNode());
+        redstoneWorldStateDirty = true;
+        alertTicking();
         refreshModelState();
     }
 
     @MENetworkEventSubscribe
     public void onPowerStatusChanged(MENetworkPowerStatusChange event) {
+        cachedManager = null;
+        PatternP2PTopologyGridService.invalidate(getGridNode());
+        redstoneWorldStateDirty = true;
+        alertTicking();
         refreshModelState();
     }
 

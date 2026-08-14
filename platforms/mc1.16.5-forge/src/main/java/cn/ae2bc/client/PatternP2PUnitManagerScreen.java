@@ -150,7 +150,7 @@ public final class PatternP2PUnitManagerScreen extends ContainerScreen<PatternP2
         TextFieldWidget field = new TextFieldWidget(font, leftPos + x, topPos + y,
                 36, 16, StringTextComponent.EMPTY);
         field.setValue(Integer.toString(value));
-        field.setMaxLength(4);
+        field.setMaxLength(Math.max(4, Integer.toString(maximum.getAsInt()).length()));
         field.setFilter(text -> validInteger(text, minimum, maximum.getAsInt()));
         field.setResponder(text -> {
             if (!text.isEmpty()) {

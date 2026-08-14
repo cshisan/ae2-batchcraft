@@ -576,7 +576,8 @@ public final class PatternP2PTunnelOutputLogic implements ProductExtractionTask 
             return productExtractionRecovery.isEmpty()
                     ? ProductExtractionTickState.DISABLED : ProductExtractionTickState.WAITING;
         }
-        var settings = endpointSettings.toExtractionSettings();
+        var settings = new ProductExtractionSettings(true, endpointSettings.interval(),
+                endpointSettings.amount(), false, java.util.Set.of());
         Direction side = output.getSide();
         if (side == null) {
             return recoveryProgress

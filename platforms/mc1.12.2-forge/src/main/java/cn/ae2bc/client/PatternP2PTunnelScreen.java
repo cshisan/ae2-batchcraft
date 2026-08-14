@@ -127,7 +127,7 @@ public final class PatternP2PTunnelScreen extends GuiContainer {
     private GuiTextField field(int id, int x, int y, int value, int minimum, IntSupplier maximum) {
         GuiTextField field = new GuiTextField(id, fontRenderer, guiLeft + x, guiTop + y, 36, 16);
         field.setText(Integer.toString(value));
-        field.setMaxStringLength(4);
+        field.setMaxStringLength(Math.max(4, Integer.toString(maximum.getAsInt()).length()));
         field.setValidator(text -> validInteger(text, minimum, maximum.getAsInt()));
         return field;
     }

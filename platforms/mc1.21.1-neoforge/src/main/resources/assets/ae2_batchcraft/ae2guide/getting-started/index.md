@@ -15,6 +15,6 @@ Build the smallest working network first, then configure frequency binding and p
 4. Encode a processing pattern and request a crafting job.
 5. Confirm that all ingredients leave the endpoint and the declared product returns.
 
-> A job is never split internally. Distribution happens between complete jobs, not between item quantities inside one job.
+> Full Dispatch is the default and keeps one processing push intact. Batch Distribution can divide a processing pattern into validated integer shares after it is configured explicitly.
 
 <SubPages />

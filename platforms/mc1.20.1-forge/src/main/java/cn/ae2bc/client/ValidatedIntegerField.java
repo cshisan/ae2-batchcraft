@@ -19,7 +19,7 @@ final class ValidatedIntegerField extends EditBox {
         this.minimum = minimum;
         this.maximum = maximum;
         this.changeListener = changeListener;
-        setMaxLength(4);
+        setMaxLength(Math.max(4, Integer.toString(maximum.getAsInt()).length()));
         setTextColorUneditable(0xE0E0E0);
         setFilter(this::isValidInput);
         setResponder(this::valueChanged);

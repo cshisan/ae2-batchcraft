@@ -42,7 +42,7 @@ class StrictReturnRoutingSourceTest {
         assertTrue(collected.contains("insertReturned(what, amount, Actionable.MODULATE)"),
                 "break recovery must use the manager filter");
 
-        assertTrue(port.contains("return isReturnPort() || type == PatternP2PUnitPortType.EXTRACT;"),
+        assertTrue(port.contains("return isReturnPort() || type == UnitPortType.EXTRACT;"),
                 "extraction ports must expose the filtered internal return inventory");
         assertTrue(port.contains("? manager.getLogic().insertReturned(what, amount, mode) : 0;"),
                 "return inventory insertion must use the manager filter");

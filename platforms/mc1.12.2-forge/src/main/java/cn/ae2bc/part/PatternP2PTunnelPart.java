@@ -266,8 +266,11 @@ public final class PatternP2PTunnelPart extends PartP2PTunnel<PatternP2PTunnelPa
 
         List<RoutedInput> result = new ArrayList<RoutedInput>(allocations.size());
         for (PatternInputSlotAllocator.Allocation allocation : allocations) {
+            long allocatedAmount = allocation.getAmount();
+            if (allocatedAmount <= 0 || allocatedAmount > Integer.MAX_VALUE) return null;
             ItemStack stack = table.getStackInSlot(allocation.getRuntimeSlot()).copy();
-            stack.setCount(allocation.getAmount());
+            if (allocatedAmount > stack.getCount()) return null;
+            stack.setCount((int) allocatedAmount);
             result.add(new RoutedInput(
                     allocation.getPatternSlot(), allocation.getRuntimeSlot(), stack));
         }
@@ -526,12 +529,14 @@ public final class PatternP2PTunnelPart extends PartP2PTunnel<PatternP2PTunnelPa
     @Override
     public void onTunnelConfigChange() {
         super.onTunnelConfigChange();
+        PatternP2PTopologyGridService.invalidate(getGridNode());
         refreshExtractionEndpoints();
     }
 
     @Override
     public void onTunnelNetworkChange() {
         super.onTunnelNetworkChange();
+        PatternP2PTopologyGridService.invalidate(getGridNode());
         refreshExtractionEndpoints();
     }
 
@@ -645,7 +650,7 @@ public final class PatternP2PTunnelPart extends PartP2PTunnel<PatternP2PTunnelPa
     @Override public int getSlotLimit(int slot) { return 64; }
     @Override public boolean isItemValid(int slot, @Nonnull ItemStack stack) { return true; }
 
-    @Override public TickingRequest getTickingRequest(IGridNode node) { return new TickingRequest(1, ProductExtractionLimits.MAX_INTERVAL, false, false); }
+    @Override public TickingRequest getTickingRequest(IGridNode node) { return new TickingRequest(1, ProductExtractionLimits.MAX_INTERVAL, false, true); }
     @Override
     public TickRateModulation tickingRequest(IGridNode node, int ticksSinceLastCall) {
         if (!isActive()) return TickRateModulation.SLOWER;
@@ -799,15 +804,10 @@ public final class PatternP2PTunnelPart extends PartP2PTunnel<PatternP2PTunnelPa
     }
 
     private void synchronizeUnitManagers() {
-        if (output || getGridNode() == null || getGridNode().getGrid() == null) return;
-        for (IGridNode node : getGridNode().getGrid().getNodes()) {
-            Object machine = node.getMachine();
-            if (machine instanceof PatternP2PUnitManagerPart) {
-                PatternP2PUnitManagerPart manager = (PatternP2PUnitManagerPart) machine;
-                if (manager.getFrequency() == getFrequency()) {
-                    manager.applyMainConfiguration(getUnitSettings(), unitConfigurationRevision);
-                }
-            }
+        if (output) return;
+        for (PatternP2PUnitManagerPart manager
+                : PatternP2PTopologyGridService.findAllByFrequency(getGridNode(), getFrequency())) {
+            manager.applyMainConfiguration(getUnitSettings(), unitConfigurationRevision);
         }
     }
     public void setOutputSettings(ReturnMode mode, boolean sync) {
@@ -829,13 +829,9 @@ public final class PatternP2PTunnelPart extends PartP2PTunnel<PatternP2PTunnelPa
             return;
         }
         for (PatternP2PTunnelPart endpoint : outputs()) endpoint.clearOutputReturnBatch();
-        if (getGridNode() == null || getGridNode().getGrid() == null) return;
-        for (IGridNode node : getGridNode().getGrid().getNodes()) {
-            Object machine = node.getMachine();
-            if (machine instanceof PatternP2PUnitManagerPart
-                    && ((PatternP2PUnitManagerPart) machine).getFrequency() == getFrequency()) {
-                ((PatternP2PUnitManagerPart) machine).resetTaskState();
-            }
+        for (PatternP2PUnitManagerPart manager
+                : PatternP2PTopologyGridService.findAllByFrequency(getGridNode(), getFrequency())) {
+            manager.resetTaskState();
         }
     }
     private void applySettings(PatternP2PUnitSettings settings) {
@@ -877,7 +873,9 @@ public final class PatternP2PTunnelPart extends PartP2PTunnel<PatternP2PTunnelPa
         PatternP2PTunnelPart input = getInput();
         if (input == null) return 0;
         int moved = 0;
-        for (int slot = 0; slot < source.getSlots() && moved < amount; slot++) {
+        int transferredSlots = 0;
+        for (int slot = 0; slot < source.getSlots() && moved < amount
+                && transferredSlots < ProductExtractionLimits.MAX_TRANSFER_ENTRIES_PER_RUN; slot++) {
             ItemStack candidate = source.extractItem(slot, amount - moved, true);
             if (candidate.isEmpty()) continue;
             ItemStack remainder = returnOutputProduct(candidate, true);
@@ -885,7 +883,9 @@ public final class PatternP2PTunnelPart extends PartP2PTunnel<PatternP2PTunnelPa
             if (accepted <= 0) continue;
             ItemStack extracted = source.extractItem(slot, accepted, false);
             ItemStack unexpected = returnOutputProduct(extracted, false);
-            moved += extracted.getCount() - unexpected.getCount();
+            int transferred = extracted.getCount() - unexpected.getCount();
+            moved = (int) Math.min((long) amount, (long) moved + transferred);
+            if (transferred > 0) transferredSlots++;
             if (!unexpected.isEmpty()) ItemHandlerHelper.insertItem(source, unexpected, false);
         }
         return moved;
@@ -940,7 +940,7 @@ public final class PatternP2PTunnelPart extends PartP2PTunnel<PatternP2PTunnelPa
         for (PatternP2PTunnelPart output : outputs()) {
             output.extractionDeadline.wake();
             try {
-                getProxy().getTick().wakeDevice(output.getGridNode());
+                getProxy().getTick().alertDevice(output.getGridNode());
             } catch (GridAccessException ignored) {
                 // Another output on the frequency may still be available.
             }

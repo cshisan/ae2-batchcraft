@@ -31,7 +31,7 @@ import cn.ae2bc.logic.RemoteReturnInventory;
 import cn.ae2bc.logic.PatternP2PUnitIdentityColors;
 import cn.ae2bc.logic.PatternP2PUnitDimensions;
 import cn.ae2bc.logic.PatternP2PUnitManagerLogic;
-import cn.ae2bc.logic.PatternP2PUnitPortType;
+import cn.ae2bc.core.unit.UnitPortType;
 import cn.ae2bc.logic.PatternP2PTopologyGridService;
 import cn.ae2bc.client.model.PatternP2PUnitModelData;
 import cn.ae2bc.menu.PatternP2PUnitManagerMenu;
@@ -137,6 +137,11 @@ public final class PatternP2PUnitManagerPart extends CablePart implements Patter
     }
 
     @Override
+    public boolean hasActiveBatchSession(java.util.UUID sessionId) {
+        return logic.hasActiveBatchSession(sessionId);
+    }
+
+    @Override
     public boolean tryAcceptPattern(IPatternDetails pattern, PatternDispatchMetadata metadata,
                                     KeyCounter[] inputs, IActionSource source) {
         return logic.tryAcceptPattern(pattern, metadata, inputs);
@@ -159,13 +164,34 @@ public final class PatternP2PUnitManagerPart extends CablePart implements Patter
         return returnFluidHandler;
     }
 
+    @Override
+    public String getDispatchId() {
+        return "unit:" + patternP2PUnitId;
+    }
+
+    @Override
+    public long getMaximumAcceptedAtomicUnits(IPatternDetails pattern, PatternDispatchMetadata atomicMetadata,
+                                               KeyCounter[] atomicInputs, long upperBound,
+                                               java.util.UUID sessionId, IActionSource source) {
+        return logic.getMaximumAcceptedAtomicUnits(
+                pattern, atomicMetadata, atomicInputs, upperBound, sessionId);
+    }
+
+    @Override
+    public boolean tryAcceptPatternAtomicUnits(IPatternDetails pattern, PatternDispatchMetadata atomicMetadata,
+                                               KeyCounter[] atomicInputs, long units,
+                                               java.util.UUID sessionId, IActionSource source) {
+        return logic.tryAcceptPatternAtomicUnits(
+                pattern, atomicMetadata, atomicInputs, units, sessionId);
+    }
+
     private void alertReturnProducers() {
         var grid = getMainNode().getGrid();
         if (grid == null) {
             return;
         }
         for (PatternP2PUnitPortPart port : grid.getService(PatternP2PTopologyGridService.class)
-                .getPorts(patternP2PUnitId, PatternP2PUnitPortType.EXTRACT)) {
+                .getPorts(patternP2PUnitId, UnitPortType.EXTRACT)) {
             port.alertTicking();
         }
     }

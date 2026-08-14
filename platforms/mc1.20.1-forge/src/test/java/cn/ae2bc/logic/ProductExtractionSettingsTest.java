@@ -13,12 +13,12 @@ class ProductExtractionSettingsTest {
         assertEquals(1, ProductExtractionSettings.clampInterval(-1));
         assertEquals(2000, ProductExtractionSettings.clampInterval(3000));
         assertEquals(1, ProductExtractionSettings.clampAmount(-1));
-        assertEquals(64, ProductExtractionSettings.clampAmount(100));
+        assertEquals(100, ProductExtractionSettings.clampAmount(100));
     }
 
     @Test
     void normalizesConstructorValuesAndKeepsMarkersImmutable() {
-        var settings = new ProductExtractionSettings(true, -1, 100, false, Set.of());
+        var settings = new ProductExtractionSettings(true, -1, Integer.MAX_VALUE, false, Set.of());
 
         assertEquals(ProductExtractionSettings.MIN_INTERVAL, settings.interval());
         assertEquals(ProductExtractionSettings.MAX_AMOUNT, settings.amount());

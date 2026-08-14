@@ -1,0 +1,13 @@
+{
+  "$schema": "../schema.json",
+  "includes": ["../common/common.json"],
+  "generatedBackground": {"width": 176, "height": 96},
+  "text": {
+    "dialog_title": {"text": {"translate": "gui.ae2_batchcraft.pattern_batch_config.title"}, "position": {"left": 8, "top": 6}},
+    "batch_count": {"text": {"translate": "gui.ae2_batchcraft.pattern_batch_count"}, "position": {"left": 12, "top": 27}}
+  },
+  "widgets": {
+    "back": {"left": 152, "top": -5, "width": 20, "height": 20},
+    "confirm": {"left": 112, "top": 42, "width": 52, "height": 18}
+  }
+}

@@ -10,4 +10,10 @@ public interface PatternEncodingTermMenuExtension {
     void ae2bc$setInputDirection(int slot, Direction direction);
 
     void ae2bc$setMaterialOutputForm(int slot, MaterialOutputForm form);
+
+    long ae2bc$getPatternBatchCount();
+
+    long ae2bc$getMaximumPatternBatchCount();
+
+    void ae2bc$setPatternBatchCount(long batchCount);
 }

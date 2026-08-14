@@ -8,6 +8,8 @@ import net.minecraft.nbt.CompoundTag;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.IdentityHashMap;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 
 /** Schedules product extraction without changing AE2's native pattern-provider ticker. */
@@ -24,18 +26,48 @@ public final class ProductExtractionGridService implements IGridService, IGridSe
     @Override
     public void onServerStartTick() {
         tick++;
-        for (Job job : schedule.takeDue(tick)) {
+        ProductExtractionBudget budget = new ProductExtractionBudget();
+        var dueJobs = schedule.takeDue(tick);
+        List<Job> budgetExhaustedJobs = new ArrayList<>();
+        int index = 0;
+        for (; index < dueJobs.size(); index++) {
+            Job job = dueJobs.get(index);
             if (job.node.getGrid() != grid || !job.task.hasProductExtractionWork()) {
                 remove(job);
                 continue;
             }
 
-            ProductExtractionTickState state = job.task.tickProductExtraction();
+            if (budget.isGridExhausted()) {
+                break;
+            }
+            budget.beginEndpoint();
+            ProductExtractionTickState state = job.task.tickProductExtraction(budget);
             if (state == ProductExtractionTickState.DISABLED) {
                 remove(job);
+            } else if (state == ProductExtractionTickState.BUDGET_EXHAUSTED) {
+                if (!schedule.isScheduled(job)) {
+                    budgetExhaustedJobs.add(job);
+                }
             } else if (!schedule.isScheduled(job)) {
                 schedule.schedule(job, tick + job.backoff.nextDelay(
                         state, job.task.getProductExtractionInterval()));
+            }
+        }
+        // Jobs that did not get grid budget go first next tick, ahead of endpoints that consumed this tick's budget.
+        for (; index < dueJobs.size(); index++) {
+            Job job = dueJobs.get(index);
+            if (job.node.getGrid() == grid && job.task.hasProductExtractionWork()) {
+                schedule.schedule(job, tick + 1);
+            } else {
+                remove(job);
+            }
+        }
+        for (Job job : budgetExhaustedJobs) {
+            if (job.node.getGrid() == grid && job.task.hasProductExtractionWork()
+                    && !schedule.isScheduled(job)) {
+                schedule.schedule(job, tick + 1);
+            } else if (job.node.getGrid() != grid || !job.task.hasProductExtractionWork()) {
+                remove(job);
             }
         }
     }

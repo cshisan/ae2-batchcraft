@@ -54,8 +54,8 @@ mixin {
     config "${mod_id}.mixins.json"
 }
 
-sourceSets.main.java.srcDir file('../../core/src/main/java')
-sourceSets.test.java.srcDir file('../../core/src/test/java')
+sourceSets.main.java.srcDir file('../../shared/src/main/java')
+sourceSets.test.java.srcDir file('../../shared/src/test/java')
 
 tasks.named('test', Test) { useJUnitPlatform() }
 

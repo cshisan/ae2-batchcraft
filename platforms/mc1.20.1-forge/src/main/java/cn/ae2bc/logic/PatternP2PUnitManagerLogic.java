@@ -14,6 +14,7 @@ import appeng.api.stacks.KeyCounter;
 import appeng.core.settings.TickRates;
 import appeng.crafting.pattern.AEProcessingPattern;
 import appeng.me.helpers.MachineSource;
+import cn.ae2bc.core.unit.UnitPortType;
 import cn.ae2bc.part.PatternP2PUnitManagerPart;
 import cn.ae2bc.part.PatternP2PUnitPortPart;
 import cn.ae2bc.pattern.MaterialOutputForm;
@@ -167,7 +168,7 @@ public final class PatternP2PUnitManagerLogic implements IGridTickable {
         if (plan == null || plan.isEmpty()) {
             return false;
         }
-        Map<PatternP2PUnitPortType, List<PatternP2PUnitPortPart>> boundPorts = getBoundPortsByType();
+        Map<UnitPortType, List<PatternP2PUnitPortPart>> boundPorts = getBoundPortsByType();
         for (PendingMaterial material : plan) {
             PatternP2PUnitPortPart port = findPort(portsFor(boundPorts, material.form()),
                     material.stack(), material.form());
@@ -229,13 +230,13 @@ public final class PatternP2PUnitManagerLogic implements IGridTickable {
         return result;
     }
 
-    private Map<PatternP2PUnitPortType, List<PatternP2PUnitPortPart>> getBoundPortsByType() {
+    private Map<UnitPortType, List<PatternP2PUnitPortPart>> getBoundPortsByType() {
         var grid = mainNode.getGrid();
         if (grid == null) {
             return Map.of();
         }
-        Map<PatternP2PUnitPortType, List<PatternP2PUnitPortPart>> result = new EnumMap<>(PatternP2PUnitPortType.class);
-        for (PatternP2PUnitPortType type : PatternP2PUnitPortType.values()) {
+        Map<UnitPortType, List<PatternP2PUnitPortPart>> result = new EnumMap<>(UnitPortType.class);
+        for (UnitPortType type : UnitPortType.values()) {
             List<PatternP2PUnitPortPart> ports = grid.getService(PatternP2PTopologyGridService.class)
                     .getPorts(manager.getPatternP2PUnitId(), type);
             if (!ports.isEmpty()) {
@@ -246,8 +247,8 @@ public final class PatternP2PUnitManagerLogic implements IGridTickable {
     }
 
     private static List<PatternP2PUnitPortPart> portsFor(
-            Map<PatternP2PUnitPortType, List<PatternP2PUnitPortPart>> boundPorts, MaterialOutputForm form) {
-        return boundPorts.getOrDefault(PatternP2PUnitPortType.forOutputForm(form), List.of());
+            Map<UnitPortType, List<PatternP2PUnitPortPart>> boundPorts, MaterialOutputForm form) {
+        return boundPorts.getOrDefault(UnitPortType.forOutputFormId(form.getId()), List.of());
     }
 
     private @Nullable PatternP2PUnitPortPart findPort(List<PatternP2PUnitPortPart> boundPorts, GenericStack stack,
@@ -262,7 +263,7 @@ public final class PatternP2PUnitManagerLogic implements IGridTickable {
 
     private boolean dispatchPending() {
         boolean changed = false;
-        Map<PatternP2PUnitPortType, List<PatternP2PUnitPortPart>> boundPorts = getBoundPortsByType();
+        Map<UnitPortType, List<PatternP2PUnitPortPart>> boundPorts = getBoundPortsByType();
         for (var iterator = pendingInputs.listIterator(); iterator.hasNext(); ) {
             PendingMaterial pending = iterator.next();
             PatternP2PUnitPortPart port = findPort(portsFor(boundPorts, pending.form()),

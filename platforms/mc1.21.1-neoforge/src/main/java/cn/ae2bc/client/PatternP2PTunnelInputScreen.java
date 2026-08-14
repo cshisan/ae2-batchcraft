@@ -5,6 +5,7 @@ import appeng.client.gui.widgets.AE2Button;
 import cn.ae2bc.logic.PatternP2PUnitConfiguration;
 import cn.ae2bc.logic.RedstoneOutputMode;
 import cn.ae2bc.logic.ReturnMode;
+import cn.ae2bc.logic.PatternDispatchMode;
 import cn.ae2bc.menu.PatternP2PTunnelInputMenu;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Tooltip;
@@ -21,6 +22,7 @@ public final class PatternP2PTunnelInputScreen extends PatternP2PUnitPagedScreen
     private final Map<RedstoneOutputMode, AE2Button> redstoneModeButtons =
             new EnumMap<>(RedstoneOutputMode.class);
     private final AE2Button resetTask;
+    private final AE2Button dispatchModeButton;
     private final VerticallyAlignedCheckbox productExtraction;
     private ValidatedIntegerField strengthInput;
     private ValidatedIntegerField pulseTimeInput;
@@ -61,6 +63,10 @@ public final class PatternP2PTunnelInputScreen extends PatternP2PUnitPagedScreen
                         "gui.ae2_batchcraft.reset_task.confirm.input"), menu::resetTaskState));
         resetTask.setTooltip(Tooltip.create(Component.translatable(
                 "gui.ae2_batchcraft.reset_task.tooltip")));
+        dispatchModeButton = widgets.addButton("dispatchMode", Component.empty(), () ->
+                menu.setDispatchMode(menu.dispatchMode == PatternDispatchMode.FULL_DISPATCH
+                        ? PatternDispatchMode.BATCH_DISTRIBUTION
+                        : PatternDispatchMode.FULL_DISPATCH));
     }
 
     @Override
@@ -95,7 +101,7 @@ public final class PatternP2PTunnelInputScreen extends PatternP2PUnitPagedScreen
     @Override
     protected int getPageHeight(Page page) {
         return switch (page) {
-            case COMMON -> 186;
+            case COMMON -> 228;
             case BREAK -> 82;
             case REDSTONE -> 166;
         };
@@ -110,6 +116,7 @@ public final class PatternP2PTunnelInputScreen extends PatternP2PUnitPagedScreen
         strictButton.visible = common;
         unblockedButton.visible = common;
         resetTask.visible = common;
+        dispatchModeButton.visible = common;
         productExtraction.visible = common;
         breakRecovery.visible = breakPort;
         for (var button : redstoneModeButtons.values()) {
@@ -148,6 +155,13 @@ public final class PatternP2PTunnelInputScreen extends PatternP2PUnitPagedScreen
         strengthInput.syncValue(menu.redstoneStrength);
         pulseTimeInput.syncValue(menu.pulseWidth);
         pulsePeriodInput.syncValue(menu.pulsePeriod);
+        PatternDispatchMode nextMode = menu.dispatchMode == PatternDispatchMode.FULL_DISPATCH
+                ? PatternDispatchMode.BATCH_DISTRIBUTION
+                : PatternDispatchMode.FULL_DISPATCH;
+        dispatchModeButton.setMessage(dispatchModeName(menu.dispatchMode));
+        dispatchModeButton.setTooltip(Tooltip.create(Component.translatable(
+                "gui.ae2_batchcraft.dispatch_mode.switch.tooltip",
+                dispatchModeName(menu.dispatchMode), dispatchModeName(nextMode))));
     }
 
     @Override
@@ -163,8 +177,11 @@ public final class PatternP2PTunnelInputScreen extends PatternP2PUnitPagedScreen
                     productExtraction.getWidth(),
                     offsetX, offsetY, imageWidth, 85, 137);
             DashedSectionRenderer.drawBackground(graphics, font,
+                    Component.translatable("gui.ae2_batchcraft.dispatch_mode"),
+                    offsetX, offsetY, imageWidth, 146, 177);
+            DashedSectionRenderer.drawBackground(graphics, font,
                     Component.translatable("gui.ae2_batchcraft.pattern_p2p_unit.section.task_reset"),
-                    offsetX, offsetY, imageWidth, 146, 178);
+                    offsetX, offsetY, imageWidth, 188, 220);
         } else if (isPage(Page.BREAK)) {
             DashedSectionRenderer.drawBackground(graphics, font,
                     Component.translatable("gui.ae2_batchcraft.pattern_p2p_unit.section.drop_handling"),
@@ -189,7 +206,9 @@ public final class PatternP2PTunnelInputScreen extends PatternP2PUnitPagedScreen
                     Component.translatable("gui.ae2_batchcraft.product_extraction.title"), 81);
             extractionControls.drawUnits(graphics, font, leftPos);
             DashedSectionRenderer.drawTitle(graphics, font,
-                    Component.translatable("gui.ae2_batchcraft.pattern_p2p_unit.section.task_reset"), 142);
+                    Component.translatable("gui.ae2_batchcraft.dispatch_mode"), 142);
+            DashedSectionRenderer.drawTitle(graphics, font,
+                    Component.translatable("gui.ae2_batchcraft.pattern_p2p_unit.section.task_reset"), 184);
         } else if (isPage(Page.BREAK)) {
             DashedSectionRenderer.drawTitle(graphics, font,
                     Component.translatable("gui.ae2_batchcraft.pattern_p2p_unit.section.drop_handling"), 39);
@@ -206,6 +225,12 @@ public final class PatternP2PTunnelInputScreen extends PatternP2PUnitPagedScreen
                 "gui.ae2_batchcraft.pattern_p2p_unit.redstone_mode." + mode.getSerializedName()),
                 () -> menu.setRedstoneMode(mode));
         redstoneModeButtons.put(mode, button);
+    }
+
+    private static Component dispatchModeName(PatternDispatchMode mode) {
+        return Component.translatable("gui.ae2_batchcraft.dispatch_mode."
+                + (mode == PatternDispatchMode.BATCH_DISTRIBUTION
+                ? "batch_distribution" : "full_dispatch"));
     }
 
 }

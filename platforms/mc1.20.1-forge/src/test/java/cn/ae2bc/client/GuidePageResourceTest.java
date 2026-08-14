@@ -30,6 +30,10 @@ class GuidePageResourceTest {
             "<ImportStructure\\s+src=\"([^\"]+\\.snbt)\"\\s*/>");
     private static final Pattern MARKDOWN_LINK = Pattern.compile("\\[[^]]+]\\(([^)#]+\\.md)(?:#[^)]+)?\\)");
     private static final Pattern HEADING = Pattern.compile("(?m)^(#{1,6})\\s+");
+    private static final Pattern EXTERNAL_MOD_CONTENT = Pattern.compile(
+            "(?i)\\b(?:minecraft|forge|neoforge|guideme|mekanism|extendedae|waila|jade|jei)\\b"
+                    + "|inventory tweaks|other mod|third-party|protection mod|claim (?:rule|protection)"
+                    + "|其他模组|第三方模组|保护模组|领地");
     private static final Set<String> UNIT_PORT_PAGES = Set.of(
             "unit/transfer-port.md",
             "unit/drop-port.md",
@@ -196,6 +200,39 @@ class GuidePageResourceTest {
                 assertFalse(lower.contains("only while a job is active"), path);
                 assertFalse(page.contains("仅在任务活动时供能"), path);
             });
+        }
+    }
+
+    @Test
+    void guideKeepsTheCompleteJobBoundaryAndDoesNotClaimBatchDistribution() throws Exception {
+        var english = readEnglishGuideTree();
+        var chinese = readGuideTree(CHINESE_GUIDE_ROOT);
+
+        assertTrue(english.get("index.md").contains("One complete processing job"));
+        assertTrue(english.get("pattern-p2p/input.md").contains("Between complete jobs only"));
+        assertTrue(chinese.get("index.md").contains("一个完整处理任务"));
+        assertTrue(chinese.get("pattern-p2p/input.md").contains("只在完整任务之间分配"));
+
+        for (var guide : List.of(english, chinese)) {
+            guide.forEach((path, page) -> {
+                assertFalse(page.contains("Batch Distribution"), path);
+                assertFalse(page.contains("batch-distribution.md"), path);
+                assertFalse(page.contains("batch count"), path);
+                assertFalse(page.contains("批次分发"), path);
+                assertFalse(page.contains("批次数量"), path);
+                assertFalse(page.contains("`64` successful return-inventory rounds"), path);
+                assertFalse(page.contains("`256` successful rounds per tick"), path);
+                assertFalse(page.contains("`64` 个成功返回库存轮次"), path);
+                assertFalse(page.contains("`256` 个成功轮次"), path);
+            });
+        }
+    }
+
+    @Test
+    void playerGuideContainsNoExternalModNamesOrContent() throws Exception {
+        for (var guide : List.of(readEnglishGuideTree(), readGuideTree(CHINESE_GUIDE_ROOT))) {
+            guide.forEach((path, page) -> assertFalse(EXTERNAL_MOD_CONTENT.matcher(page).find(),
+                    path + " references content outside AE2 and AE2 BatchCraft"));
         }
     }
 

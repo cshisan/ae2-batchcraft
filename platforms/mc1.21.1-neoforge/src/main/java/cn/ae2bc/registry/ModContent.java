@@ -12,7 +12,7 @@ import cn.ae2bc.part.PatternP2PTunnelPart;
 import cn.ae2bc.part.PatternP2PTunnelEnergyPart;
 import cn.ae2bc.part.PatternP2PUnitPortPart;
 import cn.ae2bc.part.PatternP2PUnitManagerPart;
-import cn.ae2bc.logic.PatternP2PUnitPortType;
+import cn.ae2bc.core.unit.UnitPortType;
 import cn.ae2bc.pattern.MaterialOutputConfigData;
 import cn.ae2bc.placer.ComponentPlacerSelection;
 import cn.ae2bc.placer.ComponentPlacerSettings;
@@ -48,6 +48,11 @@ public final class ModContent {
             COMPONENTS.register("material_output_config", () -> DataComponentType.<MaterialOutputConfigData>builder()
                     .persistent(MaterialOutputConfigData.CODEC)
                     .networkSynchronized(MaterialOutputConfigData.STREAM_CODEC)
+                    .build());
+    public static final Supplier<DataComponentType<Long>> PATTERN_BATCH_COUNT =
+            COMPONENTS.register("pattern_batch_count", () -> DataComponentType.<Long>builder()
+                    .persistent(com.mojang.serialization.Codec.LONG)
+                    .networkSynchronized(ByteBufCodecs.VAR_LONG)
                     .build());
     public static final Supplier<DataComponentType<UUID>> PATTERN_P2P_UNIT_ID =
             COMPONENTS.register("pattern_p2p_unit_id", () -> DataComponentType.<UUID>builder()
@@ -95,23 +100,23 @@ public final class ModContent {
     public static final DeferredHolder<Item, ColoredPartItem<PatternP2PUnitManagerPart>> PATTERN_P2P_UNIT_MANAGER =
             PATTERN_P2P_UNIT_MANAGERS.get(AEColor.TRANSPARENT);
     public static final DeferredHolder<Item, PartItem<PatternP2PUnitPortPart>> PATTERN_P2P_UNIT_PORT_DROP =
-            patternP2PUnitPort("pattern_p2p_unit_port_drop", PatternP2PUnitPortType.DROP);
+            patternP2PUnitPort("pattern_p2p_unit_port_drop", UnitPortType.DROP);
     public static final DeferredHolder<Item, PartItem<PatternP2PUnitPortPart>> PATTERN_P2P_UNIT_PORT_COLLECT =
-            patternP2PUnitPort("pattern_p2p_unit_port_collect", PatternP2PUnitPortType.COLLECT);
+            patternP2PUnitPort("pattern_p2p_unit_port_collect", UnitPortType.COLLECT);
     public static final DeferredHolder<Item, PartItem<PatternP2PUnitPortPart>> PATTERN_P2P_UNIT_PORT_PLACE =
-            patternP2PUnitPort("pattern_p2p_unit_port_place", PatternP2PUnitPortType.PLACE);
+            patternP2PUnitPort("pattern_p2p_unit_port_place", UnitPortType.PLACE);
     public static final DeferredHolder<Item, PartItem<PatternP2PUnitPortPart>> PATTERN_P2P_UNIT_PORT_BREAK =
-            patternP2PUnitPort("pattern_p2p_unit_port_break", PatternP2PUnitPortType.BREAK);
+            patternP2PUnitPort("pattern_p2p_unit_port_break", UnitPortType.BREAK);
     public static final DeferredHolder<Item, PartItem<PatternP2PUnitPortPart>> PATTERN_P2P_UNIT_PORT_TRANSFER =
-            patternP2PUnitPort("pattern_p2p_unit_port_transfer", PatternP2PUnitPortType.TRANSFER);
+            patternP2PUnitPort("pattern_p2p_unit_port_transfer", UnitPortType.TRANSFER);
     public static final DeferredHolder<Item, PartItem<PatternP2PUnitPortPart>> PATTERN_P2P_UNIT_PORT_RETURN =
-            patternP2PUnitPort("pattern_p2p_unit_port_return", PatternP2PUnitPortType.RETURN);
+            patternP2PUnitPort("pattern_p2p_unit_port_return", UnitPortType.RETURN);
     public static final DeferredHolder<Item, PartItem<PatternP2PUnitPortPart>> PATTERN_P2P_UNIT_PORT_EXTRACT =
-            patternP2PUnitPort("pattern_p2p_unit_port_extract", PatternP2PUnitPortType.EXTRACT);
+            patternP2PUnitPort("pattern_p2p_unit_port_extract", UnitPortType.EXTRACT);
     public static final DeferredHolder<Item, PartItem<PatternP2PUnitPortPart>> PATTERN_P2P_UNIT_PORT_REDSTONE =
-            patternP2PUnitPort("pattern_p2p_unit_port_redstone", PatternP2PUnitPortType.REDSTONE);
+            patternP2PUnitPort("pattern_p2p_unit_port_redstone", UnitPortType.REDSTONE);
     public static final DeferredHolder<Item, PartItem<PatternP2PUnitPortPart>> PATTERN_P2P_UNIT_PORT_ENERGY =
-            patternP2PUnitPort("pattern_p2p_unit_port_energy", PatternP2PUnitPortType.ENERGY);
+            patternP2PUnitPort("pattern_p2p_unit_port_energy", UnitPortType.ENERGY);
     public static final DeferredHolder<Item, Item> PRODUCT_EXTRACTION_CARD =
             ITEMS.register("product_extraction_card", () -> Upgrades.createUpgradeCardItem(new Item.Properties()));
     public static final DeferredHolder<Item, ComponentPlacerItem> COMPONENT_PLACER =
@@ -149,7 +154,7 @@ public final class ModContent {
     }
 
     private static DeferredHolder<Item, PartItem<PatternP2PUnitPortPart>> patternP2PUnitPort(
-            String id, PatternP2PUnitPortType type) {
+            String id, UnitPortType type) {
         return ITEMS.register(id, () -> new PartItem<>(new Item.Properties(),
                 PatternP2PUnitPortPart.class, item -> new PatternP2PUnitPortPart(item, type)));
     }

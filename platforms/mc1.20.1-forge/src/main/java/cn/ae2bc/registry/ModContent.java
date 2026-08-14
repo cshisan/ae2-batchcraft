@@ -12,7 +12,7 @@ import appeng.core.AEConfig;
 import appeng.items.parts.ColoredPartItem;
 import appeng.items.parts.PartItem;
 import cn.ae2bc.Ae2bcMod;
-import cn.ae2bc.logic.PatternP2PUnitPortType;
+import cn.ae2bc.core.unit.UnitPortType;
 import cn.ae2bc.part.PatternP2PTunnelEnergyPart;
 import cn.ae2bc.part.PatternP2PTunnelPart;
 import cn.ae2bc.part.PatternP2PUnitManagerPart;
@@ -53,23 +53,23 @@ public final class ModContent {
             PATTERN_P2P_UNIT_MANAGERS.get(AEColor.TRANSPARENT);
 
     public static final RegistryObject<PartItem<PatternP2PUnitPortPart>> PATTERN_P2P_UNIT_PORT_DROP =
-            patternP2PUnitPort("pattern_p2p_unit_port_drop", PatternP2PUnitPortType.DROP);
+            patternP2PUnitPort("pattern_p2p_unit_port_drop", UnitPortType.DROP);
     public static final RegistryObject<PartItem<PatternP2PUnitPortPart>> PATTERN_P2P_UNIT_PORT_COLLECT =
-            patternP2PUnitPort("pattern_p2p_unit_port_collect", PatternP2PUnitPortType.COLLECT);
+            patternP2PUnitPort("pattern_p2p_unit_port_collect", UnitPortType.COLLECT);
     public static final RegistryObject<PartItem<PatternP2PUnitPortPart>> PATTERN_P2P_UNIT_PORT_PLACE =
-            patternP2PUnitPort("pattern_p2p_unit_port_place", PatternP2PUnitPortType.PLACE);
+            patternP2PUnitPort("pattern_p2p_unit_port_place", UnitPortType.PLACE);
     public static final RegistryObject<PartItem<PatternP2PUnitPortPart>> PATTERN_P2P_UNIT_PORT_BREAK =
-            patternP2PUnitPort("pattern_p2p_unit_port_break", PatternP2PUnitPortType.BREAK);
+            patternP2PUnitPort("pattern_p2p_unit_port_break", UnitPortType.BREAK);
     public static final RegistryObject<PartItem<PatternP2PUnitPortPart>> PATTERN_P2P_UNIT_PORT_TRANSFER =
-            patternP2PUnitPort("pattern_p2p_unit_port_transfer", PatternP2PUnitPortType.TRANSFER);
+            patternP2PUnitPort("pattern_p2p_unit_port_transfer", UnitPortType.TRANSFER);
     public static final RegistryObject<PartItem<PatternP2PUnitPortPart>> PATTERN_P2P_UNIT_PORT_RETURN =
-            patternP2PUnitPort("pattern_p2p_unit_port_return", PatternP2PUnitPortType.RETURN);
+            patternP2PUnitPort("pattern_p2p_unit_port_return", UnitPortType.RETURN);
     public static final RegistryObject<PartItem<PatternP2PUnitPortPart>> PATTERN_P2P_UNIT_PORT_EXTRACT =
-            patternP2PUnitPort("pattern_p2p_unit_port_extract", PatternP2PUnitPortType.EXTRACT);
+            patternP2PUnitPort("pattern_p2p_unit_port_extract", UnitPortType.EXTRACT);
     public static final RegistryObject<PartItem<PatternP2PUnitPortPart>> PATTERN_P2P_UNIT_PORT_REDSTONE =
-            patternP2PUnitPort("pattern_p2p_unit_port_redstone", PatternP2PUnitPortType.REDSTONE);
+            patternP2PUnitPort("pattern_p2p_unit_port_redstone", UnitPortType.REDSTONE);
     public static final RegistryObject<PartItem<PatternP2PUnitPortPart>> PATTERN_P2P_UNIT_PORT_ENERGY =
-            patternP2PUnitPort("pattern_p2p_unit_port_energy", PatternP2PUnitPortType.ENERGY);
+            patternP2PUnitPort("pattern_p2p_unit_port_energy", UnitPortType.ENERGY);
 
     public static final RegistryObject<Item> PRODUCT_EXTRACTION_CARD = ITEMS.register(
             "product_extraction_card", () -> Upgrades.createUpgradeCardItem(new Item.Properties()));
@@ -107,7 +107,7 @@ public final class ModContent {
     }
 
     private static RegistryObject<PartItem<PatternP2PUnitPortPart>> patternP2PUnitPort(
-            String id, PatternP2PUnitPortType type) {
+            String id, UnitPortType type) {
         return ITEMS.register(id, () -> new PartItem<>(new Item.Properties(),
                 PatternP2PUnitPortPart.class, item -> new PatternP2PUnitPortPart(item, type)));
     }

@@ -2,7 +2,7 @@
 
 **Use one set of processing patterns to drive a group of machines in parallel.**
 
-Minecraft 1.21.1 | NeoForge | Applied Energistics 2
+Minecraft 1.21.1 NeoForge | Minecraft 1.20.1 / 1.16.5 / 1.12.2 Forge | Applied Energistics 2
 
 **English** | [简体中文](README_zh-CN.md)
 
@@ -10,69 +10,95 @@ Minecraft 1.21.1 | NeoForge | Applied Energistics 2
 
 AE2 BatchCraft adds a **one-to-many processing-pattern P2P network** to Applied Energistics 2.
 
-A Pattern P2P input receives complete crafting jobs from a standard AE2 Pattern Provider and distributes them in round-robin order among multiple outputs or Pattern P2P Units. To expand a production line, add more endpoints and machines without copying patterns or consuming an AE channel for every machine.
+A Pattern P2P input receives processing jobs from an AE2 Pattern Provider, or an ME Interface on older AE2 versions, and
+distributes them among multiple machine outputs or Pattern P2P Units. You can expand a production line by adding
+endpoints and machines without copying the same patterns or spending one AE channel per machine.
 
 ## Included Content
 
-| Item / Feature | Purpose |
-| --- | --- |
-| **Pattern P2P Tunnel (Input)** | Connects to a Pattern Provider, receives and distributes processing jobs, and collects returned products. Uses `1` AE channel. |
-| **Pattern P2P Tunnel (Output)** | Sends ingredients into one adjacent machine and returns its products. Uses no AE channel and can queue up to `64` jobs. |
-| **Pattern P2P Tunnel (Energy)** | Powers the AE subnet first, then distributes remaining FE among output machines and active Unit Energy Ports. Uses no channel or P2P frequency. |
-| **Pattern P2P Unit (Manager)** | Receives one complete job and coordinates a group of bound functional ports. Available in fluix and all `16` AE2 cable colors. |
-| **Pattern P2P Unit Ports** | Nine port types provide Transfer, Drop, Place, Return, Extraction, Pickup, Break, Redstone, and Energy functions. Managers and ports use no additional channels. |
-| **Product Extraction Card** | Lets a Pattern Provider actively extract filtered products from adjacent machines. Supports items, fluids, and compatible integration resource types. |
-| **AE Component Placer** | Batch-places AE cables and cable-attached parts over a point, line, or plane up to `16 x 16`, with optional P2P frequency assignment. |
-| **Per-material Configuration** | Assigns an ingredient input side for standard outputs or selects Normal, Drop, and Place forms for Pattern P2P Unit ports. |
+| Item / Feature                  | Purpose                                                                                                                                                                                 |
+|---------------------------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
+| **Pattern P2P Tunnel (Input)**  | Receives processing jobs, distributes them among available endpoints, and returns products to the Pattern Provider or ME Interface. This is the only endpoint that uses `1` AE channel. |
+| **Pattern P2P Tunnel (Output)** | Inserts ingredients into one adjacent machine and accepts returned products. It uses no AE channel.                                                                                     |
+| **Pattern P2P Tunnel (Energy)** | Powers the AE subnet and distributes remaining FE to eligible machines and Unit Energy Ports. It uses no AE channel or P2P frequency.                                                   |
+| **Pattern P2P Unit (Manager)**  | Joins the output group and coordinates several bound functional ports as one processing endpoint. Available in fluix and all AE2 cable colors.                                          |
+| **Pattern P2P Unit Ports**      | Transfer, Drop, Place, Return, Extraction, Collect, Break, Redstone, and Energy ports provide material routing and world interaction without additional channels.                       |
+| **Product Extraction Card**     | Lets an AE2 Pattern Provider actively extract filtered products from an adjacent machine. Available on Minecraft `1.20.1` and `1.21.1`.                                                 |
+| **AE Component Placer**         | Batch-places AE cables and cable-attached parts over a point, line, or plane up to `16 x 16`, using player or AE network materials.                                                     |
+| **Pattern Configuration**       | Configures ingredient input sides and Normal, Drop, or Place output forms. Minecraft `1.21.1` also provides batch distribution and per-pattern batch configuration.                     |
+
+Collect Ports handle dropped items on every supported version. On Minecraft `1.20.1` and `1.21.1`, they can also collect
+source fluids; on `1.16.5` and `1.12.2`, they collect items only.
 
 ## Why Use It?
 
-- **Parallel processing:** complete jobs are distributed among available machines in round-robin order.
-- **Fewer channels:** only the Pattern P2P input uses `1` channel; outputs, Unit Managers, and Unit ports use none.
-- **Centralized patterns:** processing patterns remain in one standard Pattern Provider instead of being copied to every machine.
-- **Flexible automation:** Pattern P2P Units can transfer materials, place or break blocks, collect drops, return products, emit redstone, and supply FE as one task endpoint.
-- **Automatic product extraction:** Pattern Providers, P2P outputs, and Unit Extraction Ports can pull results without a separate output pipe.
-- **Centralized power:** an Energy Tunnel can use even or round-robin distribution across eligible machines.
-- **Fast expansion:** the AE Component Placer can build a complete row or plane of cable-and-part endpoints.
-- **Resource compatibility:** generic AE resource handling supports items, fluids, and compatible types such as Applied Mekanistics chemicals when the integration is installed.
+- **Parallel processing:** processing jobs are distributed among available machines instead of always using the first
+  one.
+- **Fewer channels:** only the Pattern P2P input uses `1` channel; outputs, Unit Managers, and Unit Ports use none.
+- **Centralized patterns:** keep processing patterns in one AE2 Pattern Provider instead of copying them to every
+  machine.
+- **Flexible automation:** Unit Ports can route materials, interact with the world, return products, emit redstone, and
+  supply FE.
+- **Automatic product return:** outputs and return-type ports can send task products back through the input.
+- **Centralized power:** an Energy Tunnel can power the subnet and distribute FE among eligible endpoints.
+- **Fast expansion:** the AE Component Placer can build a row or plane of cable-and-part endpoints in one operation.
 
 ## Quick Start
 
 ### Build a Parallel Machine Group
 
-1. Put processing patterns in a standard AE2 **Pattern Provider** on the main network.
-2. Install a **Pattern P2P Tunnel (Input)** on an AE subnet cable with its front face against the Pattern Provider's output face.
+1. Put processing patterns in an AE2 **Pattern Provider**, or an **ME Interface** on older AE2 versions, on the main
+   network.
+2. Build a powered AE subnet and install a **Pattern P2P Tunnel (Input)** with its front face against that block's
+   output face.
 3. Install one **Pattern P2P Tunnel (Output)** in front of each processing machine on the same subnet.
 4. `Shift + Right-click` the input with an AE2 Memory Card to generate and save a frequency.
 5. Right-click every output with the same Memory Card to assign that frequency.
-6. Request a crafting job. The input sends each complete job to the next available output.
+6. Request a processing craft. The input selects the next available endpoint and sends the job to it.
 
-The input and all endpoints must be on the same AE subnet, and their chunks must be loaded. Frequency `0000` means unconfigured. Offline, unloaded, busy, or blocked endpoints are skipped.
+The input and all endpoints must be on the same AE subnet, powered, and loaded. Frequency `0000` means unconfigured.
+Offline, unloaded, busy, or blocked endpoints are skipped.
 
-> A job is never split between machines. For example, a complete `10000 A -> 10000 B` job is sent to one endpoint.
+By default, **Full Dispatch** sends one complete request to one endpoint. For example, `100 A + 800 B -> 100 C` must fit
+into one machine before it is accepted.
+
+Minecraft `1.21.1` also provides **Batch Distribution**. Select it in the input's General Configuration, then hover over
+the processing pattern's primary output and press `Ctrl + Middle Mouse Button` to open Batch Configuration. A batch
+count of `100` for `100 A + 800 B -> 100 C` defines units of `1 A + 8 B -> 1 C`; the input distributes capacity-sized
+multiples among available machines while unsent materials remain in the Pattern Provider. The game only checks
+divisibility, so the configured ratio must match the machine's real recipe.
 
 ### Build a Pattern P2P Unit
 
-Use a Unit when a process needs several interfaces or world interaction instead of one machine face.
+Use a Unit when a process needs several input methods, return paths, or world interactions instead of one machine face.
 
 1. Install a **Pattern P2P Unit (Manager)** as a cable center on the subnet.
 2. Load the Pattern P2P input frequency from a Memory Card onto the Manager.
 3. `Shift + Right-click` the Manager with a Memory Card to save its identity.
 4. Right-click each functional port with that card to bind it to the Manager.
-5. In processing-pattern mode, hover over an input ingredient and press `Ctrl + Middle Mouse Button` to select Normal, Drop, or Place output.
+5. In processing-pattern mode, hover over an input ingredient and press `Ctrl + Middle Mouse Button` to select its input
+   side and Normal, Drop, or Place output form.
 
-The Manager joins the same round-robin group as standard outputs but processes only one job at a time. Its ports must be on the same AE subnet and remain bound to that Manager's identity.
+The Manager participates in the same endpoint group as normal outputs. Its ports must be on the same AE subnet and
+remain bound to that Manager's identity.
 
 ### Optional Automation
 
-- Configure extraction under **Product Return Configuration** on the Pattern P2P input. The switch controls normal outputs; the interval and amount also configure synchronized Unit Extraction Ports.
-- Install a **Product Extraction Card** in the Pattern Provider to configure its own adjacent-machine extraction and return filter.
-- Place a **Pattern P2P Tunnel (Energy)** toward an FE source to power the subnet and eligible machines. Right-click it to choose passive/active input and even/round-robin distribution.
-- Use the **AE Component Placer** to select a point, line, or plane, choose a cable and part, optionally load a Memory Card frequency, and place the configured endpoints in one action.
+- Configure return mode and product extraction in the Pattern P2P input. Synchronized Unit Managers apply those settings
+  to their bound ports during active tasks.
+- On Minecraft `1.20.1` and `1.21.1`, install a **Product Extraction Card** in a Pattern Provider to configure its own
+  adjacent-machine extraction and product filter.
+- Place a **Pattern P2P Tunnel (Energy)** toward an FE source to power the subnet and eligible machines, then choose
+  passive/active input and even/round-robin distribution in its GUI.
+- Use the **AE Component Placer** to select a point, line, or plane, choose a cable and part, optionally load a Memory
+  Card frequency, and place the configured endpoints in one action.
 
 ## In-game Guide
 
-With [GuideME](https://modrinth.com/mod/guideme) installed, hover over any item from this mod and press AE2's guide key, `G`. The English and Chinese guide contains recipes, complete setup instructions, Unit port behavior, product return modes, energy settings, and important task-reset warnings.
+Minecraft `1.20.1` and `1.21.1` include an English and Chinese in-game guide
+when [GuideME](https://modrinth.com/mod/guideme) is installed. Hover over an item from this mod and press AE2's guide
+key, `G`, to open its page. Both guides cover recipes, setup, Unit Ports, product return, energy settings, and task
+reset behavior; the `1.21.1` guide also covers batch distribution.
 
 ## Screenshot
 
@@ -80,15 +106,14 @@ With [GuideME](https://modrinth.com/mod/guideme) installed, hover over any item 
 
 ## Requirements
 
-| Component | Version | Required |
-| --- | --- | --- |
-| Minecraft | `1.21.1` | Yes |
-| NeoForge | `21.1+` | Yes |
-| Applied Energistics 2 | `19.x` | Yes |
-| GuideME | `21.1.16+` | No; enables the in-game guide |
-| Applied Mekanistics | `1.6.0+` | No; enables compatible chemical handling |
+| Minecraft | Loader               | Applied Energistics 2 | Java      | In-game Guide |
+|-----------|----------------------|-----------------------|-----------|---------------|
+| `1.21.1`  | NeoForge `21.1.238`  | `19.2.17`             | `21`      | Yes           |
+| `1.20.1`  | Forge `47.4.10`      | `15.4.0`              | `8`、`17` | Yes           |
+| `1.16.5`  | Forge `36.2.42`      | `8.4.7`               | `8`       | No            |
+| `1.12.2`  | Forge `14.23.5.2847` | `rv6-stable-7`        | `8`       | No            |
 
-Install AE2 BatchCraft and its required dependencies in the `mods` directory on both the client and server.
+Install the release built for your Minecraft version and its required dependencies on both the client and server.
 
 ## License
 

@@ -33,6 +33,8 @@ item_ids:
 
 目标只接收部分资源时，余量保持待下发并继续重试。存在待下发材料时，端点不能接收不兼容的新任务。
 
+完整下发要求该端点接收整次处理推送。批次分发会根据当前容量分配整数份材料，该端点一次接收本轮分配到的聚合材料。
+
 ## 产物返回
 
 机器或管道可主动向输出端只入不出的返回能力推送产物。输入端开启提取后，输出端也可主动从相邻机器拉取；两条路径都应用任务的返回配置。
@@ -43,4 +45,4 @@ item_ids:
 
 已配置且节点活动的输出端也会持续接收样板P2P通道(能量)的 FE，并传给相邻机器；不需要活动合成任务。
 
-另见[材料输出方向](../troubleshooting/material-directions.md)和[端点主动提取](../product-return/endpoint-extraction.md)。
+另见[批次分发](batch-distribution.md)、[材料输出方向](../troubleshooting/material-directions.md)和[端点主动提取](../product-return/endpoint-extraction.md)。

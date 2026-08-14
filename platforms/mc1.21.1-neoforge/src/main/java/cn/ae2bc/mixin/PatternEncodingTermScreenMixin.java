@@ -4,6 +4,7 @@ import appeng.client.gui.me.items.PatternEncodingTermScreen;
 import appeng.menu.me.items.PatternEncodingTermMenu;
 import appeng.parts.encoding.EncodingMode;
 import cn.ae2bc.client.MaterialOutputConfigScreen;
+import cn.ae2bc.client.PatternBatchConfigScreen;
 import cn.ae2bc.extension.PatternEncodingTermMenuExtension;
 import cn.ae2bc.logic.DirectionLayout;
 import net.minecraft.ChatFormatting;
@@ -48,6 +49,11 @@ public abstract class PatternEncodingTermScreenMixin {
             return;
         }
         Slot hovered = ((AbstractContainerScreenInvoker) this).ae2bc$findSlot(mouseX, mouseY);
+        if (ae2bc$isPrimaryOutputSlot(menu, hovered) && hovered.hasItem()) {
+            ae2bc$showBatchConfig(screen);
+            cir.setReturnValue(true);
+            return;
+        }
         int inputSlot = ae2bc$findInputSlot(menu, hovered);
         if (inputSlot < 0 || !hovered.hasItem()) {
             return;
@@ -62,6 +68,12 @@ public abstract class PatternEncodingTermScreenMixin {
         screen.switchToScreen(new MaterialOutputConfigScreen(screen, inputSlot, ae2bc$directionLayout));
     }
 
+    @SuppressWarnings({"rawtypes", "unchecked"})
+    @Unique
+    private void ae2bc$showBatchConfig(PatternEncodingTermScreen<?> screen) {
+        screen.switchToScreen(new PatternBatchConfigScreen(screen));
+    }
+
     @ModifyArg(
             method = "renderTooltip",
             at = @At(value = "INVOKE", target = "Lappeng/client/gui/me/items/PatternEncodingTermScreen;drawTooltip(Lnet/minecraft/client/gui/GuiGraphics;IILjava/util/List;)V"),
@@ -70,6 +82,12 @@ public abstract class PatternEncodingTermScreenMixin {
         PatternEncodingTermScreen<?> screen = (PatternEncodingTermScreen<?>) (Object) this;
         PatternEncodingTermMenu menu = screen.getMenu();
         int inputSlot = ae2bc$findInputSlot(menu, screen.getSlotUnderMouse());
+        if (ae2bc$isPrimaryOutputSlot(menu, screen.getSlotUnderMouse())) {
+            List<Component> tooltip = new ArrayList<>(original);
+            tooltip.add(Component.translatable("gui.ae2_batchcraft.pattern_batch_config")
+                    .withStyle(ChatFormatting.DARK_GRAY));
+            return tooltip;
+        }
         if (inputSlot < 0) {
             return original;
         }
@@ -109,5 +127,12 @@ public abstract class PatternEncodingTermScreenMixin {
             }
         }
         return -1;
+    }
+
+    @Unique
+    private static boolean ae2bc$isPrimaryOutputSlot(PatternEncodingTermMenu menu, Slot slot) {
+        return slot != null && menu.getMode() == EncodingMode.PROCESSING
+                && menu.getProcessingOutputSlots().length > 0
+                && menu.getProcessingOutputSlots()[0] == slot;
     }
 }
