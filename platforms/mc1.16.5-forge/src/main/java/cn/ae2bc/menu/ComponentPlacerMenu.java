@@ -4,6 +4,7 @@ import appeng.core.Api;
 import appeng.api.implementations.items.IMemoryCard;
 import appeng.container.ContainerLocator;
 import appeng.container.me.crafting.CraftAmountContainer;
+import appeng.container.slot.RestrictedInputSlot;
 import appeng.util.Platform;
 import cn.ae2bc.network.ModNetwork;
 import cn.ae2bc.placer.ComponentPlacementService;
@@ -30,6 +31,9 @@ import net.minecraft.util.text.TranslationTextComponent;
 import net.minecraftforge.items.IItemHandler;
 import net.minecraftforge.items.SlotItemHandler;
 
+import java.util.Collections;
+import java.util.List;
+
 public final class ComponentPlacerMenu extends Container {
     public static final int DATA_COUNT = 11;
     private final PlayerEntity player;
@@ -39,6 +43,7 @@ public final class ComponentPlacerMenu extends Container {
     private final IItemHandler partMarker;
     private final IItemHandler materials;
     private final IItemHandler upgrades;
+    private Slot upgradeSlot;
     private final ComponentPlacerNetworkAccess networkAccess;
     private final IIntArray data;
 
@@ -55,6 +60,11 @@ public final class ComponentPlacerMenu extends Container {
         this.cableMarker = ComponentPlacerItem.getCableMarker(placer);
         this.partMarker = ComponentPlacerItem.getPartMarker(placer);
         this.materials = ComponentPlacerItem.getMaterials(placer);
+        if (!player.level.isClientSide) {
+            for (ItemStack returned : ComponentPlacerItem.migrateLegacyUpgrades(placer)) {
+                if (!player.inventory.add(returned)) player.drop(returned, false);
+            }
+        }
         this.upgrades = ComponentPlacerItem.getUpgrades(placer);
         this.networkAccess = player.level.isClientSide ? null
                 : new ComponentPlacerNetworkAccess(player, hand, placer);
@@ -72,7 +82,8 @@ public final class ComponentPlacerMenu extends Container {
         for (int i = 0; i < ComponentPlacerItem.MATERIAL_SLOT_COUNT; i++) {
             addSlot(new SlotItemHandler(materials, i, 8 + i * 18, 115));
         }
-        for (int i = 0; i < 3; i++) addSlot(new SlotItemHandler(upgrades, i, 184, 8 + i * 18));
+        upgradeSlot = new RestrictedInputSlot(RestrictedInputSlot.PlacableItemType.UPGRADES, upgrades, 0);
+        addSlot(upgradeSlot);
         for (int row = 0; row < 3; row++) {
             for (int column = 0; column < 9; column++) {
                 addSlot(new Slot(inventory, column + row * 9 + 9, 8 + column * 18, 146 + row * 18));
@@ -109,11 +120,11 @@ public final class ComponentPlacerMenu extends Container {
         if (slot == null || !slot.hasItem()) return ItemStack.EMPTY;
         ItemStack source = slot.getItem();
         ItemStack result = source.copy();
-        if (index < 14) {
-            if (!moveItemStackTo(source, 14, slots.size(), true)) return ItemStack.EMPTY;
+        if (index < 12) {
+            if (!moveItemStackTo(source, 12, slots.size(), true)) return ItemStack.EMPTY;
         } else if (ComponentPlacerItem.isAllowedMaterial(source)) {
             if (!moveItemStackTo(source, 2, 11, false)) return ItemStack.EMPTY;
-        } else if (!moveItemStackTo(source, 11, 14, false)) return ItemStack.EMPTY;
+        } else if (!moveItemStackTo(source, 11, 12, false)) return ItemStack.EMPTY;
         if (source.isEmpty()) slot.set(ItemStack.EMPTY); else slot.setChanged();
         return result;
     }
@@ -241,6 +252,7 @@ public final class ComponentPlacerMenu extends Container {
     public Hand getHand() { return hand; }
     public ItemStack getPlacer() { return placer; }
     public IItemHandler getMaterials() { return materials; }
+    public List<Slot> getUpgradeSlots() { return Collections.singletonList(upgradeSlot); }
     public ComponentPlacerNetworkAccess getNetworkAccess() { return networkAccess; }
 
     public static void writeInitialData(PacketBuffer buffer, PlayerEntity player, Hand hand) {

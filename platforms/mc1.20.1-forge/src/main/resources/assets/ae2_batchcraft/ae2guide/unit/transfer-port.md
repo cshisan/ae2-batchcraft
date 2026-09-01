@@ -23,6 +23,8 @@ Inserts materials encoded with the **Normal** output form into the inventory or 
 
 The Manager probes the port before accepting a task. During dispatch, partial insertion leaves the remainder pending and the Unit retries later. A simulation can succeed before task activation, but world mutation is blocked until the Manager's task is operational.
 
-Use multiple Transfer Ports when a machine needs separate inventories or tanks. The Manager chooses the first compatible bound port for each material.
+Use multiple Transfer Ports when a machine needs separate inventories or tanks. Configure their priority from the port's AE2 priority screen; higher priority ports are attempted first, with the normal AE2 insertion simulation deciding how much the machine can accept.
+
+The Transfer page also supports three delivery modes: **Normal** (the adjacent machine decides the accepted amount and types), **Single Item** (each port is limited to one item unit per task), and **Single Type** (each port is limited to one material type during a task). These restrictions are admission and scheduling rules; they do not override the machine's own capacity.
 
 See [Material Output Directions](../troubleshooting/material-directions.md).

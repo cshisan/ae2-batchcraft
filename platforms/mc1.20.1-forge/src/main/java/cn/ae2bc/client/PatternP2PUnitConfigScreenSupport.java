@@ -1,7 +1,6 @@
 package cn.ae2bc.client;
 
 import net.minecraft.client.gui.components.Button;
-import appeng.client.gui.widgets.AECheckbox;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.network.chat.Component;
@@ -10,7 +9,7 @@ final class PatternP2PUnitConfigScreenSupport {
     private PatternP2PUnitConfigScreenSupport() {
     }
 
-    static void applyBreakPortTooltip(AECheckbox checkbox) {
+    static void applyBreakPortTooltip(Ae2StyleToggleSwitch checkbox) {
         checkbox.setTooltip(Tooltip.create(Component
                 .translatable("gui.ae2_batchcraft.pattern_p2p_unit.port.break.scope")
                 .append("\n")

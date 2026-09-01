@@ -21,6 +21,7 @@ public abstract class PatternP2PUnitManagerCableBusMixin {
             CallbackInfoReturnable<Boolean> callback) {
         CableBusContainer container = (CableBusContainer) (Object) this;
         if (container.getPart(AEPartLocation.INTERNAL) instanceof PatternP2PUnitManagerPart
+                && !isAllowedManagerFace(stack)
                 || stack.getItem() instanceof PatternP2PUnitManagerItem
                 && !canInstallManager(container)) {
             callback.setReturnValue(false);
@@ -43,8 +44,17 @@ public abstract class PatternP2PUnitManagerCableBusMixin {
     private static boolean canInstallManager(CableBusContainer container) {
         if (!container.getFacadeContainer().isEmpty()) return false;
         for (AEPartLocation location : AEPartLocation.values()) {
-            if (container.getPart(location) != null) return false;
+            IPart part = container.getPart(location);
+            if (part == null) continue;
+            if (location != AEPartLocation.INTERNAL && isAllowedManagerFace(part.getItemStack(appeng.api.parts.PartItemStack.NETWORK))) continue;
+            return false;
         }
         return true;
+    }
+
+    private static boolean isAllowedManagerFace(ItemStack stack) {
+        if (stack == null || stack.isEmpty() || stack.getItem().getRegistryName() == null) return false;
+        net.minecraft.util.ResourceLocation id = stack.getItem().getRegistryName();
+        return "ae2".equals(id.getNamespace()) && ("cable_anchor".equals(id.getPath()) || "quartz_fiber".equals(id.getPath()));
     }
 }

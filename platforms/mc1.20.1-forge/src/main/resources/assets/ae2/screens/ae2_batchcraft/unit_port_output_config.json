@@ -1,0 +1,21 @@
+{
+  "$schema": "../schema.json",
+  "includes": ["../common/common.json", "../common/player_inventory.json"],
+  "generatedBackground": {"width": 176, "height": 242},
+  "slots": {
+    "AE2_BATCHCRAFT_UNIT_PORT_MARKER": {"left": 8, "top": 110, "grid": "BREAK_AFTER_9COLS"},
+    "PLAYER_INVENTORY": {"left": 8, "top": 158, "grid": "BREAK_AFTER_9COLS"},
+    "PLAYER_HOTBAR": {"left": 8, "top": 216, "grid": "HORIZONTAL"}
+  },
+  "text": {
+    "dialog_title": {"text": {"translate": "gui.ae2_batchcraft.unit_port_output_config.title"}, "position": {"left": 8, "top": 6}},
+    "priority_label": {"text": {"translate": "gui.ae2_batchcraft.priority"}, "position": {"left": 8, "top": 24}},
+    "markers": {"text": {"translate": "gui.ae2_batchcraft.unit_port_output_config.markers"}, "position": {"left": 8, "top": 98}},
+    "player_inventory_title": {"text": {"translate": "container.inventory"}, "position": {"left": 8, "top": 147}}
+  },
+  "widgets": {
+    "back": {"left": 152, "top": -5, "width": 20, "height": 20},
+    "priority": {"left": 19, "top": 34, "width": 138, "height": 62},
+    "priorityInput": {"left": 59, "top": 57, "width": 61, "height": 12}
+  }
+}

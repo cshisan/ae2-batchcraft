@@ -45,6 +45,11 @@ public final class ComponentPlacerMenu extends Container {
         cableMarker = ComponentPlacerItem.getCableMarker(placer);
         partMarker = ComponentPlacerItem.getPartMarker(placer);
         materials = ComponentPlacerItem.getMaterials(placer);
+        if (!player.world.isRemote) {
+            for (ItemStack returned : ComponentPlacerItem.migrateLegacyUpgrades(placer)) {
+                if (!player.inventory.addItemStackToInventory(returned)) player.dropItem(returned, false);
+            }
+        }
         upgrades = ComponentPlacerItem.getUpgrades(placer);
         networkAccess = player.world.isRemote ? null
                 : new ComponentPlacerNetworkAccess(player, hand, placer);
@@ -56,7 +61,7 @@ public final class ComponentPlacerMenu extends Container {
         addSlotToContainer(new MarkerSlot(cableMarker, 0, 40, 22));
         addSlotToContainer(new MarkerSlot(partMarker, 0, 88, 22));
         for (int i = 0; i < 9; i++) addSlotToContainer(new SlotItemHandler(materials, i, 8 + i * 18, 115));
-        for (int i = 0; i < 3; i++) addSlotToContainer(new SlotItemHandler(upgrades, i, 187, 8 + i * 18));
+        addSlotToContainer(new SlotItemHandler(upgrades, 0, 187, 8));
         for (int row = 0; row < 3; row++) for (int column = 0; column < 9; column++)
             addSlotToContainer(new Slot(inventory, column + row * 9 + 9, 8 + column * 18, 146 + row * 18));
         for (int column = 0; column < 9; column++)
@@ -83,11 +88,11 @@ public final class ComponentPlacerMenu extends Container {
         Slot slot = index >= 0 && index < inventorySlots.size() ? inventorySlots.get(index) : null;
         if (slot == null || !slot.getHasStack()) return ItemStack.EMPTY;
         ItemStack source = slot.getStack(); ItemStack result = source.copy();
-        if (index < 14) {
-            if (!mergeItemStack(source, 14, inventorySlots.size(), true)) return ItemStack.EMPTY;
+        if (index < 12) {
+            if (!mergeItemStack(source, 12, inventorySlots.size(), true)) return ItemStack.EMPTY;
         } else if (ComponentPlacerItem.isAllowedMaterial(source)) {
             if (!mergeItemStack(source, 2, 11, false)) return ItemStack.EMPTY;
-        } else if (!mergeItemStack(source, 11, 14, false)) return ItemStack.EMPTY;
+        } else if (!mergeItemStack(source, 11, 12, false)) return ItemStack.EMPTY;
         if (source.isEmpty()) slot.putStack(ItemStack.EMPTY); else slot.onSlotChanged();
         return result;
     }

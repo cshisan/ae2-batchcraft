@@ -10,6 +10,7 @@ import cn.ae2bc.registry.ModContent;
 import net.minecraft.core.Direction;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.core.registries.BuiltInRegistries;
 import org.jetbrains.annotations.Nullable;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Shadow;
@@ -28,7 +29,7 @@ public abstract class CableBusContainerMixin {
     private void ae2bc$checkPatternP2PUnitManagerPlacement(ItemStack stack, Direction side,
                                                   CallbackInfoReturnable<Boolean> cir) {
         if (ae2bc$hasPatternP2PUnitManager()) {
-            cir.setReturnValue(false);
+            if (!ae2bc$isAllowedManagerFacePart(stack)) cir.setReturnValue(false);
         } else if (ModContent.isPatternP2PUnitManagerItem(stack.getItem()) && !ae2bc$canInstallPatternP2PUnitManager()) {
             cir.setReturnValue(false);
         }
@@ -42,7 +43,7 @@ public abstract class CableBusContainerMixin {
         if (player == null) {
             return;
         }
-        if (ae2bc$hasPatternP2PUnitManager()
+        if (ae2bc$hasPatternP2PUnitManager() && !ae2bc$isAllowedManagerFacePart(partItem.asItem())
                 || ModContent.isPatternP2PUnitManagerItem(partItem.asItem())
                 && !ae2bc$canInstallPatternP2PUnitManager()) {
             cir.setReturnValue(null);
@@ -51,12 +52,20 @@ public abstract class CableBusContainerMixin {
 
     @Unique
     private boolean ae2bc$canInstallPatternP2PUnitManager() {
-        if (getPart(null) != null || !getFacadeContainer().isEmpty()) {
+        if (getPart(null) != null || !ae2bc$canKeepExistingManagerFaces() || !getFacadeContainer().isEmpty()) {
             return false;
         }
+        return true;
+    }
+
+    @Unique
+    private boolean ae2bc$canKeepExistingManagerFaces() {
         for (Direction direction : Direction.values()) {
-            if (getPart(direction) != null) {
-                return false;
+            IPart part = getPart(direction);
+            if (part != null) {
+                var id = BuiltInRegistries.ITEM.getKey(part.getPartItem().asItem());
+                if (id == null || !"ae2".equals(id.getNamespace())
+                        || !("cable_anchor".equals(id.getPath()) || "quartz_fiber".equals(id.getPath()))) return false;
             }
         }
         return true;
@@ -65,6 +74,18 @@ public abstract class CableBusContainerMixin {
     @Unique
     private boolean ae2bc$hasPatternP2PUnitManager() {
         return getPart(null) instanceof PatternP2PUnitManagerPart;
+    }
+
+    @Unique
+    private boolean ae2bc$isAllowedManagerFacePart(ItemStack stack) {
+        return ae2bc$isAllowedManagerFacePart(stack.getItem());
+    }
+
+    @Unique
+    private boolean ae2bc$isAllowedManagerFacePart(net.minecraft.world.item.Item item) {
+        var id = BuiltInRegistries.ITEM.getKey(item);
+        return id != null && "ae2".equals(id.getNamespace())
+                && ("cable_anchor".equals(id.getPath()) || "quartz_fiber".equals(id.getPath()));
     }
 
     @Inject(method = "getRenderState", at = @At("RETURN"), remap = false)

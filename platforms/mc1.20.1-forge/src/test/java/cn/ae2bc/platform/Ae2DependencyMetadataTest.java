@@ -22,12 +22,12 @@ class Ae2DependencyMetadataTest {
         }
 
         assertTrue(metadata.contains("modId=\"ae2\""));
-        assertTrue(metadata.contains("versionRange=\"[15.4.0,16.0.0)\""));
+        assertTrue(metadata.contains("versionRange=\"[15.4.10,16.0.0)\""));
 
         var properties = new Properties();
         try (var reader = Files.newBufferedReader(Path.of("gradle.properties"), StandardCharsets.UTF_8)) {
             properties.load(reader);
         }
-        assertEquals("15.4.0", properties.getProperty("ae2_version"));
+        assertEquals("15.4.10", properties.getProperty("ae2_version"));
     }
 }

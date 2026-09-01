@@ -49,6 +49,31 @@ public final class PatternP2PTunnelSettingsSyncTest {
     }
 
     @Test
+    public void inputSlotSharingUsesTheDedicatedServerUpdate() throws Exception {
+        ClassNode screen = readClass("/cn/ae2bc/client/PatternP2PTunnelScreen.class");
+        assertTrue(hasCallNamed(screen, "sendInputOutputSlotSharingMode"));
+        assertTrue(hasSettingsConstructorWithOutputSlotSharingMode(
+                method(screen, "sendCurrentSettings")));
+
+        MethodNode setter = method(readClass("/cn/ae2bc/part/PatternP2PTunnelPart.class"),
+                "setOutputSlotSharingMode");
+        assertTrue(hasCall(setter, "appeng/api/parts/IPartHost", "markForSave"));
+        assertTrue(hasCallNamed(setter, "synchronizeUnitManagers"));
+        assertTrue(hasCallNamed(setter, "wakeOutputs"));
+    }
+
+    @Test
+    public void unitPortSlotToggleWaitsForAuthoritativeContainerState() throws Exception {
+        MethodNode click = methodContainingCall(readClass(
+                "/cn/ae2bc/client/UnitPortOutputConfigScreen.class"),
+                "getSyncedSingleSlotEditable");
+        assertTrue(hasCallNamed(click, "getSyncedSingleSlotEditable"));
+        assertFalse(hasFieldWrite(click, "singleSlot"));
+        assertTrue(hasCallNamed(readClass("/cn/ae2bc/client/UnitPortOutputConfigScreen.class"),
+                "getSyncedSingleSlot"));
+    }
+
+    @Test
     public void extractionSettingsWakeEveryRuntimeConsumer() throws Exception {
         MethodNode setter = method(readClass("/cn/ae2bc/part/PatternP2PTunnelPart.class"),
                 "setExtractionSettings");
@@ -115,6 +140,25 @@ public final class PatternP2PTunnelSettingsSyncTest {
         return false;
     }
 
+    private static boolean hasCallNamed(ClassNode type, String name) {
+        for (MethodNode method : type.methods) {
+            if (hasCallNamed(method, name)) return true;
+        }
+        return false;
+    }
+
+    private static boolean hasSettingsConstructorWithOutputSlotSharingMode(MethodNode method) {
+        for (AbstractInsnNode instruction = method.instructions.getFirst();
+                instruction != null; instruction = instruction.getNext()) {
+            if (!(instruction instanceof MethodInsnNode)) continue;
+            MethodInsnNode call = (MethodInsnNode) instruction;
+            if ("cn/ae2bc/core/unit/PatternP2PUnitSettings".equals(call.owner)
+                    && "<init>".equals(call.name)
+                    && call.desc.contains("Lcn/ae2bc/core/unit/OutputSlotSharingMode;")) return true;
+        }
+        return false;
+    }
+
     private static boolean hasAlertableTickingRequest(MethodNode method) {
         for (AbstractInsnNode instruction = method.instructions.getFirst();
                 instruction != null; instruction = instruction.getNext()) {
@@ -154,5 +198,22 @@ public final class PatternP2PTunnelSettingsSyncTest {
             }
         }
         return false;
+    }
+
+    private static boolean hasFieldWrite(MethodNode method, String name) {
+        for (AbstractInsnNode instruction = method.instructions.getFirst();
+                instruction != null; instruction = instruction.getNext()) {
+            if (instruction instanceof FieldInsnNode
+                    && name.equals(((FieldInsnNode) instruction).name)
+                    && instruction.getOpcode() == Opcodes.PUTFIELD) return true;
+        }
+        return false;
+    }
+
+    private static MethodNode methodContainingCall(ClassNode type, String callName) {
+        for (MethodNode method : type.methods) {
+            if (hasCallNamed(method, callName)) return method;
+        }
+        throw new AssertionError("Missing method containing call " + callName);
     }
 }

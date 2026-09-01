@@ -39,6 +39,16 @@ public final class PatternP2PTopologyGridService {
         return manager != null && manager.isOperational() ? manager : null;
     }
 
+    /**
+     * Finds a manager for configuration lookups without requiring its AE2 node to be powered.
+     * Task dispatch must continue to use {@link #find(IGridNode, UUID, long)} so an unpowered
+     * manager cannot accept work.
+     */
+    public static PatternP2PUnitManagerPart findForConfiguration(IGridNode ownNode, UUID id) {
+        if (ownNode == null || ownNode.getGrid() == null || id == null) return null;
+        return snapshot(ownNode.getGrid()).managers.get(id);
+    }
+
     public static List<PatternP2PUnitManagerPart> findByFrequency(
             IGridNode ownNode, short frequency, long ignoredTick) {
         if (ownNode == null || ownNode.getGrid() == null) return Collections.emptyList();

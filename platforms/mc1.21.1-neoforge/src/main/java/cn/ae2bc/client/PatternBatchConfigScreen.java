@@ -102,6 +102,9 @@ public final class PatternBatchConfigScreen<C extends PatternEncodingTermMenu>
                     "gui.ae2_batchcraft.pattern_batch_count.corrected_one");
         };
         correctionVisible = validation.getResult() != PatternBatchCount.Result.VALID;
+        if (validation.getResult() == PatternBatchCount.Result.VALID) {
+            returnToParent();
+        }
     }
 
     private PatternEncodingTermMenuExtension extension() {

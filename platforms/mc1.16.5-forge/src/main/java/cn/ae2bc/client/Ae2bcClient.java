@@ -34,6 +34,8 @@ public final class Ae2bcClient {
                 ModContent.UNIT_MANAGER_SETTINGS.get(), PatternP2PUnitManagerScreen::new));
         event.enqueueWork(() -> ScreenManager.register(
                 ModContent.COMPONENT_PLACER_MENU.get(), ComponentPlacerScreen::new));
+        event.enqueueWork(() -> ScreenManager.register(
+                ModContent.UNIT_PORT_OUTPUT_CONFIG.get(), UnitPortOutputConfigScreen::new));
         event.enqueueWork(() -> {
             Item[] managers = ModContent.UNIT_MANAGERS.values().stream()
                     .map(holder -> (Item) holder.get()).toArray(Item[]::new);

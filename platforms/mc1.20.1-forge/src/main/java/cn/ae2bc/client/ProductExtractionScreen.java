@@ -5,7 +5,6 @@ import appeng.client.gui.Icon;
 import appeng.client.gui.implementations.AESubScreen;
 import appeng.client.gui.style.ScreenStyle;
 import net.minecraft.client.gui.components.Button;
-import appeng.client.gui.widgets.AECheckbox;
 import appeng.menu.SlotSemantic;
 import appeng.menu.SlotSemantics;
 import cn.ae2bc.logic.ProductExtractionSettings;
@@ -18,7 +17,7 @@ import net.minecraft.world.entity.player.Inventory;
 public final class ProductExtractionScreen extends AEBaseScreen<ProductExtractionMenu> {
     private ValidatedIntegerField intervalInput;
     private ValidatedIntegerField amountInput;
-    private final AECheckbox modeToggle;
+    private final Ae2StyleToggleSwitch modeToggle;
     private final Button intervalReset;
     private final Button amountReset;
 
@@ -26,7 +25,9 @@ public final class ProductExtractionScreen extends AEBaseScreen<ProductExtractio
                                    Component title, ScreenStyle style) {
         super(menu, playerInventory, title, style);
         AESubScreen.addBackButton(menu, "back", widgets);
-        modeToggle = widgets.addCheckbox("modeToggle", Component.empty(), this::changeFilterMode);
+        modeToggle = new Ae2StyleToggleSwitch(Component.empty());
+        modeToggle.setChangeListener(this::changeFilterMode);
+        widgets.add("modeToggle", modeToggle);
         modeToggle.setTooltip(Tooltip.create(Component.translatable(
                 "gui.ae2_batchcraft.product_extraction.toggle")));
         intervalReset = widgets.addButton("intervalReset",

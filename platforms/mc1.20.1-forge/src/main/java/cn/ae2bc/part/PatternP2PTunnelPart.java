@@ -477,21 +477,15 @@ public final class PatternP2PTunnelPart extends P2PTunnelPart<PatternP2PTunnelPa
         if (heldItem.getItem() instanceof ComponentPlacerItem) {
             return true;
         }
-        if (hand == InteractionHand.MAIN_HAND && heldItem.isEmpty()) {
-            if (!isClientSide()) {
-                openConfigurationMenu(player);
-            }
-            return true;
-        }
         // The base P2P implementation turns a matching cable into an AE2 tunnel type.
         // Pattern P2P tunnels must retain their custom type when wiring their rear face.
         if (!P2PTunnelAttunement.getTunnelPartByTriggerItem(heldItem).isEmpty()) {
             return false;
         }
         if (!(heldItem.getItem() instanceof IMemoryCard memoryCard)) {
-            return alternateUse
-                    ? super.onPartShiftActivate(player, hand, pos)
-                    : super.onPartActivate(player, hand, pos);
+            if (hand != InteractionHand.MAIN_HAND) return false;
+            if (!isClientSide()) openConfigurationMenu(player);
+            return true;
         }
         if (hand == InteractionHand.OFF_HAND) {
             return false;

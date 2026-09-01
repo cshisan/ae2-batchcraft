@@ -1,5 +1,6 @@
 package cn.ae2bc.placer;
 
+import cn.ae2bc.core.ProjectLimits;
 import appeng.api.implementations.parts.ICablePart;
 import appeng.api.networking.IGrid;
 import appeng.api.parts.BusSupport;
@@ -32,7 +33,7 @@ import java.util.Locale;
 import java.util.function.DoubleSupplier;
 
 public final class ComponentPlacerItem extends WirelessTerminalItem {
-    public static final int MATERIAL_SLOT_COUNT = 9;
+    public static final int MATERIAL_SLOT_COUNT = ProjectLimits.COMPONENT_PLACER_MATERIAL_SLOT_COUNT;
 
     public ComponentPlacerItem(DoubleSupplier powerCapacity, Properties properties) {
         super(powerCapacity, properties);

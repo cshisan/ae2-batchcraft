@@ -6,26 +6,34 @@ import cn.ae2bc.part.PatternP2PUnitManagerPart;
 
 import cn.ae2bc.core.extraction.ProductExtractionLimits;
 import cn.ae2bc.core.unit.PatternP2PUnitSettings;
+import cn.ae2bc.core.unit.OutputSlotSharingMode;
+import cn.ae2bc.core.unit.TransferPortOutputMode;
 import cn.ae2bc.logic.EnergyDistributionMode;
 import cn.ae2bc.logic.RedstoneOutputMode;
 import cn.ae2bc.logic.ReturnMode;
+import appeng.client.gui.widgets.GuiNumberBox;
 import net.minecraft.client.gui.GuiButton;
-import net.minecraft.client.gui.GuiTextField;
 import net.minecraft.client.gui.inventory.GuiContainer;
 import net.minecraft.client.renderer.GlStateManager;
 import net.minecraft.entity.player.InventoryPlayer;
 import net.minecraft.util.text.TextComponentTranslation;
 import org.lwjgl.input.Keyboard;
 
-import java.util.function.IntSupplier;
+import java.util.Collections;
 
 /** Paged 1.12.2 implementation of the 1.21 unit-manager screen. */
 public final class PatternP2PUnitManagerScreen extends GuiContainer {
-    private enum Page { COMMON, BREAK, REDSTONE }
+    private static final int PAGE_BUTTON_TOP = 20;
+    private static final int PAGE_BUTTON_HEIGHT = 20;
+    private static final int PAGE_BUTTON_SPACING = 2;
+    private enum Page { COMMON, TRANSFER, BREAK, REDSTONE, ENERGY }
 
     private final PatternP2PUnitManagerMenu menu;
     private Page page = Page.COMMON;
     private boolean syncMain;
+    private OutputSlotSharingMode slotSharingMode;
+    private EnergyDistributionMode energyMode;
+    private TransferPortOutputMode transferPortOutputMode;
     private ReturnMode returnMode;
     private boolean breakRecovery;
     private RedstoneOutputMode redstoneMode;
@@ -34,12 +42,15 @@ public final class PatternP2PUnitManagerScreen extends GuiContainer {
     private int redstoneStrength;
     private int pulseWidth;
     private int pulsePeriod;
-    private boolean resetArmed;
-    private GuiTextField intervalField;
-    private GuiTextField amountField;
-    private GuiTextField strengthField;
-    private GuiTextField widthField;
-    private GuiTextField periodField;
+    private GuiNumberBox intervalField;
+    private GuiNumberBox amountField;
+    private GuiNumberBox strengthField;
+    private GuiNumberBox widthField;
+    private GuiNumberBox periodField;
+    private GuiButton redstonePageButton;
+    private GuiButton energyPageButton;
+    private boolean relayoutInProgress;
+    private int relayoutTop;
 
     public PatternP2PUnitManagerScreen(PatternP2PUnitManagerMenu menu, InventoryPlayer inventory) {
         super(menu);
@@ -48,6 +59,9 @@ public final class PatternP2PUnitManagerScreen extends GuiContainer {
         PatternP2PUnitManagerPart part = menu.getPart();
         PatternP2PUnitSettings settings = part == null ? PatternP2PUnitSettings.DEFAULT : part.getSettings();
         syncMain = part == null || part.isSyncMainConfiguration();
+        slotSharingMode = settings.getOutputSlotSharingMode();
+        energyMode = part == null ? EnergyDistributionMode.EVEN : part.getEnergyDistributionMode();
+        transferPortOutputMode = settings.getTransferPortOutputMode();
         returnMode = settings.getReturnMode();
         breakRecovery = settings.isBreakRecovery();
         extractionInterval = settings.getExtractionInterval();
@@ -56,18 +70,32 @@ public final class PatternP2PUnitManagerScreen extends GuiContainer {
         redstoneStrength = settings.getRedstoneStrength();
         pulseWidth = settings.getPulseWidthTicks();
         pulsePeriod = settings.getPulsePeriodTicks();
-        ySize = heightFor(page);
+        ySize = resolveHeight(page);
     }
 
     @Override public void initGui() {
-        ySize = heightFor(page);
+        ySize = resolveHeight(page);
         super.initGui();
+        if (relayoutInProgress) {
+            guiTop = relayoutTop;
+        } else {
+            relayoutTop = guiTop;
+        }
         Keyboard.enableRepeatEvents(true);
         buttonList.add(new Ae2Button(1, guiLeft + 152, guiTop - 5, 20, 20, "X"));
-        buttonList.add(new Ae2Button(2, guiLeft - 24, guiTop + 20, 20, 20, ">"));
+        buttonList.add(pageIconButton(2, Page.COMMON, 20, Ae2IconButton.PERMISSION_BUILD));
+        buttonList.add(pageIconButton(3, Page.TRANSFER, 42, Ae2IconButton.FULLNESS_HALF));
+        buttonList.add(pageIconButton(4, Page.BREAK, 64, Ae2IconButton.PERMISSION_CRAFT));
+        redstonePageButton = pageIconButton(5, Page.REDSTONE, 86, 1);
+        energyPageButton = pageIconButton(6, Page.ENERGY, 108, 164);
+        buttonList.add(redstonePageButton);
+        buttonList.add(energyPageButton);
+        buttonList.add(new Ae2IconButton(14, guiLeft + xSize + 2, guiTop + 17, Ae2IconButton.ICON_128));
         if (page == Page.COMMON) initCommon();
+        else if (page == Page.TRANSFER) initTransfer();
         else if (page == Page.BREAK) initBreak();
-        else initRedstone();
+        else if (page == Page.REDSTONE) initRedstone();
+        else initEnergy();
     }
 
     private void initCommon() {
@@ -77,13 +105,32 @@ public final class PatternP2PUnitManagerScreen extends GuiContainer {
                 guiLeft + xSize - 8 - syncWidth, guiTop + 22, syncWidth, syncLabel, syncMain));
         buttonList.add(modeButton(11, 12, ReturnMode.STRICT));
         buttonList.add(modeButton(12, 91, ReturnMode.UNBLOCKED));
-        intervalField = field(0, 104, 92, extractionInterval,
-                ProductExtractionLimits.MIN_INTERVAL, () -> ProductExtractionLimits.MAX_INTERVAL);
-        amountField = field(1, 104, 113, extractionAmount,
-                ProductExtractionLimits.MIN_AMOUNT, () -> ProductExtractionLimits.MAX_AMOUNT);
-        buttonList.add(new Ae2Button(14, guiLeft + 12, guiTop + 153, 152, 20, resetLabel()));
+        intervalField = new GuiNumberBox(fontRenderer, guiLeft + 104, guiTop + 96, 36,
+                fontRenderer.FONT_HEIGHT, Integer.class);
+        intervalField.setEnableBackgroundDrawing(true);
+        intervalField.setText(Integer.toString(extractionInterval));
+        intervalField.setMaxStringLength(16);
+        intervalField.setTextColor(0xFFFFFF);
+        intervalField.setVisible(true);
+        amountField = new GuiNumberBox(fontRenderer, guiLeft + 104, guiTop + 117, 36,
+                fontRenderer.FONT_HEIGHT, Integer.class);
+        amountField.setEnableBackgroundDrawing(true);
+        amountField.setText(Integer.toString(extractionAmount));
+        amountField.setMaxStringLength(16);
+        amountField.setTextColor(0xFFFFFF);
+        amountField.setVisible(true);
+        GuiButton singleSlot = new Ae2Button(15, guiLeft + 12, guiTop + 153, 152, 20,
+                tr("gui.ae2_batchcraft.pattern_p2p_unit.single_slot." + slotSharingMode.getSerializedName()));
+        singleSlot.enabled = !syncMain;
+        buttonList.add(singleSlot);
         intervalField.setEnabled(!syncMain);
         amountField.setEnabled(!syncMain);
+    }
+
+    private void initTransfer() {
+        for (TransferPortOutputMode mode : TransferPortOutputMode.values()) {
+            buttonList.add(transferModeButton(25 + mode.getId(), 12 + mode.getId() * 52, mode));
+        }
     }
 
     private void initBreak() {
@@ -99,13 +146,35 @@ public final class PatternP2PUnitManagerScreen extends GuiContainer {
         buttonList.add(redstoneButton(30, 12, RedstoneOutputMode.SINGLE_TRIGGER));
         buttonList.add(redstoneButton(31, 64, RedstoneOutputMode.PERIODIC_PULSE));
         buttonList.add(redstoneButton(32, 116, RedstoneOutputMode.CONTINUOUS));
-        strengthField = field(2, 104, 92, redstoneStrength, 0, () -> 15);
-        widthField = field(3, 104, 113, pulseWidth, 1, () -> pulsePeriod);
-        periodField = field(4, 104, 134, pulsePeriod, 1,
-                () -> PatternP2PUnitSettings.MAX_PULSE_TICKS);
+        strengthField = new GuiNumberBox(fontRenderer, guiLeft + 104, guiTop + 96, 36,
+                fontRenderer.FONT_HEIGHT, Integer.class);
+        strengthField.setEnableBackgroundDrawing(true);
+        strengthField.setText(Integer.toString(redstoneStrength));
+        strengthField.setMaxStringLength(16);
+        strengthField.setTextColor(0xFFFFFF);
+        strengthField.setVisible(true);
+        widthField = new GuiNumberBox(fontRenderer, guiLeft + 104, guiTop + 117, 36,
+                fontRenderer.FONT_HEIGHT, Integer.class);
+        widthField.setEnableBackgroundDrawing(true);
+        widthField.setText(Integer.toString(pulseWidth));
+        widthField.setMaxStringLength(16);
+        widthField.setTextColor(0xFFFFFF);
+        widthField.setVisible(true);
+        periodField = new GuiNumberBox(fontRenderer, guiLeft + 104, guiTop + 138, 36,
+                fontRenderer.FONT_HEIGHT, Integer.class);
+        periodField.setEnableBackgroundDrawing(true);
+        periodField.setText(Integer.toString(pulsePeriod));
+        periodField.setMaxStringLength(16);
+        periodField.setTextColor(0xFFFFFF);
+        periodField.setVisible(true);
         strengthField.setEnabled(!syncMain);
         widthField.setEnabled(!syncMain);
         periodField.setEnabled(!syncMain);
+    }
+
+    private void initEnergy() {
+        buttonList.add(new Ae2Button(40, guiLeft + 12, guiTop + 50, 152, 20,
+                tr("gui.ae2_batchcraft.energy_distribution_mode." + energyMode.getSerializedName())));
     }
 
     private GuiButton modeButton(int id, int x, ReturnMode mode) {
@@ -122,27 +191,22 @@ public final class PatternP2PUnitManagerScreen extends GuiContainer {
         return button;
     }
 
-    private GuiTextField field(int id, int x, int y, int value, int minimum, IntSupplier maximum) {
-        GuiTextField field = new GuiTextField(id, fontRenderer, guiLeft + x, guiTop + y, 36, 16);
-        field.setText(Integer.toString(value));
-        field.setMaxStringLength(Math.max(4, Integer.toString(maximum.getAsInt()).length()));
-        field.setValidator(text -> validInteger(text, minimum, maximum.getAsInt()));
-        return field;
-    }
-
-    private static boolean validInteger(String text, int minimum, int maximum) {
-        if (text.isEmpty()) return true;
-        try {
-            int value = Integer.parseInt(text);
-            return value >= minimum && value <= maximum;
-        } catch (NumberFormatException ignored) {
-            return false;
-        }
+    private GuiButton transferModeButton(int id, int x, TransferPortOutputMode mode) {
+        GuiButton button = new Ae2Button(id, guiLeft + x, guiTop + 50, 48, 20,
+                tr("gui.ae2_batchcraft.pattern_p2p_unit.transfer_mode." + mode.getSerializedName()));
+        button.enabled = !syncMain && transferPortOutputMode != mode;
+        return button;
     }
 
     @Override protected void actionPerformed(GuiButton button) {
         if (button.id == 1) mc.player.closeScreen();
-        else if (button.id == 2) switchPage();
+        else if (button.id >= 2 && button.id <= 6) {
+            Page target = pageForButtonId(button.id);
+            if (target == null) return;
+            captureFields();
+            page = target;
+            rebuildGui();
+        }
         else if (button.id == 10) {
             syncMain = ((ToggleSwitch) button).selected();
             sendCurrentSettings(false);
@@ -158,7 +222,26 @@ public final class PatternP2PUnitManagerScreen extends GuiContainer {
             sendCurrentSettings(false);
             rebuildGui();
         }
-        else if (button.id == 14) armOrReset(button);
+        else if (button.id == 14) {
+            captureFields();
+            TaskResetConfirmation.open(this, "gui.ae2_batchcraft.reset_task.confirm.unit",
+                    () -> sendCurrentSettings(true));
+        }
+        else if (button.id == 15) {
+            slotSharingMode = slotSharingMode.next();
+            sendCurrentSettings(false);
+            rebuildGui();
+        }
+        else if (button.id >= 25 && button.id <= 27) {
+            transferPortOutputMode = TransferPortOutputMode.fromId(button.id - 25);
+            sendCurrentSettings(false);
+            rebuildGui();
+        }
+        else if (button.id == 40) {
+            energyMode = energyMode.next();
+            sendCurrentSettings(false);
+            rebuildGui();
+        }
         else if (button.id == 20) {
             breakRecovery = ((ToggleSwitch) button).selected();
             sendCurrentSettings(false);
@@ -174,24 +257,37 @@ public final class PatternP2PUnitManagerScreen extends GuiContainer {
 
     private void switchPage() {
         captureFields();
-        page = page == Page.COMMON ? Page.BREAK : page == Page.BREAK ? Page.REDSTONE : Page.COMMON;
+        page = page == Page.COMMON ? Page.TRANSFER : page == Page.TRANSFER ? Page.BREAK
+                : page == Page.BREAK ? Page.REDSTONE : page == Page.REDSTONE ? Page.ENERGY : Page.COMMON;
         rebuildGui();
     }
 
-    private void armOrReset(GuiButton button) {
-        if (resetArmed) { resetArmed = false; sendCurrentSettings(true); }
-        else resetArmed = true;
-        button.displayString = resetLabel();
+    private GuiButton pageIconButton(int id, Page target, int y, int iconIndex) {
+        Ae2IconButton button = new Ae2IconButton(id, guiLeft - 24, guiTop + y, iconIndex);
+        button.enabled = page != target;
+        return button;
     }
 
-    private String resetLabel() {
-        return tr(resetArmed ? "gui.ae2_batchcraft.reset_task.confirm_button"
-                : "gui.ae2_batchcraft.reset_task");
+    private static Page pageForButtonId(int id) {
+        switch (id) {
+            case 2: return Page.COMMON;
+            case 3: return Page.TRANSFER;
+            case 4: return Page.BREAK;
+            case 5: return Page.REDSTONE;
+            case 6: return Page.ENERGY;
+            default: return null;
+        }
     }
 
     private void rebuildGui() {
         buttonList.clear();
-        initGui();
+        relayoutTop = guiTop;
+        relayoutInProgress = true;
+        try {
+            initGui();
+        } finally {
+            relayoutInProgress = false;
+        }
     }
 
     private void captureFields() {
@@ -238,10 +334,13 @@ public final class PatternP2PUnitManagerScreen extends GuiContainer {
                 ProductExtractionLimits.clampAmount(extractionAmount), redstoneMode,
                 Math.max(0, Math.min(15, redstoneStrength)),
                 Math.max(1, Math.min(period, pulseWidth)), period);
+        settings = new PatternP2PUnitSettings(settings.getReturnMode(), settings.isBreakRecovery(),
+                settings.getExtractionInterval(), settings.getExtractionAmount(), settings.getRedstoneMode(),
+                settings.getRedstoneStrength(), settings.getPulseWidthTicks(), settings.getPulsePeriodTicks(),
+                transferPortOutputMode, slotSharingMode);
         PatternP2PUnitManagerPart part = menu.getPart();
         ModNetwork.sendUnitManagerSettings(menu, part == null ? 0 : part.getFrequencyUnsigned(),
-                settings, syncMain,
-                part == null ? EnergyDistributionMode.EVEN : part.getEnergyDistributionMode(), resetTask);
+                settings, syncMain, energyMode, resetTask);
     }
 
     @Override protected void drawGuiContainerBackgroundLayer(float partialTicks, int mouseX, int mouseY) {
@@ -250,11 +349,17 @@ public final class PatternP2PUnitManagerScreen extends GuiContainer {
         if (page == Page.COMMON) {
             section("gui.ae2_batchcraft.return_configuration", 43, 74);
             section("gui.ae2_batchcraft.product_extraction.title", 85, 137);
-            section("gui.ae2_batchcraft.pattern_p2p_unit.section.task_reset", 146, 178);
-        } else if (page == Page.BREAK) section("gui.ae2_batchcraft.pattern_p2p_unit.section.drop_handling", 43, 74);
-        else {
+            section("gui.ae2_batchcraft.pattern_p2p_unit.section.single_slot", 146, 178);
+        } else if (page == Page.TRANSFER) section("gui.ae2_batchcraft.pattern_p2p_unit.section.transfer_mode", 43, 74);
+        else if (page == Page.BREAK) section("gui.ae2_batchcraft.pattern_p2p_unit.section.drop_handling", 43, 74);
+        else if (page == Page.REDSTONE) {
             section("gui.ae2_batchcraft.pattern_p2p_unit.redstone_mode", 43, 74);
             section("gui.ae2_batchcraft.pattern_p2p_unit.section.signal_parameters", 85, 158);
+        } else {
+            section("gui.ae2_batchcraft.pattern_p2p_unit.section.energy_configuration", 43, 74);
+        }
+        if (page == Page.COMMON) {
+        } else if (page == Page.REDSTONE) {
         }
     }
 
@@ -266,14 +371,17 @@ public final class PatternP2PUnitManagerScreen extends GuiContainer {
             title("gui.ae2_batchcraft.product_extraction.title", 81);
             value("gui.ae2_batchcraft.product_extraction.interval", 96, "gui.ae2_batchcraft.time.ticks");
             value("gui.ae2_batchcraft.product_extraction.amount", 117, "gui.ae2_batchcraft.product_extraction.unit");
-            title("gui.ae2_batchcraft.pattern_p2p_unit.section.task_reset", 142);
-        } else if (page == Page.BREAK) title("gui.ae2_batchcraft.pattern_p2p_unit.section.drop_handling", 39);
-        else {
+            title("gui.ae2_batchcraft.pattern_p2p_unit.section.single_slot", 142);
+        } else if (page == Page.TRANSFER) title("gui.ae2_batchcraft.pattern_p2p_unit.section.transfer_mode", 39);
+        else if (page == Page.BREAK) title("gui.ae2_batchcraft.pattern_p2p_unit.section.drop_handling", 39);
+        else if (page == Page.REDSTONE) {
             title("gui.ae2_batchcraft.pattern_p2p_unit.redstone_mode", 39);
             title("gui.ae2_batchcraft.pattern_p2p_unit.section.signal_parameters", 81);
             value("gui.ae2_batchcraft.pattern_p2p_unit.redstone_strength", 96, null);
             value("gui.ae2_batchcraft.pattern_p2p_unit.pulse_width", 117, "gui.ae2_batchcraft.time.ticks");
             value("gui.ae2_batchcraft.pattern_p2p_unit.pulse_period", 138, "gui.ae2_batchcraft.time.ticks");
+        } else {
+            title("gui.ae2_batchcraft.pattern_p2p_unit.section.energy_configuration", 39);
         }
     }
 
@@ -289,15 +397,52 @@ public final class PatternP2PUnitManagerScreen extends GuiContainer {
     @Override public void drawScreen(int mouseX, int mouseY, float partialTicks) {
         drawDefaultBackground();
         super.drawScreen(mouseX, mouseY, partialTicks);
-        if (page == Page.COMMON) { intervalField.drawTextBox(); amountField.drawTextBox(); }
-        else if (page == Page.REDSTONE) { strengthField.drawTextBox(); widthField.drawTextBox(); periodField.drawTextBox(); }
+        if (page == Page.COMMON) {
+            intervalField.drawTextBox();
+            amountField.drawTextBox();
+        } else if (page == Page.REDSTONE) {
+            strengthField.drawTextBox();
+            widthField.drawTextBox();
+            periodField.drawTextBox();
+        }
         renderHoveredToolTip(mouseX, mouseY);
+        drawControlTooltip(mouseX, mouseY);
     }
 
-    private static int heightFor(Page page) { return page == Page.COMMON ? 186 : page == Page.BREAK ? 82 : 166; }
+    private void drawControlTooltip(int mouseX, int mouseY) {
+        for (GuiButton button : buttonList) {
+            if (!isHovered(button, mouseX, mouseY)) continue;
+            String key = null;
+            if (button.id == 14) {
+                key = "gui.ae2_batchcraft.reset_task.tooltip.unit";
+            } else if (button.id == 15) {
+                key = "gui.ae2_batchcraft.pattern_p2p_unit.single_slot.tooltip";
+            } else if (button.id >= 25 && button.id <= 27) {
+                TransferPortOutputMode mode = TransferPortOutputMode.fromId(button.id - 25);
+                key = "gui.ae2_batchcraft.pattern_p2p_unit.transfer_mode."
+                        + mode.getSerializedName() + ".tooltip";
+            }
+            if (key != null) drawHoveringText(Collections.singletonList(tr(key)), mouseX, mouseY);
+            return;
+        }
+    }
+
+    private static boolean isHovered(GuiButton button, int mouseX, int mouseY) {
+        return button.visible && mouseX >= button.x && mouseY >= button.y
+                && mouseX < button.x + button.width && mouseY < button.y + button.height;
+    }
+
+    private static int heightFor(Page page) { return page == Page.COMMON ? 186 : page == Page.TRANSFER ? 82 : page == Page.BREAK ? 82 : page == Page.REDSTONE ? 166 : 100; }
+    private static int resolveHeight(Page page) {
+        int pageCount = Page.values().length;
+        int toolbarHeight = PAGE_BUTTON_TOP + pageCount * PAGE_BUTTON_HEIGHT
+                + Math.max(0, pageCount - 1) * PAGE_BUTTON_SPACING;
+        return Math.max(heightFor(page), toolbarHeight);
+    }
     private static int parse(String value, int fallback) {
         try { return Integer.parseInt(value); } catch (NumberFormatException ignored) { return fallback; }
     }
     private static String check(String key, boolean value) { return (value ? "[x] " : "[ ] ") + tr(key); }
     private static String tr(String key) { return new TextComponentTranslation(key).getUnformattedText(); }
+
 }

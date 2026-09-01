@@ -5,9 +5,13 @@ import net.minecraft.client.gui.GuiButton;
 import net.minecraft.client.renderer.GlStateManager;
 
 /** Thin constructor adapter that keeps the screens independent of the platform constructor signature. */
-final class Ae2Button extends GuiButton {
+class Ae2Button extends GuiButton {
     Ae2Button(int id, int x, int y, int width, int height, String text) {
         super(id, x, y, width, height, text);
+    }
+
+    boolean isHovered() {
+        return hovered;
     }
 
     @Override

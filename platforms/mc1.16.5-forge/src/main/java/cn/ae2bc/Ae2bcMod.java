@@ -1,5 +1,6 @@
 package cn.ae2bc;
 
+import cn.ae2bc.core.ModConstants;
 import appeng.api.config.Actionable;
 import appeng.api.definitions.IParts;
 import appeng.core.AEConfig;
@@ -19,7 +20,7 @@ import appeng.api.config.Upgrades;
 /** Forge 36 entry point. All AE2 8-specific registration stays in this platform. */
 @Mod(Ae2bcMod.MOD_ID)
 public final class Ae2bcMod {
-    public static final String MOD_ID = "ae2_batchcraft";
+    public static final String MOD_ID = ModConstants.MOD_ID;
 
     public Ae2bcMod() {
         IEventBus bus = FMLJavaModLoadingContext.get().getModEventBus();
@@ -31,8 +32,6 @@ public final class Ae2bcMod {
     private void commonSetup(FMLCommonSetupEvent event) {
         event.enqueueWork(() -> {
             Api.instance().registries().wireless().registerWirelessHandler(ModContent.COMPONENT_PLACER.get());
-            Upgrades.CAPACITY.registerItem(ModContent.COMPONENT_PLACER.get(), 2,
-                    "gui.ae2_batchcraft.component_placer");
             Upgrades.CRAFTING.registerItem(ModContent.COMPONENT_PLACER.get(), 1,
                     "gui.ae2_batchcraft.component_placer");
         });

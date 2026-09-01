@@ -28,6 +28,8 @@ public final class PatternP2PTunnelEnergyScreen extends ContainerScreen<PatternP
     @Override
     protected void init() {
         super.init();
+        addButton(new Ae2Button(leftPos + 176, topPos - 5, 20, 20,
+                new net.minecraft.util.text.StringTextComponent("X"), button -> onClose()));
         Button passive = addButton(new Ae2Button(leftPos + 12, topPos + 35, 85, 20,
                 tr("gui.ae2_batchcraft.energy.mode.passive"), button -> {
                     pullEnabled = false;

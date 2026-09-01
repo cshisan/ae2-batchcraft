@@ -52,6 +52,10 @@ public final class PatternP2PTunnelMenu extends Container {
     public int getExtractionInterval() { return settings.getExtractionInterval(); }
     public int getExtractionAmount() { return settings.getExtractionAmount(); }
     public boolean isOutput() { return output; }
+    /** Only the real Pattern P2P input part owns global unit-port slot sharing. */
+    public boolean isInputConfiguration() {
+        return !output && part != null && !part.isOutput();
+    }
     public PatternP2PUnitSettings getSettings() { return settings; }
     public boolean isSyncInputSettings() { return syncInputSettings; }
     public BlockPos getPos() { return pos; }
@@ -77,6 +81,8 @@ public final class PatternP2PTunnelMenu extends Container {
                 cn.ae2bc.logic.ReturnMode.fromId(buffer.readUnsignedByte()), buffer.readBoolean(),
                 buffer.readInt(), buffer.readInt(),
                 cn.ae2bc.logic.RedstoneOutputMode.fromId(buffer.readUnsignedByte()),
-                buffer.readUnsignedByte(), buffer.readInt(), buffer.readInt());
+                buffer.readUnsignedByte(), buffer.readInt(), buffer.readInt(),
+                cn.ae2bc.core.unit.TransferPortOutputMode.fromId(buffer.readUnsignedByte()),
+                cn.ae2bc.core.unit.OutputSlotSharingMode.fromId(buffer.readUnsignedByte()));
     }
 }

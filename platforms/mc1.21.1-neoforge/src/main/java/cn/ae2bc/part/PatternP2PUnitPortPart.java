@@ -10,6 +10,7 @@ import appeng.api.config.Actionable;
 import appeng.api.ids.AEComponents;
 import appeng.api.implementations.items.IMemoryCard;
 import appeng.api.implementations.items.MemoryCardMessages;
+import appeng.core.definitions.AEItems;
 import appeng.api.networking.IGridNode;
 import appeng.api.networking.IGridNodeListener;
 import appeng.api.networking.security.IActionSource;
@@ -29,6 +30,14 @@ import appeng.api.stacks.GenericStack;
 import appeng.api.storage.MEStorage;
 import appeng.helpers.externalstorage.GenericStackFluidStorage;
 import appeng.helpers.externalstorage.GenericStackItemStorage;
+import appeng.helpers.IPriorityHost;
+import appeng.menu.ISubMenu;
+import appeng.menu.MenuOpener;
+import appeng.menu.implementations.PriorityMenu;
+import cn.ae2bc.menu.UnitPortOutputConfigMenu;
+import appeng.util.inv.AppEngInternalInventory;
+import appeng.util.inv.InternalInventoryHost;
+import appeng.util.inv.filter.IAEItemFilter;
 import appeng.api.util.AECableType;
 import appeng.core.settings.TickRates;
 import appeng.me.helpers.MachineSource;
@@ -37,6 +46,8 @@ import appeng.parts.PartModel;
 import appeng.parts.p2p.P2PModels;
 import appeng.parts.automation.StackWorldBehaviors;
 import appeng.parts.automation.FluidPickupStrategy;
+import appeng.menu.MenuOpener;
+import appeng.menu.locator.MenuLocators;
 import appeng.util.Platform;
 import cn.ae2bc.Ae2bcMod;
 import cn.ae2bc.logic.RedstoneOutputMode;
@@ -82,11 +93,15 @@ import java.util.IdentityHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import cn.ae2bc.core.unit.TransferPortOutputMode;
+import cn.ae2bc.core.unit.OutputSlotSharingMode;
 
 /** A unit endpoint. Task ports are gated by their manager; energy ports operate continuously. */
-public final class PatternP2PUnitPortPart extends AEBasePart implements IGridTickable, ProductExtractionTask {
+public final class PatternP2PUnitPortPart extends AEBasePart implements IGridTickable, ProductExtractionTask, IPriorityHost {
     private static final String PRODUCT_EXTRACTION_RECOVERY = "ProductExtractionRecovery";
     private static final String BOUND_FREQUENCY_TAG = "BoundFrequency";
+    public static final int MIN_TRANSFER_PRIORITY = -9999;
+    public static final int MAX_TRANSFER_PRIORITY = 9999;
     private static final ResourceLocation IDENTITY_MODEL = ResourceLocation.fromNamespaceAndPath(
             Ae2bcMod.MOD_ID, "part/p2p/pattern_p2p_unit_port_identity");
     private static final Map<UnitPortType, PatternP2PUnitPortModels> MODELS = createModels();
@@ -100,6 +115,10 @@ public final class PatternP2PUnitPortPart extends AEBasePart implements IGridTic
     private @Nullable UUID boundPatternP2PUnitId;
     private @Nullable PatternP2PUnitManagerPart cachedManager;
     private short boundFrequency;
+    private int transferPriority;
+    private boolean singleSlot;
+    private final AppEngInternalInventory outputFilterMarkers;
+    private final AppEngInternalInventory outputFilterInverter;
     private @Nullable PlacementStrategy placementStrategy;
     private @Nullable List<PickupStrategy> breakStrategies;
     private @Nullable PickupStrategy collectFluidStrategy;
@@ -113,6 +132,24 @@ public final class PatternP2PUnitPortPart extends AEBasePart implements IGridTic
     public PatternP2PUnitPortPart(IPartItem<?> partItem, UnitPortType type) {
         super(partItem);
         this.type = type;
+        InternalInventoryHost filterHost = new InternalInventoryHost() {
+            @Override public void saveChangedInventory(AppEngInternalInventory inv) {
+                getHost().markForSave();
+                getHost().markForUpdate();
+                PatternP2PUnitManagerPart manager = getManager();
+                if (manager != null) manager.getLogic().alertPendingRetry();
+            }
+            @Override public boolean isClientSide() { return PatternP2PUnitPortPart.this.isClientSide(); }
+        };
+        this.outputFilterMarkers = new AppEngInternalInventory(filterHost, 18, 1);
+        this.outputFilterInverter = new AppEngInternalInventory(filterHost, 1, 1,
+                new IAEItemFilter() {
+                    @Override
+                    public boolean allowInsert(appeng.api.inventories.InternalInventory inv,
+                                               int slot, ItemStack stack) {
+                        return stack.is(AEItems.INVERTER_CARD.asItem());
+                    }
+                });
         this.productExtractionRecovery = new ExtractionRecoveryQueue(() -> getHost().markForSave());
         getMainNode().addService(IGridTickable.class, this);
     }
@@ -138,6 +175,30 @@ public final class PatternP2PUnitPortPart extends AEBasePart implements IGridTic
         return type;
     }
 
+    public AppEngInternalInventory getOutputFilterMarkers() {
+        return outputFilterMarkers;
+    }
+
+    public AppEngInternalInventory getOutputFilterInverter() {
+        return outputFilterInverter;
+    }
+
+    private boolean allowsOutputFilter(AEKey what) {
+        if (!type.acceptsTaskInput()) return true;
+        boolean hasMarkers = false;
+        boolean marked = false;
+        for (int i = 0; i < outputFilterMarkers.size(); i++) {
+            ItemStack marker = outputFilterMarkers.getStackInSlot(i);
+            if (!marker.isEmpty()) {
+                hasMarkers = true;
+                AEItemKey key = AEItemKey.of(marker);
+                if (key != null && key.equals(what)) marked = true;
+            }
+        }
+        boolean inverted = !outputFilterInverter.getStackInSlot(0).isEmpty();
+        return !hasMarkers || (inverted ? !marked : marked);
+    }
+
     public @Nullable UUID getBoundPatternP2PUnitId() {
         return boundPatternP2PUnitId;
     }
@@ -160,8 +221,7 @@ public final class PatternP2PUnitPortPart extends AEBasePart implements IGridTic
 
     public long insertInput(PatternP2PUnitManagerPart manager, GenericStack stack,
                             MaterialOutputForm form, Actionable mode) {
-        if (!isBoundTo(manager) || stack == null || stack.amount() <= 0
-                || UnitPortType.forOutputFormId(form.getId()) != type || !form.supports(stack.what())) {
+        if (!matchesInput(manager, stack, form)) {
             return 0;
         }
         // Admission probes happen before task activation; world mutation does not.
@@ -210,6 +270,95 @@ public final class PatternP2PUnitPortPart extends AEBasePart implements IGridTic
                     getMainNode().getNode().getOwningPlayerProfileId());
         }
         return breakStrategies == null ? List.of() : breakStrategies;
+    }
+
+    public int getTransferPriority() {
+        return transferPriority;
+    }
+
+    public boolean isSingleSlot() {
+        return singleSlot;
+    }
+
+    public boolean isSingleSlotEditable() {
+        PatternP2PUnitManagerPart manager = getManager();
+        return manager == null || manager.getLogic().getEffectiveConfiguration().outputSlotSharingMode()
+                == OutputSlotSharingMode.FOLLOW_PORT;
+    }
+
+    public boolean getEffectiveSingleSlot() {
+        PatternP2PUnitManagerPart manager = getManager();
+        if (manager == null) {
+            return singleSlot;
+        }
+        return switch (manager.getLogic().getEffectiveConfiguration().outputSlotSharingMode()) {
+            case ALL -> true;
+            case DISABLED -> false;
+            case FOLLOW_PORT -> singleSlot;
+        };
+    }
+
+    /** Cheap candidate filter used before priority sorting and machine probing. */
+    public boolean matchesInput(PatternP2PUnitManagerPart manager, GenericStack stack,
+                                MaterialOutputForm form) {
+        return isBoundTo(manager) && stack != null && stack.amount() > 0 && form != null
+                && UnitPortType.forOutputFormId(form.getId()) == type
+                && form.supports(stack.what()) && allowsOutputFilter(stack.what());
+    }
+
+    public void setSingleSlot(boolean value) {
+        if (!isSingleSlotEditable()) {
+            return;
+        }
+        if (singleSlot != value) {
+            singleSlot = value;
+            getHost().markForSave();
+            getHost().markForUpdate();
+            PatternP2PUnitManagerPart manager = getManager();
+            if (manager != null) {
+                manager.getLogic().alertPendingRetry();
+            }
+        }
+    }
+
+    @Override public int getPriority() { return transferPriority; }
+    @Override public void setPriority(int value) { setTransferPriority(value); }
+    @Override public ItemStack getMainMenuIcon() { return getPartItem().asItem().getDefaultInstance(); }
+    @Override public void returnToMainMenu(Player player, ISubMenu subMenu) { player.closeContainer(); }
+
+    public void setTransferPriority(int value) {
+        int clamped = Math.clamp(value, MIN_TRANSFER_PRIORITY, MAX_TRANSFER_PRIORITY);
+        if (transferPriority != clamped) {
+            transferPriority = clamped;
+            getHost().markForSave();
+            getHost().markForUpdate();
+            PatternP2PUnitManagerPart manager = getManager();
+            if (manager != null) manager.getLogic().alertPendingRetry();
+        }
+    }
+
+    /** Estimates aggregate free item-handler capacity for admission planning. */
+    public long estimateTransferCapacity(AEKey what, long fallback) {
+        if (type != UnitPortType.TRANSFER || !(what instanceof AEItemKey key)
+                || !(getLevel() instanceof ServerLevel level) || getSide() == null) {
+            return fallback;
+        }
+        var handler = level.getCapability(Capabilities.ItemHandler.BLOCK,
+                getBlockEntity().getBlockPos().relative(getSide()), getSide().getOpposite());
+        if (handler == null) return fallback;
+        ItemStack probe = key.toStack(1);
+        long total = 0;
+        for (int slot = 0; slot < handler.getSlots(); slot++) {
+            ItemStack existing = handler.getStackInSlot(slot);
+            int limit = Math.max(0, handler.getSlotLimit(slot));
+            if (existing.isEmpty()) {
+                total += limit;
+            } else if (ItemStack.isSameItemSameComponents(existing, probe)) {
+                ItemStack remainder = handler.insertItem(slot, probe.copyWithCount(limit), true);
+                total += Math.max(0, limit - remainder.getCount());
+            }
+        }
+        return total > 0 ? total : fallback;
     }
 
     private @Nullable PickupStrategy getCollectFluidStrategy() {
@@ -562,6 +711,13 @@ public final class PatternP2PUnitPortPart extends AEBasePart implements IGridTic
         super.readFromNBT(data, registries);
         boundPatternP2PUnitId = data.hasUUID("PatternP2PUnitId") ? data.getUUID("PatternP2PUnitId") : null;
         boundFrequency = data.getShort(BOUND_FREQUENCY_TAG);
+        transferPriority = Math.clamp(data.getInt("TransferPriority"), MIN_TRANSFER_PRIORITY, MAX_TRANSFER_PRIORITY);
+        singleSlot = data.contains("SingleSlot")
+                ? data.getBoolean("SingleSlot")
+                // Migrate the old inverse setting once for existing ports.
+                : data.contains("AllowMultiplePatternSlots") && !data.getBoolean("AllowMultiplePatternSlots");
+        outputFilterMarkers.readFromNBT(data, "OutputFilterMarkers", registries);
+        outputFilterInverter.readFromNBT(data, "OutputFilterInverter", registries);
         cachedManager = null;
         redstoneWorldStateDirty = true;
         taskStartTick = Long.MIN_VALUE;
@@ -577,6 +733,10 @@ public final class PatternP2PUnitPortPart extends AEBasePart implements IGridTic
             data.remove("PatternP2PUnitId");
         }
         data.putShort(BOUND_FREQUENCY_TAG, boundFrequency);
+        data.putInt("TransferPriority", transferPriority);
+        data.putBoolean("SingleSlot", singleSlot);
+        outputFilterMarkers.writeToNBT(data, "OutputFilterMarkers", registries);
+        outputFilterInverter.writeToNBT(data, "OutputFilterInverter", registries);
         productExtractionRecovery.write(data, PRODUCT_EXTRACTION_RECOVERY, registries);
     }
 
@@ -600,6 +760,12 @@ public final class PatternP2PUnitPortPart extends AEBasePart implements IGridTic
     @Override
     public boolean onUseItemOn(ItemStack heldItem, Player player, InteractionHand hand, Vec3 pos) {
         if (!(heldItem.getItem() instanceof IMemoryCard card) || hand == InteractionHand.OFF_HAND) {
+            if (hand == InteractionHand.MAIN_HAND && type.acceptsTaskInput()) {
+                if (!isClientSide()) {
+                    MenuOpener.open(UnitPortOutputConfigMenu.TYPE, player, MenuLocators.forPart(this));
+                }
+                return true;
+            }
             return super.onUseItemOn(heldItem, player, hand, pos);
         }
         if (isClientSide()) {
@@ -616,8 +782,12 @@ public final class PatternP2PUnitPortPart extends AEBasePart implements IGridTic
         var requestedManager = grid == null ? null
                 : grid.getService(PatternP2PTopologyGridService.class).findManager(patternP2PUnitId);
         if ((currentManager != null && currentManager.isTaskActive())
-                || (requestedManager != null && (requestedManager.isTaskActive()
-                || requestedManager.getFrequency() != requestedFrequency))) {
+                || (requestedManager != null && requestedManager.isTaskActive())) {
+            player.displayClientMessage(net.minecraft.network.chat.Component.translatable(
+                    "message.ae2_batchcraft.frequency_change_during_task"), true);
+            return true;
+        }
+        if (requestedManager != null && requestedManager.getFrequency() != requestedFrequency) {
             card.notifyUser(player, MemoryCardMessages.INVALID_MACHINE);
             return true;
         }
@@ -722,6 +892,7 @@ public final class PatternP2PUnitPortPart extends AEBasePart implements IGridTic
             data.writeUUID(boundPatternP2PUnitId);
         }
         data.writeShort(getBoundFrequency());
+        data.writeInt(transferPriority);
     }
 
     @Override
@@ -732,7 +903,10 @@ public final class PatternP2PUnitPortPart extends AEBasePart implements IGridTic
         boundPatternP2PUnitId = data.readBoolean() ? data.readUUID() : null;
         cachedManager = null;
         boundFrequency = data.readShort();
+        int previousPriority = transferPriority;
+        transferPriority = Math.clamp(data.readInt(), MIN_TRANSFER_PRIORITY, MAX_TRANSFER_PRIORITY);
         return changed || previousFrequency != boundFrequency
+                || previousPriority != transferPriority
                 || !java.util.Objects.equals(previous, boundPatternP2PUnitId);
     }
 

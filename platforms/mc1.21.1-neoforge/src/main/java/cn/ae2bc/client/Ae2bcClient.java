@@ -8,6 +8,7 @@ import cn.ae2bc.menu.PatternP2PTunnelEnergyMenu;
 import cn.ae2bc.menu.ComponentPlacerMenu;
 import cn.ae2bc.menu.ProductExtractionMenu;
 import cn.ae2bc.menu.PatternP2PUnitManagerMenu;
+import cn.ae2bc.menu.UnitPortOutputConfigMenu;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.common.Mod;
@@ -31,6 +32,7 @@ public final class Ae2bcClient {
     private static final String ENERGY_SCREEN_STYLE = "/screens/ae2_batchcraft/pattern_p2p_tunnel_energy.json";
     private static final String PRODUCT_EXTRACTION_SCREEN_STYLE = "/screens/ae2_batchcraft/product_extraction.json";
     private static final String PATTERN_P2P_UNIT_MANAGER_SCREEN_STYLE = "/screens/ae2_batchcraft/pattern_p2p_unit_manager.json";
+    private static final String UNIT_PORT_OUTPUT_CONFIG_SCREEN_STYLE = "/screens/ae2_batchcraft/unit_port_output_config.json";
 
     public Ae2bcClient(IEventBus modBus) {
         modBus.addListener(Ae2bcClient::registerScreens);
@@ -63,7 +65,11 @@ public final class Ae2bcClient {
         event.<PatternP2PUnitManagerMenu, PatternP2PUnitManagerScreen>register(
                 PatternP2PUnitManagerMenu.TYPE, (menu, inventory, title) ->
                         new PatternP2PUnitManagerScreen(menu, inventory, title,
-                                StyleManager.loadStyleDoc(PATTERN_P2P_UNIT_MANAGER_SCREEN_STYLE)));
+                        StyleManager.loadStyleDoc(PATTERN_P2P_UNIT_MANAGER_SCREEN_STYLE)));
+        event.<UnitPortOutputConfigMenu, UnitPortOutputConfigScreen>register(
+                UnitPortOutputConfigMenu.TYPE, (menu, inventory, title) ->
+                        new UnitPortOutputConfigScreen(menu, inventory, title,
+                                StyleManager.loadStyleDoc(UNIT_PORT_OUTPUT_CONFIG_SCREEN_STYLE)));
     }
 
     private static void registerGeometryLoaders(ModelEvent.RegisterGeometryLoaders event) {

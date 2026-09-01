@@ -5,7 +5,7 @@ license = "GPL-3.0-only"
 [[mods]]
 modId = "ae2_batchcraft"
 version = "${file.jarVersion}"
-displayName = "AE2 BatchCraft"
+displayName = "AE2 BatchCraft (ae2bc)"
 authors = "AE2BC"
 logoFile = "icon.png"
 description = '''

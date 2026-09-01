@@ -2,14 +2,11 @@ package cn.ae2bc.client;
 
 import appeng.client.gui.style.PaletteColor;
 import appeng.client.gui.style.ScreenStyle;
-import appeng.client.gui.widgets.AECheckbox;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 
-final class VerticallyAlignedCheckbox extends AECheckbox {
-    private static final int CHECKBOX_WIDTH = 22;
-    private static final int CHECKBOX_HEIGHT = 14;
+final class VerticallyAlignedCheckbox extends Ae2StyleToggleSwitch {
     private static final int LABEL_GAP = 4;
 
     private final ScreenStyle style;
@@ -20,7 +17,7 @@ final class VerticallyAlignedCheckbox extends AECheckbox {
     }
 
     VerticallyAlignedCheckbox(ScreenStyle style, Component message, boolean showLabel) {
-        super(0, 0, 0, CHECKBOX_HEIGHT, style, message);
+        super(message);
         this.style = style;
         this.showLabel = showLabel;
     }
@@ -29,7 +26,7 @@ final class VerticallyAlignedCheckbox extends AECheckbox {
         int labelWidth = showLabel
                 ? Minecraft.getInstance().font.width(getMessage()) + LABEL_GAP
                 : 0;
-        int width = labelWidth + CHECKBOX_WIDTH;
+        int width = labelWidth + SWITCH_WIDTH;
         setWidth(width);
         return width;
     }

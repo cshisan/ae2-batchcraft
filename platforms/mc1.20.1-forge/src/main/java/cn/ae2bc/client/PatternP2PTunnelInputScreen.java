@@ -2,9 +2,12 @@ package cn.ae2bc.client;
 
 import appeng.client.gui.style.ScreenStyle;
 import net.minecraft.client.gui.components.Button;
+import appeng.client.gui.widgets.TabButton;
 import cn.ae2bc.logic.PatternP2PUnitConfiguration;
 import cn.ae2bc.logic.RedstoneOutputMode;
 import cn.ae2bc.logic.ReturnMode;
+import cn.ae2bc.core.unit.TransferPortOutputMode;
+import cn.ae2bc.core.unit.OutputSlotSharingMode;
 import cn.ae2bc.menu.PatternP2PTunnelInputMenu;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Tooltip;
@@ -20,7 +23,10 @@ public final class PatternP2PTunnelInputScreen extends PatternP2PUnitPagedScreen
     private final VerticallyAlignedCheckbox breakRecovery;
     private final Map<RedstoneOutputMode, Button> redstoneModeButtons =
             new EnumMap<>(RedstoneOutputMode.class);
-    private final Button resetTask;
+    private final Map<TransferPortOutputMode, Button> transferModeButtons =
+            new EnumMap<>(TransferPortOutputMode.class);
+    private final TabButton resetTaskToolbar;
+    private final Button slotSharingMode;
     private final VerticallyAlignedCheckbox productExtraction;
     private ValidatedIntegerField strengthInput;
     private ValidatedIntegerField pulseTimeInput;
@@ -55,12 +61,23 @@ public final class PatternP2PTunnelInputScreen extends PatternP2PUnitPagedScreen
         addRedstoneModeButton("redstoneSingle", RedstoneOutputMode.SINGLE_TRIGGER);
         addRedstoneModeButton("redstonePeriodic", RedstoneOutputMode.PERIODIC_PULSE);
         addRedstoneModeButton("redstoneContinuous", RedstoneOutputMode.CONTINUOUS);
-        resetTask = widgets.addButton("resetTask",
-                Component.translatable("gui.ae2_batchcraft.reset_task"),
-                () -> TaskResetConfirmation.open(this, Component.translatable(
+        for (TransferPortOutputMode mode : TransferPortOutputMode.values()) {
+            var button = widgets.addButton("transfer" + camel(mode.getSerializedName()),
+                    Component.translatable("gui.ae2_batchcraft.pattern_p2p_unit.transfer_mode." + mode.getSerializedName()),
+                    () -> menu.setTransferPortOutputMode(mode));
+            button.setTooltip(Tooltip.create(Component.translatable(
+                    "gui.ae2_batchcraft.pattern_p2p_unit.transfer_mode." + mode.getSerializedName() + ".tooltip")));
+            transferModeButtons.put(mode, button);
+        }
+        resetTaskToolbar = new TabButton(appeng.client.gui.Icon.SCHEDULING_DEFAULT,
+                Component.translatable("gui.ae2_batchcraft.reset_task.tooltip"), ignored ->
+                TaskResetConfirmation.open(this, Component.translatable(
                         "gui.ae2_batchcraft.reset_task.confirm.input"), menu::resetTaskState));
-        resetTask.setTooltip(Tooltip.create(Component.translatable(
-                "gui.ae2_batchcraft.reset_task.tooltip")));
+        addToRightToolbar("resetTaskToolbar", resetTaskToolbar);
+        slotSharingMode = widgets.addButton("slotSharingMode", Component.empty(),
+                () -> menu.setOutputSlotSharingMode(menu.outputSlotSharingMode.next()));
+        slotSharingMode.setTooltip(Tooltip.create(Component.translatable(
+                "gui.ae2_batchcraft.pattern_p2p_unit.single_slot.tooltip")));
     }
 
     @Override
@@ -96,25 +113,35 @@ public final class PatternP2PTunnelInputScreen extends PatternP2PUnitPagedScreen
     protected int getPageHeight(Page page) {
         return switch (page) {
             case COMMON -> 186;
+            case TRANSFER -> 82;
             case BREAK -> 82;
             case REDSTONE -> 166;
+            case ENERGY -> 82;
         };
+    }
+
+    @Override
+    protected boolean supportsEnergyPage() {
+        return false;
     }
 
     @Override
     protected void updatePageVisibility() {
         boolean common = isPage(Page.COMMON);
+        boolean transfer = isPage(Page.TRANSFER);
         boolean breakPort = isPage(Page.BREAK);
         boolean redstonePort = isPage(Page.REDSTONE);
 
         strictButton.visible = common;
         unblockedButton.visible = common;
-        resetTask.visible = common;
+        resetTaskToolbar.visible = true;
+        slotSharingMode.visible = common;
         productExtraction.visible = common;
         breakRecovery.visible = breakPort;
         for (var button : redstoneModeButtons.values()) {
             button.visible = redstonePort;
         }
+        for (var button : transferModeButtons.values()) button.visible = transfer;
         if (strengthInput != null) {
             strengthInput.visible = redstonePort;
             pulseTimeInput.visible = redstonePort;
@@ -145,6 +172,12 @@ public final class PatternP2PTunnelInputScreen extends PatternP2PUnitPagedScreen
         for (var entry : redstoneModeButtons.entrySet()) {
             entry.getValue().active = entry.getKey() != menu.redstoneMode;
         }
+        for (var entry : transferModeButtons.entrySet()) {
+            entry.getValue().active = entry.getKey() != menu.transferPortOutputMode;
+        }
+        slotSharingMode.setMessage(Component.translatable(
+                "gui.ae2_batchcraft.pattern_p2p_unit.single_slot." +
+                        menu.outputSlotSharingMode.getSerializedName()));
         strengthInput.syncValue(menu.redstoneStrength);
         pulseTimeInput.syncValue(menu.pulseWidth);
         pulsePeriodInput.syncValue(menu.pulsePeriod);
@@ -163,8 +196,12 @@ public final class PatternP2PTunnelInputScreen extends PatternP2PUnitPagedScreen
                     productExtraction.getWidth(),
                     offsetX, offsetY, imageWidth, 85, 137);
             DashedSectionRenderer.drawBackground(graphics, font,
-                    Component.translatable("gui.ae2_batchcraft.pattern_p2p_unit.section.task_reset"),
-                    offsetX, offsetY, imageWidth, 146, 178);
+                    Component.translatable("gui.ae2_batchcraft.pattern_p2p_unit.section.single_slot"),
+                    offsetX, offsetY, imageWidth, 146, 177);
+        } else if (isPage(Page.TRANSFER)) {
+            DashedSectionRenderer.drawBackground(graphics, font,
+                    Component.translatable("gui.ae2_batchcraft.pattern_p2p_unit.section.transfer_mode"),
+                    offsetX, offsetY, imageWidth, 43, 74);
         } else if (isPage(Page.BREAK)) {
             DashedSectionRenderer.drawBackground(graphics, font,
                     Component.translatable("gui.ae2_batchcraft.pattern_p2p_unit.section.drop_handling"),
@@ -189,7 +226,10 @@ public final class PatternP2PTunnelInputScreen extends PatternP2PUnitPagedScreen
                     Component.translatable("gui.ae2_batchcraft.product_extraction.title"), 81);
             extractionControls.drawUnits(graphics, font, leftPos);
             DashedSectionRenderer.drawTitle(graphics, font,
-                    Component.translatable("gui.ae2_batchcraft.pattern_p2p_unit.section.task_reset"), 142);
+                    Component.translatable("gui.ae2_batchcraft.pattern_p2p_unit.section.single_slot"), 142);
+        } else if (isPage(Page.TRANSFER)) {
+            DashedSectionRenderer.drawTitle(graphics, font,
+                    Component.translatable("gui.ae2_batchcraft.pattern_p2p_unit.section.transfer_mode"), 39);
         } else if (isPage(Page.BREAK)) {
             DashedSectionRenderer.drawTitle(graphics, font,
                     Component.translatable("gui.ae2_batchcraft.pattern_p2p_unit.section.drop_handling"), 39);
@@ -206,6 +246,16 @@ public final class PatternP2PTunnelInputScreen extends PatternP2PUnitPagedScreen
                 "gui.ae2_batchcraft.pattern_p2p_unit.redstone_mode." + mode.getSerializedName()),
                 () -> menu.setRedstoneMode(mode));
         redstoneModeButtons.put(mode, button);
+    }
+
+    private static String camel(String value) {
+        StringBuilder result = new StringBuilder();
+        boolean upper = true;
+        for (char c : value.toCharArray()) {
+            if (c == '_') upper = true;
+            else { result.append(upper ? Character.toUpperCase(c) : c); upper = false; }
+        }
+        return result.toString();
     }
 
 }

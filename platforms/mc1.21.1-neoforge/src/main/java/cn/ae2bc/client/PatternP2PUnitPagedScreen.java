@@ -6,18 +6,27 @@ import appeng.client.gui.style.BackgroundGenerator;
 import appeng.client.gui.style.ScreenStyle;
 import appeng.client.gui.widgets.IconButton;
 import appeng.client.gui.widgets.TabButton;
+import appeng.client.gui.widgets.VerticalButtonBar;
+import cn.ae2bc.mixin.AEBaseScreenAccessor;
+import cn.ae2bc.mixin.WidgetContainerAccessor;
+import java.util.EnumMap;
+import java.util.Map;
 import appeng.menu.AEBaseMenu;
+import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
+import net.minecraft.client.renderer.Rect2i;
 import net.minecraft.world.entity.player.Inventory;
 
 abstract class PatternP2PUnitPagedScreen<T extends AEBaseMenu> extends AEBaseScreen<T> {
-    private static final int LEFT_TOOLBAR_MIN_HEIGHT = 55;
+    private static final int TOOLBAR_BACKGROUND_BOTTOM_PADDING = 3;
 
     protected enum Page {
         COMMON("common"),
+        TRANSFER("transfer"),
         BREAK("break"),
-        REDSTONE("redstone");
+        REDSTONE("redstone"),
+        ENERGY("energy");
 
         private final String serializedName;
 
@@ -26,30 +35,59 @@ abstract class PatternP2PUnitPagedScreen<T extends AEBaseMenu> extends AEBaseScr
         }
     }
 
-    private final IconButton pageButton;
+    private final Map<Page, IconButton> pageButtons = new EnumMap<>(Page.class);
+    private final RightToolbarPanel rightToolbar = new RightToolbarPanel();
     private Page page = Page.COMMON;
+    private boolean relayoutInProgress;
+    private int relayoutHeight;
 
     protected PatternP2PUnitPagedScreen(T menu, Inventory inventory, Component title, ScreenStyle style) {
         super(menu, inventory, title, style);
-
         var closeButton = new TabButton(Icon.CLEAR,
                 Component.translatable("gui.ae2_batchcraft.configuration.close"), button -> onClose());
         widgets.add("close", closeButton);
+        widgets.add("rightToolbar", rightToolbar);
 
-        pageButton = new IconButton(button -> selectNextPage()) {
-            @Override
-            protected Icon getIcon() {
-                return Icon.ARROW_RIGHT;
+        for (Page candidate : Page.values()) {
+            if (candidate == Page.ENERGY && !supportsEnergyPage()) {
+                continue;
             }
-        };
-        pageButton.setMessage(pageButtonMessage());
-        addToLeftToolbar(pageButton);
+            ScaledIconButton button = new ScaledIconButton(pageIcon(candidate), pageIconScale(candidate),
+                    pageIconOffsetX(candidate), pageIconOffsetY(candidate),
+                    ignored -> selectPage(candidate));
+            button.setDimWhenInactive(false);
+            button.setMessage(Component.translatable("gui.ae2_batchcraft.pattern_p2p_unit.page." + candidate.serializedName));
+            pageButtons.put(candidate, button);
+            addToLeftToolbar(button);
+        }
     }
 
     @Override
     protected void init() {
-        imageHeight = resolvePageHeight(page);
+        updatePageVisibility();
+        imageHeight = relayoutInProgress ? relayoutHeight : getPageHeight(page);
         super.init();
+    }
+
+    /** Completes the first layout after the subclass has created its delayed controls. */
+    protected final void completeInitialLayout() {
+        if (relayoutInProgress) {
+            return;
+        }
+
+        int resolvedHeight = resolvePageHeight(page);
+        if (resolvedHeight == imageHeight) {
+            return;
+        }
+
+        relayoutHeight = resolvedHeight;
+        relayoutInProgress = true;
+        try {
+            imageHeight = resolvedHeight;
+            repositionElements();
+        } finally {
+            relayoutInProgress = false;
+        }
     }
 
     @Override
@@ -67,7 +105,7 @@ abstract class PatternP2PUnitPagedScreen<T extends AEBaseMenu> extends AEBaseScr
     @Override
     protected void updateBeforeRender() {
         super.updateBeforeRender();
-        pageButton.setMessage(pageButtonMessage());
+        pageButtons.forEach((candidate, button) -> button.active = candidate != page);
         setTextContent("page_title", Component.translatable(
                 "gui.ae2_batchcraft.pattern_p2p_unit.page." + page.serializedName));
     }
@@ -78,29 +116,112 @@ abstract class PatternP2PUnitPagedScreen<T extends AEBaseMenu> extends AEBaseScr
 
     protected abstract int getPageHeight(Page candidate);
 
+    protected boolean supportsEnergyPage() {
+        return true;
+    }
+
     protected abstract void updatePageVisibility();
 
-    private void selectNextPage() {
-        page = switch (page) {
-            case COMMON -> Page.BREAK;
-            case BREAK -> Page.REDSTONE;
-            case REDSTONE -> Page.COMMON;
-        };
-        imageHeight = resolvePageHeight(page);
+    private void selectPage(Page next) {
+        if (page == next) {
+            return;
+        }
+        page = next;
         updatePageVisibility();
+        rebuildPageLayout();
     }
 
     private int resolvePageHeight(Page candidate) {
-        return Math.max(getPageHeight(candidate), LEFT_TOOLBAR_MIN_HEIGHT);
+        return Math.max(getPageHeight(candidate), getToolbarHeightFromAe2());
     }
 
-    private Component pageButtonMessage() {
-        Page nextPage = switch (page) {
-            case COMMON -> Page.BREAK;
-            case BREAK -> Page.REDSTONE;
-            case REDSTONE -> Page.COMMON;
-        };
-        return Component.translatable("gui.ae2_batchcraft.pattern_p2p_unit.page.switch",
-                Component.translatable("gui.ae2_batchcraft.pattern_p2p_unit.page." + nextPage.serializedName));
+    private int getToolbarHeightFromAe2() {
+        VerticalButtonBar toolbar = getVerticalToolbar();
+        if (toolbar != null) {
+            toolbar.updateBeforeRender();
+            Rect2i bounds = toolbar.getBounds();
+            if (bounds.getHeight() > 0) {
+                // VerticalButtonBar draws from bounds.y - 1 with bounds.height + 4 pixels.
+                return bounds.getY() + bounds.getHeight() + TOOLBAR_BACKGROUND_BOTTOM_PADDING;
+            }
+        }
+
+        return getToolbarHeightFallback();
     }
+
+    private int getToolbarHeightFallback() {
+        int toolbarHeight = 0;
+        for (Button button : pageButtons.values()) {
+            if (button.visible) {
+                toolbarHeight += button.getHeight() + 6;
+            }
+        }
+        if (toolbarHeight == 0) {
+            return 0;
+        }
+        var toolbarStyle = style.getWidget("verticalToolbar");
+        Integer configuredTop = toolbarStyle == null ? null : toolbarStyle.getTop();
+        int toolbarTop = configuredTop == null ? 0 : configuredTop;
+        return toolbarTop + 2 + toolbarHeight + TOOLBAR_BACKGROUND_BOTTOM_PADDING;
+    }
+
+    private VerticalButtonBar getVerticalToolbar() {
+        WidgetContainerAccessor widgets = (WidgetContainerAccessor) (Object)
+                ((AEBaseScreenAccessor) (Object) this).ae2bc$getWidgets();
+        var composite = widgets.ae2bc$getCompositeWidgetsById().get("verticalToolbar");
+        return composite instanceof VerticalButtonBar toolbar ? toolbar : null;
+    }
+
+    private void rebuildPageLayout() {
+        updatePageVisibility();
+        if (relayoutInProgress) {
+            return;
+        }
+
+        int resolvedHeight = resolvePageHeight(page);
+        if (resolvedHeight == imageHeight) {
+            return;
+        }
+
+        relayoutHeight = resolvedHeight;
+        relayoutInProgress = true;
+        try {
+            imageHeight = resolvedHeight;
+            repositionElements();
+        } finally {
+            relayoutInProgress = false;
+        }
+    }
+
+    private static Icon pageIcon(Page page) {
+        return switch (page) {
+            case COMMON -> Icon.COG;
+            case TRANSFER -> Icon.ACCESS_WRITE;
+            case BREAK -> Icon.PLACEMENT_BLOCK;
+            case REDSTONE -> Icon.REDSTONE_ON;
+            case ENERGY -> Icon.POWER_UNIT_RF;
+        };
+    }
+
+    private static float pageIconScale(Page page) {
+        return switch (page) {
+            case TRANSFER -> 1.1f;
+            case BREAK -> 0.9f;
+            default -> 1.0f;
+        };
+    }
+
+    private static int pageIconOffsetX(Page page) {
+        return 0;
+    }
+
+    private static int pageIconOffsetY(Page page) {
+        return page == Page.TRANSFER ? 1 : 0;
+    }
+
+    protected final <B extends IconButton> B addToRightToolbar(String widgetId, B button) {
+        rightToolbar.addButton(button);
+        return button;
+    }
+
 }

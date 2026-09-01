@@ -233,7 +233,8 @@ public final class PatternP2PUnitManagerPart extends CablePart implements Patter
 
     private boolean handlePartUse(Player player, InteractionHand hand, Vec3 pos, boolean alternateUse) {
         ItemStack heldItem = player.getItemInHand(hand);
-        if (hand == InteractionHand.MAIN_HAND && heldItem.isEmpty()) {
+        if (hand == InteractionHand.MAIN_HAND
+                && !(heldItem.getItem() instanceof IMemoryCard)) {
             if (!isClientSide()) {
                 MenuOpener.open(PatternP2PUnitManagerMenu.TYPE, player, MenuLocators.forPart(this));
             }

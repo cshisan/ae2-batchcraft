@@ -53,6 +53,21 @@ class DispatchWakeBoundarySourceTest {
         assertTrue(port.contains("manager.getLogic().alertPendingRetry();"));
     }
 
+    @Test
+    void unitPortDispatchFiltersBeforePriorityAndDistinguishesRejectAndPartialInsert() throws Exception {
+        String manager = source("logic/PatternP2PUnitManagerLogic.java");
+        assertTrue(manager.contains("candidatePorts(\n                    portsFor(boundPorts, pending.form()), pending)"));
+        assertTrue(manager.contains("if (inserted <= 0)"));
+        assertTrue(manager.contains("continue;\n                }\n                inserted = Math.min(inserted, remaining);"));
+        assertTrue(manager.contains("dispatchSlotPorts.putIfAbsent(pending.slot(), port)"));
+        assertTrue(manager.contains("remaining <= 0 && (material.slot() < 0 || !assignedSlotPort.containsKey(material.slot()))")
+                || manager.contains("material.slot() < 0 || !assignedSlotPort.containsKey(material.slot())"));
+
+        String port = source("part/PatternP2PUnitPortPart.java");
+        assertTrue(port.contains("public boolean matchesInput"));
+        assertTrue(port.contains("UnitPortType.forOutputFormId(form.getId()) == type"));
+    }
+
     private static String source(String relativePath) throws Exception {
         return Files.readString(Path.of("src/main/java/cn/ae2bc").resolve(relativePath));
     }

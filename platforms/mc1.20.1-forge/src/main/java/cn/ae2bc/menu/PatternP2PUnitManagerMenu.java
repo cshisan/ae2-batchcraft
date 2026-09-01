@@ -10,6 +10,8 @@ import cn.ae2bc.logic.RedstoneOutputMode;
 import cn.ae2bc.logic.ReturnMode;
 import cn.ae2bc.logic.PatternP2PUnitConfiguration;
 import cn.ae2bc.logic.ProductExtractionSettings;
+import cn.ae2bc.core.unit.TransferPortOutputMode;
+import cn.ae2bc.core.unit.OutputSlotSharingMode;
 import cn.ae2bc.part.PatternP2PUnitManagerPart;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
@@ -27,6 +29,8 @@ public final class PatternP2PUnitManagerMenu extends AEBaseMenu {
     private static final String SET_PRODUCT_EXTRACTION_INTERVAL = "setProductExtractionInterval";
     private static final String SET_PRODUCT_EXTRACTION_AMOUNT = "setProductExtractionAmount";
     private static final String RESET_TASK_STATE = "resetTaskState";
+    private static final String SET_TRANSFER_PORT_OUTPUT_MODE = "setTransferPortOutputMode";
+    private static final String SET_OUTPUT_SLOT_SHARING_MODE = "setOutputSlotSharingMode";
 
     public static final MenuType<PatternP2PUnitManagerMenu> TYPE = MenuTypeBuilder
             .create(PatternP2PUnitManagerMenu::new, PatternP2PUnitManagerPart.class)
@@ -44,6 +48,8 @@ public final class PatternP2PUnitManagerMenu extends AEBaseMenu {
     @GuiSync(7) public EnergyDistributionMode energyDistributionMode = EnergyDistributionMode.EVEN;
     @GuiSync(8) public int productExtractionInterval = ProductExtractionSettings.DEFAULT_INTERVAL;
     @GuiSync(9) public int productExtractionAmount = ProductExtractionSettings.DEFAULT_AMOUNT;
+    @GuiSync(10) public TransferPortOutputMode transferPortOutputMode = TransferPortOutputMode.NORMAL;
+    @GuiSync(11) public OutputSlotSharingMode outputSlotSharingMode = OutputSlotSharingMode.DISABLED;
 
     public PatternP2PUnitManagerMenu(int id, Inventory inventory, PatternP2PUnitManagerPart host) {
         super(TYPE, id, inventory, host);
@@ -70,6 +76,10 @@ public final class PatternP2PUnitManagerMenu extends AEBaseMenu {
         registerClientAction(SET_PRODUCT_EXTRACTION_AMOUNT, Integer.class, value -> update(
                 configuration().withProductExtraction(productExtractionInterval, value)));
         registerClientAction(RESET_TASK_STATE, this::handleResetTaskState);
+        registerClientAction(SET_TRANSFER_PORT_OUTPUT_MODE, TransferPortOutputMode.class,
+                value -> update(configuration().withTransferPortOutputMode(value)));
+        registerClientAction(SET_OUTPUT_SLOT_SHARING_MODE, OutputSlotSharingMode.class,
+                value -> update(configuration().withOutputSlotSharingMode(value)));
     }
 
     @Override
@@ -115,6 +125,17 @@ public final class PatternP2PUnitManagerMenu extends AEBaseMenu {
         sendClientAction(SET_PRODUCT_EXTRACTION_AMOUNT, productExtractionAmount);
     }
     public void resetTaskState() { sendClientAction(RESET_TASK_STATE); }
+    public void setTransferPortOutputMode(TransferPortOutputMode value) {
+        transferPortOutputMode = value;
+        sendClientAction(SET_TRANSFER_PORT_OUTPUT_MODE, value);
+    }
+
+    public void setOutputSlotSharingMode(OutputSlotSharingMode value) {
+        if (value != null) {
+            outputSlotSharingMode = value;
+            sendClientAction(SET_OUTPUT_SLOT_SHARING_MODE, value);
+        }
+    }
 
     private void handleResetTaskState() {
         if (isServerSide()) host.resetTaskState();
@@ -132,7 +153,7 @@ public final class PatternP2PUnitManagerMenu extends AEBaseMenu {
     private PatternP2PUnitConfiguration configuration() {
         return new PatternP2PUnitConfiguration(returnMode, breakRecovery, redstoneStrength,
                 redstoneMode, pulseWidth, pulsePeriod,
-                productExtractionInterval, productExtractionAmount);
+                productExtractionInterval, productExtractionAmount, transferPortOutputMode, outputSlotSharingMode);
     }
 
     private void update(PatternP2PUnitConfiguration value) {
@@ -148,5 +169,7 @@ public final class PatternP2PUnitManagerMenu extends AEBaseMenu {
         pulsePeriod = value.pulsePeriodTicks();
         productExtractionInterval = value.productExtractionInterval();
         productExtractionAmount = value.productExtractionAmount();
+        transferPortOutputMode = value.transferPortOutputMode();
+        outputSlotSharingMode = value.outputSlotSharingMode();
     }
 }

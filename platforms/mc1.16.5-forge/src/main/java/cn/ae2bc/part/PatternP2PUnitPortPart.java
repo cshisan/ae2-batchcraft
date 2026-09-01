@@ -10,6 +10,11 @@ import java.util.UUID;
 import appeng.api.implementations.items.IMemoryCard;
 import appeng.api.implementations.items.MemoryCardMessages;
 import appeng.api.implementations.IPowerChannelState;
+import appeng.helpers.IPriorityHost;
+import net.minecraftforge.items.ItemStackHandler;
+import appeng.container.ContainerLocator;
+import appeng.container.ContainerOpener;
+import appeng.container.implementations.PriorityContainer;
 import appeng.api.parts.IPartCollisionHelper;
 import appeng.api.parts.IPartModel;
 import appeng.api.util.AECableType;
@@ -27,6 +32,7 @@ import cn.ae2bc.client.model.PatternP2PUnitModelData;
 import cn.ae2bc.core.extraction.ProductExtractionLimits;
 import cn.ae2bc.logic.PatternP2PUnitIdentityColors;
 import cn.ae2bc.core.unit.UnitPortType;
+import cn.ae2bc.core.unit.OutputSlotSharingMode;
 import cn.ae2bc.core.energy.EnergyEndpoint;
 import cn.ae2bc.core.schedule.ExtractionDeadlineGate;
 import net.minecraft.entity.player.PlayerEntity;
@@ -59,10 +65,17 @@ import net.minecraftforge.items.IItemHandler;
 import net.minecraftforge.items.ItemHandlerHelper;
 import net.minecraftforge.common.capabilities.Capability;
 import net.minecraftforge.common.util.LazyOptional;
+import net.minecraftforge.fml.network.NetworkHooks;
+import net.minecraft.inventory.container.SimpleNamedContainerProvider;
+import net.minecraft.entity.player.ServerPlayerEntity;
+import net.minecraft.util.text.TranslationTextComponent;
+import cn.ae2bc.menu.UnitPortOutputConfigMenu;
 
 /** Unchanneled unit endpoint. Concrete machine behavior is layered onto this binding base. */
 public final class PatternP2PUnitPortPart extends AEBasePart
-        implements EnergyEndpoint, IGridTickable, IPowerChannelState {
+        implements EnergyEndpoint, IGridTickable, IPowerChannelState, IPriorityHost {
+    public static final int MIN_TRANSFER_PRIORITY = -9999;
+    public static final int MAX_TRANSFER_PRIORITY = 9999;
     private static final ResourceLocation STATUS_OFF_MODEL_ID = new ResourceLocation(
             "appliedenergistics2", "part/p2p/p2p_tunnel_status_off");
     private static final ResourceLocation STATUS_ON_MODEL_ID = new ResourceLocation(
@@ -89,11 +102,37 @@ public final class PatternP2PUnitPortPart extends AEBasePart
     private int redstonePower;
     private boolean redstoneWorldStateDirty = true;
     private long taskStartTick = Long.MIN_VALUE;
+    private int transferPriority;
+    private boolean singleSlot;
     private long observedTaskRevision = Long.MIN_VALUE;
+    private final ItemStackHandler outputFilterMarkers;
+    private final ItemStackHandler outputFilterInverter;
 
     public PatternP2PUnitPortPart(ItemStack stack, UnitPortType type) {
         super(stack);
         this.type = type;
+        this.outputFilterMarkers = new ItemStackHandler(18) {
+            @Override protected void onContentsChanged(int slot) {
+                getHost().markForSave();
+                getHost().markForUpdate();
+                alertManagerPendingRetry();
+            }
+            @Override public int getSlotLimit(int slot) { return 1; }
+            @Override public boolean isItemValid(int slot, ItemStack stack) { return false; }
+        };
+        this.outputFilterInverter = new ItemStackHandler(1) {
+            @Override protected void onContentsChanged(int slot) {
+                getHost().markForSave();
+                getHost().markForUpdate();
+                alertManagerPendingRetry();
+            }
+            @Override public int getSlotLimit(int slot) { return 1; }
+            @Override public boolean isItemValid(int slot, ItemStack stack) {
+                return stack.getItem().getRegistryName() != null
+                        && "appliedenergistics2".equals(stack.getItem().getRegistryName().getNamespace())
+                        && "inverter_card".equals(stack.getItem().getRegistryName().getPath());
+            }
+        };
         ResourceLocation front = modelId(type);
         this.modelOff = createModel(STATUS_OFF_MODEL_ID, front);
         this.modelOn = createModel(STATUS_ON_MODEL_ID, front);
@@ -139,6 +178,58 @@ public final class PatternP2PUnitPortPart extends AEBasePart
     }
 
     public UnitPortType getPortType() { return type; }
+    public int getTransferPriority() { return transferPriority; }
+    public boolean isSingleSlot() { return singleSlot; }
+    public boolean isSingleSlotEditable() {
+        PatternP2PUnitManagerPart manager = findManagerForConfiguration();
+        return manager == null || manager.getOutputSlotSharingMode() == OutputSlotSharingMode.FOLLOW_PORT;
+    }
+    public boolean getEffectiveSingleSlot() {
+        PatternP2PUnitManagerPart manager = findManagerForConfiguration();
+        if (manager == null) return singleSlot;
+        switch (manager.getOutputSlotSharingMode()) {
+            case ALL: return true;
+            case DISABLED: return false;
+            case FOLLOW_PORT: return singleSlot;
+            default: return singleSlot;
+        }
+    }
+    public void setSingleSlot(boolean value) {
+        if (!isSingleSlotEditable()) return;
+        if (singleSlot == value) return;
+        singleSlot = value;
+        getHost().markForSave(); getHost().markForUpdate();
+        alertManagerPendingRetry();
+    }
+    public ItemStackHandler getOutputFilterMarkers() { return outputFilterMarkers; }
+    public ItemStackHandler getOutputFilterInverter() { return outputFilterInverter; }
+
+    private boolean allowsOutputFilter(ItemStack stack) {
+        if (!type.acceptsTaskInput()) return true;
+        boolean hasMarkers = false;
+        boolean marked = false;
+        for (int i = 0; i < outputFilterMarkers.getSlots(); i++) {
+            ItemStack marker = outputFilterMarkers.getStackInSlot(i);
+            if (!marker.isEmpty()) {
+                hasMarkers = true;
+                if (ItemStack.isSame(marker, stack) && ItemStack.tagMatches(marker, stack)) marked = true;
+            }
+        }
+        boolean inverted = !outputFilterInverter.getStackInSlot(0).isEmpty();
+        return !hasMarkers || (inverted ? !marked : marked);
+    }
+    @Override public int getPriority() { return transferPriority; }
+    @Override public void setPriority(int value) { setTransferPriority(value); }
+    @Override public ItemStack getItemStackRepresentation() { return getItemStack(); }
+    @Override public net.minecraft.inventory.container.ContainerType<?> getContainerType() { return PriorityContainer.TYPE; }
+    public void setTransferPriority(int value) {
+        int clamped = Math.max(MIN_TRANSFER_PRIORITY, Math.min(MAX_TRANSFER_PRIORITY, value));
+        if (transferPriority == clamped) return;
+        transferPriority = clamped;
+        getHost().markForSave();
+        getHost().markForUpdate();
+        alertManagerPendingRetry();
+    }
     public UUID getBoundManagerId() { return boundManagerId; }
     public short getBoundFrequency() { return (short) getBoundFrequencyUnsigned(); }
     public boolean isBoundUnitTaskActive() {
@@ -160,12 +251,20 @@ public final class PatternP2PUnitPortPart extends AEBasePart
             cachedManager = null;
             return null;
         }
-        if (cachedManager != null && boundManagerId.equals(cachedManager.getUnitId())
+        if (cachedManager != null && isBoundTo(cachedManager)
                 && cachedManager.getGridNode() != null
                 && cachedManager.getGridNode().getGrid() == getGridNode().getGrid()) return cachedManager;
         cachedManager = PatternP2PTopologyGridService.find(getGridNode(), boundManagerId,
                 getTile().getLevel().getGameTime());
+        if (cachedManager != null && !isBoundTo(cachedManager)) cachedManager = null;
         return cachedManager;
+    }
+
+    private PatternP2PUnitManagerPart findManagerForConfiguration() {
+        if (boundManagerId == null || getTile().getLevel() == null) return null;
+        PatternP2PUnitManagerPart manager = PatternP2PTopologyGridService.findForConfiguration(
+                getGridNode(), boundManagerId);
+        return manager != null && isBoundTo(manager) ? manager : null;
     }
 
     public boolean isOperational() {
@@ -177,6 +276,7 @@ public final class PatternP2PUnitPortPart extends AEBasePart
     public int insertTaskInput(PatternP2PUnitManagerPart manager, ItemStack stack, boolean simulate) {
         if (stack == null || stack.isEmpty()
                 || manager == null || !isBoundTo(manager) || !manager.isOperational()) return 0;
+        if (!allowsOutputFilter(stack)) return 0;
         if (type == UnitPortType.TRANSFER) {
             ItemStack remainder = ItemHandlerHelper.insertItem(adjacentItemHandler(), stack.copy(), simulate);
             return stack.getCount() - remainder.getCount();
@@ -192,28 +292,55 @@ public final class PatternP2PUnitPortPart extends AEBasePart
             }
             return stack.getCount();
         }
-        if (type == UnitPortType.PLACE && stack.getCount() == 1 && stack.getItem() instanceof BlockItem
+        if (type == UnitPortType.PLACE && stack.getCount() >= 1 && stack.getItem() instanceof BlockItem
                 && getTile().getLevel() instanceof ServerWorld && getSide() != null) {
             Direction face = getSide().getFacing();
             BlockPos target = getTile().getBlockPos().relative(face);
             if (!getTile().getLevel().getBlockState(target).getMaterial().isReplaceable()) return 0;
             if (simulate) return 1;
             ServerWorld level = (ServerWorld) getTile().getLevel();
-            FakePlayer player = FakePlayerFactory.getMinecraft(level);
+            FakePlayer player = placementPlayer(level);
             ItemStack previous = player.getItemInHand(Hand.MAIN_HAND);
             ItemStack placing = stack.copy();
+            placing.setCount(1);
             player.setItemInHand(Hand.MAIN_HAND, placing);
             try {
                 BlockRayTraceResult hit = new BlockRayTraceResult(Vector3d.atCenterOf(target),
                         face.getOpposite(), target, false);
                 ActionResultType result = placing.useOn(new net.minecraft.item.BlockItemUseContext(
                         player, Hand.MAIN_HAND, placing, hit));
-                return result.consumesAction() && placing.isEmpty() ? 1 : 0;
+            return result.consumesAction() && placing.isEmpty() ? 1 : 0;
             } finally {
                 player.setItemInHand(Hand.MAIN_HAND, previous);
             }
         }
         return 0;
+    }
+
+    /** Estimates aggregate item-handler capacity without changing the adjacent inventory. */
+    public int estimateTransferCapacity(ItemStack stack, int fallback) {
+        if (type == UnitPortType.DROP) return Integer.MAX_VALUE;
+        if (type != UnitPortType.TRANSFER || stack == null || stack.isEmpty()) return fallback;
+        IItemHandler handler = adjacentItemHandler();
+        long total = 0;
+        for (int slot = 0; slot < handler.getSlots(); slot++) {
+            int limit = Math.max(0, handler.getSlotLimit(slot));
+            if (limit <= 0) continue;
+            ItemStack probe = stack.copy();
+            probe.setCount(limit);
+            ItemStack remainder = handler.insertItem(slot, probe, true);
+            total += Math.max(0, limit - remainder.getCount());
+            if (total >= Integer.MAX_VALUE) return Integer.MAX_VALUE;
+        }
+        return total > 0 ? (int) total : fallback;
+    }
+
+    public boolean matchesInput(PatternP2PUnitManagerPart manager, ItemStack stack,
+            cn.ae2bc.pattern.MaterialOutputForm form) {
+        return isBoundTo(manager) && stack != null && !stack.isEmpty() && form != null
+                && UnitPortType.forOutputFormId(form.getId()) == type
+                && form.supports(stack)
+                && allowsOutputFilter(stack);
     }
 
     /** Forwards Forge Energy supplied by an energy tunnel to the adjacent machine. */
@@ -227,8 +354,19 @@ public final class PatternP2PUnitPortPart extends AEBasePart
         return target == null || !target.canReceive() ? 0 : target.receiveEnergy(maxReceive, simulate);
     }
 
-    private boolean isBoundTo(PatternP2PUnitManagerPart manager) {
-        return boundManagerId != null && boundManagerId.equals(manager.getUnitId());
+    public boolean isBoundTo(PatternP2PUnitManagerPart manager) {
+        return manager != null && boundManagerId != null
+                && boundManagerId.equals(manager.getUnitId())
+                && (boundFrequency == 0 || boundFrequency == manager.getFrequency());
+    }
+
+    private FakePlayer placementPlayer(ServerWorld level) {
+        if (getGridNode() != null) {
+            PlayerEntity owner = appeng.core.Api.instance().registries().players()
+                    .findPlayer(getGridNode().getPlayerID());
+            if (owner != null) return FakePlayerFactory.get(level, owner.getGameProfile());
+        }
+        return FakePlayerFactory.getMinecraft(level);
     }
 
     private IItemHandler adjacentItemHandler() {
@@ -282,6 +420,13 @@ public final class PatternP2PUnitPortPart extends AEBasePart
         } catch (appeng.me.GridAccessException ignored) {
         }
         if (type == UnitPortType.RETURN) notifyNeighbors();
+    }
+
+    private void alertManagerPendingRetry() {
+        if (getTile() == null || getTile().getLevel() == null
+                || getTile().getLevel().isClientSide) return;
+        PatternP2PUnitManagerPart manager = findManager();
+        if (manager != null) manager.alertPendingRetry();
     }
 
     public void invalidateTaskRuntimeState() {
@@ -425,7 +570,22 @@ public final class PatternP2PUnitPortPart extends AEBasePart
     }
 
     @Override public boolean onPartActivate(PlayerEntity player, Hand hand, Vector3d hitPos) {
-        return bindFromMemoryCard(player, hand) || super.onPartActivate(player, hand, hitPos);
+        if (bindFromMemoryCard(player, hand)) return true;
+        if (hand == Hand.MAIN_HAND && type.acceptsTaskInput()) {
+            if (!player.level.isClientSide) {
+                NetworkHooks.openGui((ServerPlayerEntity) player, new SimpleNamedContainerProvider(
+                        (id, inventory, ignored) -> new UnitPortOutputConfigMenu(id, inventory, this),
+                        new TranslationTextComponent("gui.ae2_batchcraft.unit_port_output_config.title")),
+                        buffer -> {
+                            buffer.writeBlockPos(getTile().getBlockPos());
+                            buffer.writeByte(getSide().getFacing().ordinal());
+                            buffer.writeBoolean(getEffectiveSingleSlot());
+                            buffer.writeBoolean(isSingleSlotEditable());
+                        });
+            }
+            return true;
+        }
+        return super.onPartActivate(player, hand, hitPos);
     }
 
     @Override public boolean onPartShiftActivate(PlayerEntity player, Hand hand, Vector3d hitPos) {
@@ -448,8 +608,12 @@ public final class PatternP2PUnitPortPart extends AEBasePart
         PatternP2PUnitManagerPart requested = PatternP2PTopologyGridService.find(getGridNode(), requestedId,
                 getTile().getLevel().getGameTime());
         if ((current != null && current.isTaskActive())
-                || (requested != null && (requested.isTaskActive()
-                || requested.getFrequency() != requestedFrequency))) {
+                || (requested != null && requested.isTaskActive())) {
+            player.displayClientMessage(new TranslationTextComponent(
+                    "message.ae2_batchcraft.frequency_change_during_task"), true);
+            return true;
+        }
+        if (requested != null && requested.getFrequency() != requestedFrequency) {
             card.notifyUser(player, MemoryCardMessages.INVALID_MACHINE);
             return true;
         }
@@ -459,8 +623,17 @@ public final class PatternP2PUnitPortPart extends AEBasePart
         PatternP2PTopologyGridService.invalidate(getGridNode());
         getHost().markForSave();
         getHost().markForUpdate();
+        alertManagerPendingRetry();
         card.notifyUser(player, MemoryCardMessages.SETTINGS_LOADED);
         return true;
+    }
+
+    @Override
+    public void onNeighborChanged(net.minecraft.world.IBlockReader level,
+            BlockPos pos, BlockPos neighbor) {
+        super.onNeighborChanged(level, pos, neighbor);
+        alertTicking();
+        alertManagerPendingRetry();
     }
 
     @Override
@@ -470,6 +643,7 @@ public final class PatternP2PUnitPortPart extends AEBasePart
         PatternP2PTopologyGridService.invalidate(getGridNode());
         redstoneWorldStateDirty = true;
         alertTicking();
+        alertManagerPendingRetry();
         refreshModelState();
     }
 
@@ -479,6 +653,7 @@ public final class PatternP2PUnitPortPart extends AEBasePart
         PatternP2PTopologyGridService.invalidate(getGridNode());
         redstoneWorldStateDirty = true;
         alertTicking();
+        alertManagerPendingRetry();
         refreshModelState();
     }
 
@@ -496,6 +671,12 @@ public final class PatternP2PUnitPortPart extends AEBasePart
         super.readFromNBT(data);
         boundManagerId = data.hasUUID("PatternP2PUnitId") ? data.getUUID("PatternP2PUnitId") : null;
         boundFrequency = data.getShort("PatternP2PUnitFrequency");
+        transferPriority = Math.max(-9999, Math.min(9999, data.getInt("TransferPriority")));
+        singleSlot = data.contains("SingleSlot")
+                ? data.getBoolean("SingleSlot")
+                : data.contains("AllowMultiplePatternSlots") && !data.getBoolean("AllowMultiplePatternSlots");
+        if (data.contains("OutputFilterMarkers")) outputFilterMarkers.deserializeNBT(data.getCompound("OutputFilterMarkers"));
+        if (data.contains("OutputFilterInverter")) outputFilterInverter.deserializeNBT(data.getCompound("OutputFilterInverter"));
         cachedManager = null;
         redstoneWorldStateDirty = true;
         taskStartTick = Long.MIN_VALUE;
@@ -507,6 +688,10 @@ public final class PatternP2PUnitPortPart extends AEBasePart
         if (boundManagerId != null) data.putUUID("PatternP2PUnitId", boundManagerId);
         boundFrequency = (short) getBoundFrequencyUnsigned();
         data.putShort("PatternP2PUnitFrequency", boundFrequency);
+        data.putInt("TransferPriority", transferPriority);
+        data.putBoolean("SingleSlot", singleSlot);
+        data.put("OutputFilterMarkers", outputFilterMarkers.serializeNBT());
+        data.put("OutputFilterInverter", outputFilterInverter.serializeNBT());
     }
 
     @Override public void writeToStream(PacketBuffer data) throws java.io.IOException {
@@ -516,6 +701,8 @@ public final class PatternP2PUnitPortPart extends AEBasePart
         data.writeBoolean(boundManagerId != null);
         if (boundManagerId != null) data.writeUUID(boundManagerId);
         data.writeShort(getBoundFrequencyUnsigned());
+        data.writeInt(transferPriority);
+        data.writeBoolean(singleSlot);
         data.writeBoolean(modelPowered);
         data.writeBoolean(modelOnline);
     }
@@ -528,10 +715,15 @@ public final class PatternP2PUnitPortPart extends AEBasePart
         boolean oldOnline = modelOnline;
         boundManagerId = data.readBoolean() ? data.readUUID() : null;
         boundFrequency = data.readShort();
+        int oldPriority = transferPriority;
+        transferPriority = Math.max(-9999, Math.min(9999, data.readInt()));
+        boolean oldSingleSlot = singleSlot;
+        singleSlot = data.readBoolean();
         modelPowered = data.readBoolean();
         modelOnline = data.readBoolean();
         cachedManager = null;
-        return changed || oldFrequency != boundFrequency || !Objects.equals(oldId, boundManagerId)
+        return changed || oldFrequency != boundFrequency || oldPriority != transferPriority
+                || oldSingleSlot != singleSlot || !Objects.equals(oldId, boundManagerId)
                 || oldPowered != modelPowered || oldOnline != modelOnline;
     }
 

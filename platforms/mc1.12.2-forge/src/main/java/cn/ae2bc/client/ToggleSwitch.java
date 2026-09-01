@@ -17,6 +17,10 @@ final class ToggleSwitch extends GuiButton {
         return selected;
     }
 
+    boolean isHovered() {
+        return hovered;
+    }
+
     @Override
     public boolean mousePressed(Minecraft minecraft, int mouseX, int mouseY) {
         if (!super.mousePressed(minecraft, mouseX, mouseY)) return false;

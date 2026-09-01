@@ -3,7 +3,6 @@ package cn.ae2bc.mixin;
 import appeng.helpers.patternprovider.PatternProviderLogic;
 import appeng.menu.MenuOpener;
 import appeng.menu.SlotSemantics;
-import appeng.menu.guisync.GuiSync;
 import appeng.menu.implementations.PatternProviderMenu;
 import appeng.menu.slot.RestrictedInputSlot;
 import cn.ae2bc.extension.PatternProviderExtractionExtension;
@@ -23,9 +22,6 @@ public abstract class PatternProviderMenuMixin implements PatternProviderMenuExt
 
     @Shadow @Final protected PatternProviderLogic logic;
 
-    @Unique @GuiSync(80)
-    private boolean ae2bc$productExtractionCard;
-
     @Inject(
             method = "<init>(Lnet/minecraft/world/inventory/MenuType;I"
                     + "Lnet/minecraft/world/entity/player/Inventory;"
@@ -40,14 +36,6 @@ public abstract class PatternProviderMenuMixin implements PatternProviderMenuExt
                 AE2BC_OPEN_PRODUCT_EXTRACTION, this::ae2bc$openProductExtraction);
     }
 
-    @Inject(method = "broadcastChanges", at = @At("TAIL"))
-    private void ae2bc$syncProductExtractionCard(CallbackInfo ci) {
-        PatternProviderMenu menu = (PatternProviderMenu) (Object) this;
-        if (!menu.isClientSide()) {
-            ae2bc$productExtractionCard = ((PatternProviderExtractionExtension) logic).ae2bc$hasProductExtractionCard();
-        }
-    }
-
     @Override
     public void ae2bc$openProductExtractionSettings() {
         ((AEBaseMenuInvoker) this).ae2bc$sendClientAction(AE2BC_OPEN_PRODUCT_EXTRACTION);
@@ -55,7 +43,9 @@ public abstract class PatternProviderMenuMixin implements PatternProviderMenuExt
 
     @Override
     public boolean ae2bc$hasProductExtractionCard() {
-        return ae2bc$productExtractionCard;
+        // The restricted upgrade slot is already synchronized by the vanilla
+        // container protocol, so its backing inventory is authoritative on both sides.
+        return ((PatternProviderExtractionExtension) logic).ae2bc$hasProductExtractionCard();
     }
 
     @Unique

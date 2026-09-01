@@ -1,5 +1,6 @@
 package cn.ae2bc.part;
 
+import cn.ae2bc.core.ProjectLimits;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -40,7 +41,7 @@ import net.minecraftforge.energy.IEnergyStorage;
 /** rv6 energy entry point with a small platform adapter around the shared distributor. */
 public final class PatternP2PTunnelEnergyPart extends PartBasicState
         implements IExternalPowerSink, IGridTickable {
-    public static final int PULL_INTERVAL = 5;
+    public static final int PULL_INTERVAL = ProjectLimits.ENERGY_TUNNEL_PULL_INTERVAL;
     public static final ResourceLocation MODEL_ID = new ResourceLocation(
             "ae2_batchcraft", "part/p2p/pattern_p2p_tunnel_energy");
     private static final IPartModel MODEL = new PartModel(true, MODEL_ID);
@@ -88,7 +89,7 @@ public final class PatternP2PTunnelEnergyPart extends PartBasicState
 
     @Override
     public boolean onPartActivate(EntityPlayer player, EnumHand hand, Vec3d hit) {
-        if (hand == EnumHand.MAIN_HAND && player.getHeldItem(hand).isEmpty()) {
+        if (hand == EnumHand.MAIN_HAND) {
             if (!player.world.isRemote) {
                 player.openGui(Ae2bcMod.INSTANCE, Ae2bcMod.GUI_ENERGY_BASE
                                 + getSide().getFacing().ordinal(), player.world,

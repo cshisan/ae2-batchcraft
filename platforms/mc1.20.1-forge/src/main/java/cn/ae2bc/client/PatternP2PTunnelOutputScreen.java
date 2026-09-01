@@ -1,7 +1,9 @@
 package cn.ae2bc.client;
 
 import appeng.client.gui.AEBaseScreen;
+import appeng.client.gui.Icon;
 import appeng.client.gui.style.ScreenStyle;
+import appeng.client.gui.widgets.TabButton;
 import net.minecraft.client.gui.components.Button;
 import cn.ae2bc.logic.ReturnMode;
 import cn.ae2bc.menu.PatternP2PTunnelOutputMenu;
@@ -21,6 +23,8 @@ public final class PatternP2PTunnelOutputScreen extends AEBaseScreen<PatternP2PT
     public PatternP2PTunnelOutputScreen(PatternP2PTunnelOutputMenu menu, Inventory playerInventory,
                                           Component title, ScreenStyle style) {
         super(menu, playerInventory, title, style);
+        widgets.add("close", new TabButton(Icon.CLEAR,
+                Component.translatable("gui.ae2_batchcraft.configuration.close"), button -> onClose()));
         for (ReturnMode mode : ReturnMode.values()) {
             String modeName = mode.getSerializedName();
             var button = widgets.addButton("return" + Character.toUpperCase(modeName.charAt(0))

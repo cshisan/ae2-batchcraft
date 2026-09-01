@@ -1,5 +1,6 @@
 package cn.ae2bc.placer;
 
+import cn.ae2bc.core.ProjectLimits;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.codecs.RecordCodecBuilder;
 import net.minecraft.core.Direction;
@@ -9,7 +10,7 @@ public record ComponentPlacerSettings(
         int offsetX,
         int offsetY,
         int offsetZ) {
-    public static final int MAX_OFFSET = 16;
+    public static final int MAX_OFFSET = ProjectLimits.COMPONENT_PLACER_MAX_OFFSET;
     public static final ComponentPlacerSettings DEFAULT = new ComponentPlacerSettings(
             Direction.UP, 0, 1, 0);
 

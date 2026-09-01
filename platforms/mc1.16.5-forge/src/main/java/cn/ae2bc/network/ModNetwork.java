@@ -5,6 +5,7 @@ import cn.ae2bc.menu.PatternP2PTunnelEnergyMenu;
 import cn.ae2bc.menu.PatternP2PTunnelMenu;
 import cn.ae2bc.menu.PatternP2PUnitManagerMenu;
 import cn.ae2bc.menu.ComponentPlacerMenu;
+import cn.ae2bc.menu.UnitPortOutputConfigMenu;
 import cn.ae2bc.part.PatternP2PTunnelEnergyPart;
 import cn.ae2bc.part.PatternP2PTunnelPart;
 import cn.ae2bc.part.PatternP2PUnitManagerPart;
@@ -14,6 +15,7 @@ import java.util.function.Supplier;
 
 import cn.ae2bc.core.extraction.ProductExtractionLimits;
 import cn.ae2bc.core.unit.PatternP2PUnitSettings;
+import cn.ae2bc.core.unit.OutputSlotSharingMode;
 import cn.ae2bc.logic.EnergyDistributionMode;
 import cn.ae2bc.Ae2bcMod;
 import net.minecraft.entity.player.ServerPlayerEntity;
@@ -62,6 +64,69 @@ public final class ModNetwork {
         CHANNEL.registerMessage(5, ComponentPlacerActionPacket.class,
                 ComponentPlacerActionPacket::encode, ComponentPlacerActionPacket::decode,
                 ComponentPlacerActionPacket::handle);
+        CHANNEL.registerMessage(6, UnitPortPriorityPacket.class,
+                UnitPortPriorityPacket::encode, UnitPortPriorityPacket::decode,
+                UnitPortPriorityPacket::handle);
+        CHANNEL.registerMessage(7, InputOutputSlotSharingModePacket.class,
+                InputOutputSlotSharingModePacket::encode, InputOutputSlotSharingModePacket::decode,
+                InputOutputSlotSharingModePacket::handle);
+    }
+
+    public static void sendUnitPortPriority(UnitPortOutputConfigMenu menu, int priority) {
+        sendUnitPortPriority(menu, priority, menu.singleSlot);
+    }
+
+    public static void sendUnitPortPriority(UnitPortOutputConfigMenu menu, int priority,
+            boolean singleSlot) {
+        CHANNEL.sendToServer(new UnitPortPriorityPacket(menu.containerId, menu.getPos(),
+                menu.getSide(), priority, singleSlot));
+    }
+
+    private static final class UnitPortPriorityPacket {
+        private final int windowId;
+        private final BlockPos pos;
+        private final Direction side;
+        private final int priority;
+        private final boolean singleSlot;
+        private UnitPortPriorityPacket(int windowId, BlockPos pos, Direction side, int priority,
+                boolean singleSlot) {
+            this.windowId = windowId;
+            this.pos = pos;
+            this.side = side;
+            this.priority = Math.max(-9999, Math.min(9999, priority));
+            this.singleSlot = singleSlot;
+        }
+        private static void encode(UnitPortPriorityPacket packet, PacketBuffer buffer) {
+            buffer.writeInt(packet.windowId);
+            buffer.writeBlockPos(packet.pos);
+            buffer.writeByte(packet.side.ordinal());
+            buffer.writeInt(packet.priority);
+            buffer.writeBoolean(packet.singleSlot);
+        }
+        private static UnitPortPriorityPacket decode(PacketBuffer buffer) {
+            return new UnitPortPriorityPacket(buffer.readInt(), buffer.readBlockPos(),
+                    Direction.values()[buffer.readUnsignedByte() % Direction.values().length], buffer.readInt(),
+                    buffer.readBoolean());
+        }
+        private static void handle(UnitPortPriorityPacket packet, Supplier<NetworkEvent.Context> contextSupplier) {
+            NetworkEvent.Context context = contextSupplier.get();
+            ServerPlayerEntity sender = context.getSender();
+            context.enqueueWork(() -> {
+                if (sender == null || !(sender.containerMenu instanceof UnitPortOutputConfigMenu)
+                        || sender.containerMenu.containerId != packet.windowId
+                        || sender.distanceToSqr(packet.pos.getX() + 0.5, packet.pos.getY() + 0.5,
+                        packet.pos.getZ() + 0.5) > 64.0) return;
+                UnitPortOutputConfigMenu menu = (UnitPortOutputConfigMenu) sender.containerMenu;
+                if (!menu.getPos().equals(packet.pos) || menu.getSide() != packet.side) return;
+                cn.ae2bc.part.PatternP2PUnitPortPart part =
+                        UnitPortOutputConfigMenu.findPart(sender, packet.pos, packet.side);
+                if (part != null && part.getPortType().acceptsTaskInput()) {
+                    part.setPriority(packet.priority);
+                    part.setSingleSlot(packet.singleSlot);
+                }
+            });
+            context.setPacketHandled(true);
+        }
     }
 
     public static void sendComponentPlacerAction(ComponentPlacerMenu menu, int action, int value) {
@@ -108,7 +173,8 @@ public final class ModNetwork {
         CHANNEL.sendToServer(new ExtractionSettingsPacket(menu.containerId, menu.getPos(), menu.getSide(), enabled,
                 new PatternP2PUnitSettings(current.getReturnMode(), current.isBreakRecovery(),
                         interval, amount, current.getRedstoneMode(), current.getRedstoneStrength(),
-                        current.getPulseWidthTicks(), current.getPulsePeriodTicks()),
+                        current.getPulseWidthTicks(), current.getPulsePeriodTicks(),
+                        current.getTransferPortOutputMode(), current.getOutputSlotSharingMode()),
                 menu.isSyncInputSettings(), false));
     }
 
@@ -116,6 +182,61 @@ public final class ModNetwork {
             PatternP2PUnitSettings settings, boolean syncInputSettings, boolean resetTask) {
         CHANNEL.sendToServer(new ExtractionSettingsPacket(menu.containerId, menu.getPos(), menu.getSide(), enabled,
                 settings, syncInputSettings, resetTask));
+    }
+
+    public static void sendInputOutputSlotSharingMode(PatternP2PTunnelMenu menu,
+            OutputSlotSharingMode mode) {
+        CHANNEL.sendToServer(new InputOutputSlotSharingModePacket(menu.containerId, menu.getPos(),
+                menu.getSide(), mode));
+    }
+
+    private static final class InputOutputSlotSharingModePacket {
+        private final int windowId;
+        private final BlockPos pos;
+        private final Direction side;
+        private final OutputSlotSharingMode mode;
+
+        private InputOutputSlotSharingModePacket(int windowId, BlockPos pos, Direction side,
+                OutputSlotSharingMode mode) {
+            this.windowId = windowId;
+            this.pos = pos;
+            this.side = side;
+            this.mode = mode == null ? OutputSlotSharingMode.DISABLED : mode;
+        }
+
+        private static void encode(InputOutputSlotSharingModePacket packet, PacketBuffer buffer) {
+            buffer.writeInt(packet.windowId);
+            buffer.writeBlockPos(packet.pos);
+            buffer.writeByte(packet.side.ordinal());
+            buffer.writeByte(packet.mode.getId());
+        }
+
+        private static InputOutputSlotSharingModePacket decode(PacketBuffer buffer) {
+            return new InputOutputSlotSharingModePacket(buffer.readInt(), buffer.readBlockPos(),
+                    Direction.values()[buffer.readUnsignedByte() % Direction.values().length],
+                    OutputSlotSharingMode.fromId(buffer.readUnsignedByte()));
+        }
+
+        private static void handle(InputOutputSlotSharingModePacket packet,
+                Supplier<NetworkEvent.Context> contextSupplier) {
+            NetworkEvent.Context context = contextSupplier.get();
+            ServerPlayerEntity sender = context.getSender();
+            context.enqueueWork(() -> {
+                if (sender == null || !(sender.containerMenu instanceof PatternP2PTunnelMenu)
+                        || sender.containerMenu.containerId != packet.windowId
+                        || !((PatternP2PTunnelMenu) sender.containerMenu).getPos().equals(packet.pos)
+                        || ((PatternP2PTunnelMenu) sender.containerMenu).getSide() != packet.side
+                        || sender.distanceToSqr(packet.pos.getX() + 0.5, packet.pos.getY() + 0.5,
+                        packet.pos.getZ() + 0.5) > 64.0) {
+                    return;
+                }
+                PatternP2PTunnelPart part = PatternP2PTunnelMenu.findPart(sender, packet.pos, packet.side);
+                if (part != null && !part.isOutput()) {
+                    part.setOutputSlotSharingMode(packet.mode);
+                }
+            });
+            context.setPacketHandled(true);
+        }
     }
 
     public static void sendMaterialOutputConfig(int windowId, long[] packed) {
@@ -183,6 +304,8 @@ public final class ModNetwork {
             buffer.writeByte(packet.settings.getRedstoneStrength());
             buffer.writeInt(packet.settings.getPulseWidthTicks());
             buffer.writeInt(packet.settings.getPulsePeriodTicks());
+            buffer.writeByte(packet.settings.getTransferPortOutputMode().getId());
+            buffer.writeByte(packet.settings.getOutputSlotSharingMode().getId());
             buffer.writeBoolean(packet.syncMainConfiguration);
             buffer.writeByte(packet.energyDistributionMode.getId());
             buffer.writeBoolean(packet.resetTask);
@@ -197,6 +320,11 @@ public final class ModNetwork {
                     buffer.readInt(), buffer.readInt(),
                     cn.ae2bc.logic.RedstoneOutputMode.fromId(buffer.readUnsignedByte()),
                     buffer.readUnsignedByte(), buffer.readInt(), buffer.readInt());
+            settings = new PatternP2PUnitSettings(settings.getReturnMode(), settings.isBreakRecovery(),
+                    settings.getExtractionInterval(), settings.getExtractionAmount(), settings.getRedstoneMode(),
+                    settings.getRedstoneStrength(), settings.getPulseWidthTicks(), settings.getPulsePeriodTicks(),
+                    cn.ae2bc.core.unit.TransferPortOutputMode.fromId(buffer.readUnsignedByte()),
+                    cn.ae2bc.core.unit.OutputSlotSharingMode.fromId(buffer.readUnsignedByte()));
             return new UnitManagerSettingsPacket(windowId, pos, frequency, settings,
                     buffer.readBoolean(), EnergyDistributionMode.fromId(buffer.readUnsignedByte()),
                     buffer.readBoolean());
@@ -215,8 +343,9 @@ public final class ModNetwork {
                 PatternP2PUnitManagerPart part = PatternP2PUnitManagerMenu.findPart(sender, packet.pos);
                 if (part != null) {
                     part.setFrequency(packet.frequency);
-                    part.setSettings(packet.settings);
                     part.setSyncMainConfiguration(packet.syncMainConfiguration);
+                    part.setSettings(packet.settings);
+                    part.setEnergyDistributionMode(packet.energyDistributionMode);
                     if (packet.resetTask) part.resetTaskState();
                 }
             });
@@ -382,8 +511,10 @@ public final class ModNetwork {
         buffer.writeInt(settings.getExtractionAmount());
         buffer.writeByte(settings.getRedstoneMode().getId());
         buffer.writeByte(settings.getRedstoneStrength());
-        buffer.writeInt(settings.getPulseWidthTicks());
-        buffer.writeInt(settings.getPulsePeriodTicks());
+            buffer.writeInt(settings.getPulseWidthTicks());
+            buffer.writeInt(settings.getPulsePeriodTicks());
+            buffer.writeByte(settings.getTransferPortOutputMode().getId());
+            buffer.writeByte(settings.getOutputSlotSharingMode().getId());
     }
 
     private static PatternP2PUnitSettings readSettings(PacketBuffer buffer) {
@@ -391,7 +522,9 @@ public final class ModNetwork {
                 cn.ae2bc.logic.ReturnMode.fromId(buffer.readUnsignedByte()), buffer.readBoolean(),
                 buffer.readInt(), buffer.readInt(),
                 cn.ae2bc.logic.RedstoneOutputMode.fromId(buffer.readUnsignedByte()),
-                buffer.readUnsignedByte(), buffer.readInt(), buffer.readInt());
+                    buffer.readUnsignedByte(), buffer.readInt(), buffer.readInt(),
+                    cn.ae2bc.core.unit.TransferPortOutputMode.fromId(buffer.readUnsignedByte()),
+                    cn.ae2bc.core.unit.OutputSlotSharingMode.fromId(buffer.readUnsignedByte()));
     }
 
     private static final class MaterialOutputConfigPacket {

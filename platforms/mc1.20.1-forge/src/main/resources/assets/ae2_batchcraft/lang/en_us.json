@@ -132,6 +132,14 @@
   "gui.ae2_batchcraft.pattern_p2p_unit.page.common": "General",
   "gui.ae2_batchcraft.pattern_p2p_unit.page.break": "Break Port",
   "gui.ae2_batchcraft.pattern_p2p_unit.page.redstone": "Redstone Port",
+  "gui.ae2_batchcraft.pattern_p2p_unit.page.transfer": "Unit Port (Transfer)",
+  "gui.ae2_batchcraft.pattern_p2p_unit.section.transfer_mode": "Transfer Mode",
+  "gui.ae2_batchcraft.pattern_p2p_unit.transfer_mode.normal": "Normal",
+  "gui.ae2_batchcraft.pattern_p2p_unit.transfer_mode.single_item": "Single Item",
+  "gui.ae2_batchcraft.pattern_p2p_unit.transfer_mode.same_type": "Same Type",
+  "gui.ae2_batchcraft.pattern_p2p_unit.transfer_mode.normal.tooltip": "No additional restriction; the machine determines capacity and item types.",
+  "gui.ae2_batchcraft.pattern_p2p_unit.transfer_mode.single_item.tooltip": "Each transfer port accepts at most one item for the current task.",
+  "gui.ae2_batchcraft.pattern_p2p_unit.transfer_mode.same_type.tooltip": "Each transfer port accepts only one item type for the current task.",
   "gui.ae2_batchcraft.pattern_p2p_unit.page.switch": "Switch to %s",
   "gui.ae2_batchcraft.pattern_p2p_unit.section.energy_configuration": "Energy Configuration",
   "gui.ae2_batchcraft.pattern_p2p_unit.section.task_reset": "Task Reset",
@@ -164,7 +172,22 @@
   "tooltip.ae2_batchcraft.task_state": "Task State: %s",
   "tooltip.ae2_batchcraft.task_state.idle": "Idle",
   "tooltip.ae2_batchcraft.task_state.working": "Working",
+  "message.ae2_batchcraft.frequency_change_during_task": "Frequency cannot be changed while a task is running",
   "tooltip.ae2_batchcraft.unit.unbound": "Unbound",
   "tooltip.ae2_batchcraft.material_output_config": "Output Configuration",
   "tooltip.ae2_batchcraft.material_output_config.entry": "%1$s: %2$s · %3$s"
+  ,"gui.ae2_batchcraft.priority":"Priority"
+  ,"gui.ae2_batchcraft.enabled":"Enabled"
+  ,"gui.ae2_batchcraft.disabled":"Disabled"
+  ,"gui.ae2_batchcraft.unit_port_output_config.title":"Unit Port Output Configuration"
+  ,"gui.ae2_batchcraft.unit_port_output_config.markers":"Material Markers"
+  ,"gui.ae2_batchcraft.unit_port_output_config.inverter":"AE2 Inverter Card"
+  ,"gui.ae2_batchcraft.confirm":"Confirm"
+  ,"gui.ae2_batchcraft.unit_port_output_config.single_slot.tooltip":"Single-port single-slot\nCurrent: %s\nWhen enabled, this port may output materials from only one pattern slot"
+  ,"gui.ae2_batchcraft.pattern_p2p_unit.page.energy":"Unit Port (Energy)"
+  ,"gui.ae2_batchcraft.pattern_p2p_unit.section.single_slot":"Single-port single-slot"
+  ,"gui.ae2_batchcraft.pattern_p2p_unit.single_slot.tooltip":"Controls whether an output port may serve only one encoded pattern material slot"
+  ,"gui.ae2_batchcraft.pattern_p2p_unit.single_slot.all":"All Enabled"
+  ,"gui.ae2_batchcraft.pattern_p2p_unit.single_slot.disabled":"Disabled"
+  ,"gui.ae2_batchcraft.pattern_p2p_unit.single_slot.follow_port":"Follow Port Configuration"
 }

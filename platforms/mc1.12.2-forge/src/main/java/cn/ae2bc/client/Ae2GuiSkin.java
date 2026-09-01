@@ -5,8 +5,11 @@ import net.minecraft.client.gui.Gui;
 import net.minecraft.util.ResourceLocation;
 
 final class Ae2GuiSkin extends Gui {
+    private static final Ae2GuiSkin INSTANCE = new Ae2GuiSkin();
     private static final ResourceLocation INTERFACE =
             new ResourceLocation("appliedenergistics2", "textures/guis/interface.png");
+    private static final ResourceLocation RIGHT_TOOLBAR =
+            new ResourceLocation("appliedenergistics2", "textures/guis/bus.png");
     private static final int TEXTURE_SIZE = 256;
     private static final int PANEL_WIDTH = 176;
     private static final int PANEL_HEIGHT = 212;
@@ -36,6 +39,19 @@ final class Ae2GuiSkin extends Gui {
                 0, PANEL_HEIGHT - BORDER, BORDER, BORDER);
         stretch(x + width - BORDER, y + height - BORDER, BORDER, BORDER,
                 PANEL_WIDTH - BORDER, PANEL_HEIGHT - BORDER, BORDER, BORDER);
+    }
+
+    static void drawRightToolbar(int x, int y, int mainWidth, int buttonCount) {
+        int height = buttonCount * 20 + Math.max(0, buttonCount - 1) * 6 + 12;
+        Minecraft.getMinecraft().getTextureManager().bindTexture(RIGHT_TOOLBAR);
+        stretch(x + mainWidth, y + 17, 28, height, 176, 0, 35, 61);
+    }
+
+    /** Matches GuiUpgradeable's one-slot side panel used by the ME Interface. */
+    static void drawInterfaceUpgradePanel(int x, int y, int mainWidth, int upgradeSlots) {
+        Minecraft.getMinecraft().getTextureManager().bindTexture(INTERFACE);
+        INSTANCE.drawTexturedModalRect(x + mainWidth, y, 177, 0,
+                35, 14 + Math.max(0, upgradeSlots) * 18);
     }
 
     private static void stretch(int x, int y, int width, int height,

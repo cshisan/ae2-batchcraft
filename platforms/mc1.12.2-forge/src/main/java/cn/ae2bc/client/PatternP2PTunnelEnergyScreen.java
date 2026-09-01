@@ -29,6 +29,7 @@ public final class PatternP2PTunnelEnergyScreen extends GuiContainer {
 
     @Override public void initGui() {
         super.initGui();
+        buttonList.add(new Ae2Button(4, guiLeft + 176, guiTop - 5, 20, 20, "X"));
         GuiButton passive = new Ae2Button(1, guiLeft + 12, guiTop + 35, 85, 20,
                 tr("gui.ae2_batchcraft.energy.mode.passive"));
         GuiButton active = new Ae2Button(2, guiLeft + 103, guiTop + 35, 85, 20,
@@ -41,7 +42,9 @@ public final class PatternP2PTunnelEnergyScreen extends GuiContainer {
     }
 
     @Override protected void actionPerformed(GuiButton button) {
-        if (button.id == 1) {
+        if (button.id == 4) {
+            mc.player.closeScreen();
+        } else if (button.id == 1) {
             pullEnabled = false;
             sendCurrentSettings();
             rebuildGui();

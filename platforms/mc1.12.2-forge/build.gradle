@@ -10,6 +10,115 @@ buildscript {
 
 apply plugin: 'net.minecraftforge.gradle.forge'
 
+import groovy.json.JsonSlurper
+import java.security.MessageDigest
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+
+def minecraftAssetsDir = new File(gradle.gradleUserHomeDir, 'caches/minecraft/assets')
+def minecraftAssetIndexId = '1.12'
+
+// ForgeGradle 2.3 uses an obsolete HTTP endpoint for asset objects. Prefetch
+// missing objects over HTTPS so its normal getAssets task can finish offline.
+task downloadAssetsHttps {
+    dependsOn getAssetIndex
+
+    doLast {
+        def indexFile = new File(minecraftAssetsDir, "indexes/${minecraftAssetIndexId}.json")
+        if (!indexFile.isFile()) {
+            throw new GradleException("Missing Minecraft asset index: ${indexFile}")
+        }
+
+        def index = new JsonSlurper().parse(indexFile)
+        def objectsDir = new File(minecraftAssetsDir, 'objects')
+        def digest = MessageDigest.getInstance('SHA-1')
+        def downloaded = 0
+        def skipped = 0
+
+        index.objects.each { assetPath, asset ->
+            def hash = asset.hash as String
+            def prefix = hash.substring(0, 2)
+            def target = new File(objectsDir, "${prefix}/${hash}")
+            def valid = target.isFile() && target.length() == (asset.size as long)
+
+            if (valid) {
+                digest.reset()
+                target.withInputStream { stream ->
+                    byte[] buffer = new byte[8192]
+                    int read
+                    while ((read = stream.read(buffer)) != -1) {
+                        digest.update(buffer, 0, read)
+                    }
+                }
+                valid = digest.digest().encodeHex().toString().equalsIgnoreCase(hash)
+            }
+
+            if (valid) {
+                skipped++
+                return
+            }
+
+            target.parentFile.mkdirs()
+            def temporary = new File(target.parentFile, "${hash}.download")
+            if (temporary.exists()) {
+                temporary.delete()
+            }
+
+            def url = new URL("https://resources.download.minecraft.net/${prefix}/${hash}")
+            def connection = url.openConnection()
+            connection.connectTimeout = 15000
+            connection.readTimeout = 60000
+            connection.connect()
+            connection.inputStream.withCloseable { input ->
+                temporary.withOutputStream { output ->
+                    byte[] buffer = new byte[8192]
+                    int read
+                    while ((read = input.read(buffer)) != -1) {
+                        output.write(buffer, 0, read)
+                    }
+                }
+            }
+
+            if (temporary.length() != (asset.size as long)) {
+                temporary.delete()
+                throw new GradleException("Invalid size for Minecraft asset ${assetPath}")
+            }
+            digest.reset()
+            temporary.withInputStream { stream ->
+                byte[] buffer = new byte[8192]
+                int read
+                while ((read = stream.read(buffer)) != -1) {
+                    digest.update(buffer, 0, read)
+                }
+            }
+            if (!digest.digest().encodeHex().toString().equalsIgnoreCase(hash)) {
+                temporary.delete()
+                throw new GradleException("Invalid SHA-1 for Minecraft asset ${assetPath}")
+            }
+            try {
+                Files.move(temporary.toPath(), target.toPath(), StandardCopyOption.REPLACE_EXISTING)
+            } catch (Exception ignored) {
+                temporary.delete()
+                throw new GradleException("Unable to install Minecraft asset ${target}")
+            }
+            downloaded++
+            if (downloaded % 50 == 0) {
+                logger.lifecycle("Downloaded ${downloaded} Minecraft assets over HTTPS")
+            }
+        }
+
+        logger.lifecycle("Minecraft asset HTTPS prefetch complete: ${downloaded} downloaded, ${skipped} already cached")
+    }
+}
+
+getAssets.dependsOn downloadAssetsHttps
+
+// ForgeGradle 2.3 declares runClient outputs, which can cause a later
+// invocation to be skipped as UP-TO-DATE. A run task must always launch a client.
+runClient {
+    outputs.upToDateWhen { false }
+}
+
 version = mod_version
 group = mod_group_id
 archivesBaseName = "ae2-batchcraft-${minecraft_version}"

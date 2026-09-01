@@ -293,20 +293,23 @@ public final class Ae2IntegrationTransformer implements IClassTransformer {
     private static byte[] transformPatternTermGui(byte[] basicClass) {
         ClassNode node = new ClassNode();
         new ClassReader(basicClass).accept(node, 0);
-        if (hasMethod(node, "mouseClicked", "(III)V")
-                || hasMethod(node, "func_73864_a", "(III)V")
-                || hasMethod(node, "drawSlot", "(Lnet/minecraft/inventory/Slot;)V")
-                || hasMethod(node, "func_146977_a", "(Lnet/minecraft/inventory/Slot;)V")
-                || hasMethod(node, "drawScreen", "(IIF)V")
-                || hasMethod(node, "func_73863_a", "(IIF)V")) {
-            throw new IllegalStateException("Unexpected AE2 GuiPatternTerm override shape");
+        // In the development environment Forge remaps obfuscated method names after
+        // this transformer runs. Injecting both aliases therefore produces duplicate
+        // methods (for example mouseClicked and func_73864_a become the same method).
+        // Detect the namespace from an existing AE2 method and inject one alias only.
+        boolean deobfuscated = hasMethod(node, "initGui", "()V");
+        String mouseClicked = deobfuscated ? "mouseClicked" : "func_73864_a";
+        String drawSlot = deobfuscated ? "drawSlot" : "func_146977_a";
+        String drawScreen = deobfuscated ? "drawScreen" : "func_73863_a";
+        if (!hasMethod(node, mouseClicked, "(III)V")) {
+            node.methods.add(patternTermMouseClickedMethod(node, mouseClicked));
         }
-        node.methods.add(patternTermMouseClickedMethod(node, "mouseClicked"));
-        node.methods.add(patternTermMouseClickedMethod(node, "func_73864_a"));
-        node.methods.add(patternTermDrawSlotMethod(node, "drawSlot"));
-        node.methods.add(patternTermDrawSlotMethod(node, "func_146977_a"));
-        node.methods.add(patternTermDrawScreenMethod(node, "drawScreen"));
-        node.methods.add(patternTermDrawScreenMethod(node, "func_73863_a"));
+        if (!hasMethod(node, drawSlot, "(Lnet/minecraft/inventory/Slot;)V")) {
+            node.methods.add(patternTermDrawSlotMethod(node, drawSlot));
+        }
+        if (!hasMethod(node, drawScreen, "(IIF)V")) {
+            node.methods.add(patternTermDrawScreenMethod(node, drawScreen));
+        }
         ClassWriter writer = new ClassWriter(ClassWriter.COMPUTE_MAXS);
         node.accept(writer);
         return writer.toByteArray();

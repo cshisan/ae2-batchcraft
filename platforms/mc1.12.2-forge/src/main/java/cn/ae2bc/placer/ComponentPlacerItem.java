@@ -1,7 +1,7 @@
 package cn.ae2bc.placer;
 
+import cn.ae2bc.core.ProjectLimits;
 import appeng.api.AEApi;
-import appeng.api.config.Upgrades;
 import appeng.api.implementations.items.IMemoryCard;
 import appeng.api.implementations.parts.IPartCable;
 import appeng.api.parts.BusSupport;
@@ -12,6 +12,7 @@ import cn.ae2bc.Ae2bcMod;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
 import net.minecraft.nbt.NBTTagCompound;
+import net.minecraft.nbt.NBTTagList;
 import net.minecraft.util.ActionResult;
 import net.minecraft.util.EnumActionResult;
 import net.minecraft.util.EnumFacing;
@@ -25,11 +26,13 @@ import net.minecraftforge.fml.common.eventhandler.EventPriority;
 import net.minecraftforge.fml.common.eventhandler.SubscribeEvent;
 import net.minecraftforge.items.IItemHandler;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
 @Mod.EventBusSubscriber(modid = Ae2bcMod.MOD_ID)
 public final class ComponentPlacerItem extends ToolWirelessTerminal {
-    public static final int MATERIAL_SLOT_COUNT = 9;
+    public static final int MATERIAL_SLOT_COUNT = ProjectLimits.COMPONENT_PLACER_MATERIAL_SLOT_COUNT;
     private static final String SETTINGS_KEY = "ae2bc_settings";
     private static final String SELECTION_KEY = "ae2bc_selection";
     private static final String MATERIALS_KEY = "ae2bc_materials";
@@ -40,9 +43,6 @@ public final class ComponentPlacerItem extends ToolWirelessTerminal {
 
     public ComponentPlacerItem() { setMaxStackSize(1); }
     @Override public boolean canHandle(ItemStack stack) { return stack.getItem() == this; }
-    @Override public double getAEMaxPower(ItemStack stack) {
-        return super.getAEMaxPower(stack) * (1 << countUpgrade(stack, Upgrades.CAPACITY));
-    }
     @Override public EnumActionResult onItemUse(EntityPlayer player, World world, BlockPos pos,
                                                 EnumHand hand, EnumFacing facing,
                                                 float hitX, float hitY, float hitZ) {
@@ -126,30 +126,54 @@ public final class ComponentPlacerItem extends ToolWirelessTerminal {
                 new ComponentPlacerInventory.Filter() { public boolean allow(ComponentPlacerInventory i, int s, ItemStack v) { return v.isEmpty() || isUsablePart(v); } });
     }
     public static IItemHandler getUpgrades(ItemStack stack) {
-        return new ComponentPlacerInventory(stack, UPGRADES_KEY, 3, 1,
+        return new ComponentPlacerInventory(stack, UPGRADES_KEY, 1, 1,
                 new ComponentPlacerInventory.Filter() {
                     public boolean allow(ComponentPlacerInventory inventory, int slot, ItemStack candidate) {
-                        Upgrades type = upgradeType(candidate); if (type == null) return false;
-                        int installed = 0; int maximum = type == Upgrades.CAPACITY ? 2 : 1;
-                        for (int i = 0; i < inventory.getSlots(); i++)
-                            if (i != slot && upgradeType(inventory.getStackInSlot(i)) == type) installed++;
-                        return installed < maximum;
+                        return candidate.isEmpty() || isCraftingCard(candidate);
                     }
-                });
+                }, true);
     }
     public static ItemStack getMarkedCable(ItemStack stack) { return getCableMarker(stack).getStackInSlot(0).copy(); }
     public static ItemStack getMarkedPart(ItemStack stack) { return getPartMarker(stack).getStackInSlot(0).copy(); }
-    public static boolean hasCraftingCard(ItemStack stack) { return countUpgrade(stack, Upgrades.CRAFTING) > 0; }
-    public static int countUpgrade(ItemStack stack, Upgrades type) {
-        int result = 0; IItemHandler inventory = getUpgrades(stack);
-        for (int i = 0; i < inventory.getSlots(); i++) if (upgradeType(inventory.getStackInSlot(i)) == type) result++;
-        return result;
+    public static boolean hasCraftingCard(ItemStack stack) {
+        return isCraftingCard(getUpgrades(stack).getStackInSlot(0));
     }
-    private static Upgrades upgradeType(ItemStack stack) {
-        if (stack.isEmpty()) return null;
-        if (AEApi.instance().definitions().materials().cardCapacity().isSameAs(stack)) return Upgrades.CAPACITY;
-        if (AEApi.instance().definitions().materials().cardCrafting().isSameAs(stack)) return Upgrades.CRAFTING;
-        return null;
+
+    public static List<ItemStack> migrateLegacyUpgrades(ItemStack stack) {
+        List<ItemStack> returned = new ArrayList<ItemStack>();
+        NBTTagCompound root = stack.getTagCompound();
+        if (root == null || !root.hasKey(UPGRADES_KEY, 10)) return returned;
+
+        NBTTagCompound stored = root.getCompoundTag(UPGRADES_KEY);
+        NBTTagList items = stored.getTagList("Items", 10);
+        ItemStack craftingCard = ItemStack.EMPTY;
+        for (int index = 0; index < items.tagCount(); index++) {
+            ItemStack candidate = new ItemStack(items.getCompoundTagAt(index));
+            if (candidate.isEmpty()) continue;
+            if (craftingCard.isEmpty() && isCraftingCard(candidate)) {
+                craftingCard = candidate.copy();
+                craftingCard.setCount(1);
+                candidate.shrink(1);
+            }
+            if (!candidate.isEmpty()) returned.add(candidate.copy());
+        }
+
+        NBTTagCompound normalized = new NBTTagCompound();
+        NBTTagList normalizedItems = new NBTTagList();
+        if (!craftingCard.isEmpty()) {
+            NBTTagCompound cardTag = new NBTTagCompound();
+            cardTag.setInteger("Slot", 0);
+            craftingCard.writeToNBT(cardTag);
+            normalizedItems.appendTag(cardTag);
+        }
+        normalized.setTag("Items", normalizedItems);
+        normalized.setInteger("Size", 1);
+        if (!normalized.equals(stored)) root.setTag(UPGRADES_KEY, normalized);
+        return returned;
+    }
+
+    private static boolean isCraftingCard(ItemStack stack) {
+        return !stack.isEmpty() && AEApi.instance().definitions().materials().cardCrafting().isSameAs(stack);
     }
     public static boolean isUsableCable(ItemStack stack) {
         if (stack == null || stack.isEmpty() || !(stack.getItem() instanceof IPartItem)) return false;

@@ -1,5 +1,6 @@
 package cn.ae2bc.part;
 
+import cn.ae2bc.core.ProjectLimits;
 import cn.ae2bc.menu.PatternP2PTunnelEnergyMenu;
 
 import java.util.ArrayList;
@@ -47,7 +48,7 @@ import net.minecraftforge.fml.network.NetworkHooks;
 /** AE2 8 energy entry point that distributes received power to Pattern P2P outputs. */
 public final class PatternP2PTunnelEnergyPart extends EnergyAcceptorPart
         implements IGridTickable, IPowerChannelState {
-    public static final int PULL_INTERVAL = 5;
+    public static final int PULL_INTERVAL = ProjectLimits.ENERGY_TUNNEL_PULL_INTERVAL;
     public static final ResourceLocation MODEL_ID = new ResourceLocation(
             "ae2_batchcraft", "part/p2p/pattern_p2p_tunnel_energy");
     private static final IPartModel MODEL = new PartModel(true, MODEL_ID);
@@ -129,7 +130,7 @@ public final class PatternP2PTunnelEnergyPart extends EnergyAcceptorPart
 
     @Override
     public boolean onPartActivate(PlayerEntity player, Hand hand, Vector3d hitPos) {
-        if (hand == Hand.MAIN_HAND && player.getItemInHand(hand).isEmpty()) {
+        if (hand == Hand.MAIN_HAND) {
             if (!player.level.isClientSide && player instanceof ServerPlayerEntity) {
                 NetworkHooks.openGui((ServerPlayerEntity) player, new SimpleNamedContainerProvider(
                         (id, inventory, ignored) -> new PatternP2PTunnelEnergyMenu(id, inventory, this),

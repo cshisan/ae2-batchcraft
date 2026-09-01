@@ -1,6 +1,8 @@
 package cn.ae2bc.client;
 
 import appeng.api.util.AEColor;
+import appeng.client.Point;
+import appeng.client.gui.widgets.UpgradesPanel;
 import appeng.util.Platform;
 import cn.ae2bc.menu.ComponentPlacerMenu;
 import cn.ae2bc.network.ModNetwork;
@@ -10,6 +12,7 @@ import com.mojang.blaze3d.matrix.MatrixStack;
 import net.minecraft.client.gui.screen.inventory.ContainerScreen;
 import net.minecraft.client.gui.widget.button.Button;
 import net.minecraft.entity.player.PlayerInventory;
+import net.minecraft.client.renderer.Rectangle2d;
 import net.minecraft.util.Direction;
 import net.minecraft.util.ResourceLocation;
 import net.minecraft.util.text.ITextComponent;
@@ -24,13 +27,12 @@ import java.util.Map;
 public final class ComponentPlacerScreen extends ContainerScreen<ComponentPlacerMenu> {
     private static final ResourceLocation INVENTORY_TEXTURE =
             new ResourceLocation("textures/gui/container/inventory.png");
-    private static final ResourceLocation UPGRADE_TEXTURE =
-            new ResourceLocation("appliedenergistics2", "textures/guis/extra_panels.png");
     private final Map<Direction, Ae2Button> directionButtons =
             new EnumMap<Direction, Ae2Button>(Direction.class);
     private final Map<Button, ITextComponent> tooltips = new LinkedHashMap<Button, ITextComponent>();
     private final Button[] minus = new Button[3];
     private final Button[] plus = new Button[3];
+    private UpgradesPanel upgradesPanel;
     private Button reset;
     private Button clear;
     private Button execute;
@@ -45,6 +47,11 @@ public final class ComponentPlacerScreen extends ContainerScreen<ComponentPlacer
     @Override
     protected void init() {
         super.init();
+        upgradesPanel = new UpgradesPanel(menu.getUpgradeSlots());
+        upgradesPanel.populateScreen(ignored -> { },
+                new Rectangle2d(leftPos, topPos, imageWidth, imageHeight), null);
+        upgradesPanel.setPosition(new Point(176, 0));
+        upgradesPanel.updateBeforeRender();
         directionButtons.clear();
         tooltips.clear();
         Direction front = minecraft.player.getDirection();
@@ -129,20 +136,15 @@ public final class ComponentPlacerScreen extends ContainerScreen<ComponentPlacer
         for (int row = 0; row < 3; row++) for (int column = 0; column < 9; column++)
             drawSlot(matrices, 8 + column * 18, 146 + row * 18);
         for (int column = 0; column < 9; column++) drawSlot(matrices, 8 + column * 18, 204);
-        drawUpgradePanel(matrices);
+        if (upgradesPanel != null) {
+            upgradesPanel.drawBackgroundLayer(matrices, getBlitOffset(), upgradesPanel.getBounds(), Point.ZERO);
+        }
         drawFrequency(matrices);
     }
 
     private void drawSlot(MatrixStack matrices, int x, int y) {
         minecraft.getTextureManager().bind(INVENTORY_TEXTURE);
         blit(matrices, leftPos + x - 1, topPos + y - 1, 7, 83, 18, 18);
-    }
-
-    private void drawUpgradePanel(MatrixStack matrices) {
-        minecraft.getTextureManager().bind(UPGRADE_TEXTURE);
-        blit(matrices, leftPos + 176, topPos, 32, 25, 0, 0, 32, 25, 128, 128);
-        blit(matrices, leftPos + 176, topPos + 25, 32, 18, 0, 7, 32, 18, 128, 128);
-        blit(matrices, leftPos + 176, topPos + 43, 32, 25, 0, 7, 32, 25, 128, 128);
     }
 
     private void drawFrequency(MatrixStack matrices) {
@@ -195,7 +197,7 @@ public final class ComponentPlacerScreen extends ContainerScreen<ComponentPlacer
         } else if (insideSlot(mouseX, mouseY, 88, 22)) {
             renderTooltip(matrices, tr("gui.ae2_batchcraft.component_placer.part.tooltip"), mouseX, mouseY);
         } else if (mouseX >= leftPos + 176 && mouseX < leftPos + 208
-                && mouseY >= topPos && mouseY < topPos + 68) {
+                && mouseY >= topPos && mouseY < topPos + 25) {
             renderTooltip(matrices, tr("gui.ae2_batchcraft.component_placer.upgrades.tooltip"), mouseX, mouseY);
         }
         for (Map.Entry<Button, ITextComponent> entry : tooltips.entrySet()) {

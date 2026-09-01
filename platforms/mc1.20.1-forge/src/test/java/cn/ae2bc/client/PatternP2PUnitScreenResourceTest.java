@@ -16,6 +16,8 @@ class PatternP2PUnitScreenResourceTest {
             "assets/ae2/screens/ae2_batchcraft/pattern_p2p_tunnel_output.json";
     private static final String PRODUCT_EXTRACTION_SCREEN =
             "assets/ae2/screens/ae2_batchcraft/product_extraction.json";
+    private static final String OUTPUT_PORT_CONFIG_SCREEN =
+            "assets/ae2/screens/ae2_batchcraft/unit_port_output_config.json";
 
     @Test
     void configurationScreensExposeTheSharedPageNavigation() throws Exception {
@@ -25,8 +27,8 @@ class PatternP2PUnitScreenResourceTest {
 
     @Test
     void taskEndpointsExposeTheResetTaskButton() throws Exception {
-        assertTrue(readText(MANAGER_SCREEN).contains("\"resetTask\""));
-        assertTrue(readText(INPUT_SCREEN).contains("\"resetTask\""));
+        assertTrue(readText(MANAGER_SCREEN).contains("\"resetTaskToolbar\""));
+        assertTrue(readText(INPUT_SCREEN).contains("\"resetTaskToolbar\""));
         assertTrue(readText(OUTPUT_SCREEN).contains("\"resetTask\""));
     }
 
@@ -77,6 +79,28 @@ class PatternP2PUnitScreenResourceTest {
         assertTrue(screen.contains("gui.ae2_batchcraft.product_extraction.unit"));
         org.junit.jupiter.api.Assertions.assertFalse(
                 screen.contains("gui.ae2_batchcraft.product_extraction.item"));
+    }
+
+    @Test
+    void pageToolbarUsesDynamicHeightAndTheSelectedAe2Icons() throws Exception {
+        String source = java.nio.file.Files.readString(java.nio.file.Path.of(
+                "src/main/java/cn/ae2bc/client/PatternP2PUnitPagedScreen.java"));
+
+        assertTrue(source.contains("style.getWidget(\"verticalToolbar\").getTop()"));
+        assertTrue(source.contains("case TRANSFER -> Icon.ACCESS_WRITE"));
+        assertTrue(source.contains("case REDSTONE -> Icon.REDSTONE_HIGH"));
+    }
+
+    @Test
+    void outputPortConfigProvidesTheAe2PriorityInputStyle() throws Exception {
+        String screen = readText(OUTPUT_PORT_CONFIG_SCREEN);
+        String source = java.nio.file.Files.readString(java.nio.file.Path.of(
+                "src/main/java/cn/ae2bc/client/UnitPortOutputConfigScreen.java"));
+        assertTrue(screen.contains("\"priorityInput\""));
+        assertTrue(source.contains("new UpgradesPanel(menu.getSlots(SlotSemantics.UPGRADE),"));
+        org.junit.jupiter.api.Assertions.assertFalse(screen.contains("\"UPGRADE\""));
+        org.junit.jupiter.api.Assertions.assertFalse(screen.contains("AE2_BATCHCRAFT_UNIT_PORT_INVERTER"));
+        org.junit.jupiter.api.Assertions.assertTrue(screen.contains("\"top\": 110"));
     }
 
     private static void assertPagedConfigurationScreen(String resource) throws Exception {

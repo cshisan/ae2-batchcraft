@@ -1,7 +1,7 @@
 [
   {
     "modid": "ae2_batchcraft",
-    "name": "AE2 BatchCraft",
+    "name": "AE2 BatchCraft (ae2bc)",
     "description": "AE2 BatchCraft platform adapter for Minecraft 1.12.2 Forge.",
     "version": "${version}",
     "mcversion": "${mcversion}",

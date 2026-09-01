@@ -1,8 +1,8 @@
 package cn.ae2bc.placer;
 
+import cn.ae2bc.core.ProjectLimits;
 import appeng.core.Api;
 import appeng.api.config.Actionable;
-import appeng.api.config.Upgrades;
 import appeng.api.parts.BusSupport;
 import appeng.api.implementations.parts.ICablePart;
 import appeng.api.parts.IPart;
@@ -30,11 +30,13 @@ import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.fml.network.NetworkHooks;
 import net.minecraftforge.items.IItemHandler;
 
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Locale;
 
 @Mod.EventBusSubscriber(modid = Ae2bcMod.MOD_ID)
 public final class ComponentPlacerItem extends WirelessTerminalItem {
-    public static final int MATERIAL_SLOT_COUNT = 9;
+    public static final int MATERIAL_SLOT_COUNT = ProjectLimits.COMPONENT_PLACER_MATERIAL_SLOT_COUNT;
     private static final String SETTINGS_KEY = "ae2bc_settings";
     private static final String SELECTION_KEY = "ae2bc_selection";
     private static final String MATERIALS_KEY = "ae2bc_materials";
@@ -54,8 +56,7 @@ public final class ComponentPlacerItem extends WirelessTerminalItem {
 
     @Override
     public double getAEMaxPower(ItemStack stack) {
-        int cards = countUpgrade(stack, Upgrades.CAPACITY);
-        return AEConfig.instance().getWirelessTerminalBattery().getAsDouble() * (1 << cards);
+        return AEConfig.instance().getWirelessTerminalBattery().getAsDouble();
     }
 
     @Override
@@ -174,16 +175,8 @@ public final class ComponentPlacerItem extends WirelessTerminalItem {
     }
 
     public static IItemHandler getUpgrades(ItemStack stack) {
-        return new ComponentPlacerInventory(stack, UPGRADES_KEY, 3, 1, (inventory, slot, candidate) -> {
-            Upgrades type = upgradeType(candidate);
-            if (type == null) return false;
-            int maximum = type == Upgrades.CAPACITY ? 2 : 1;
-            int installed = 0;
-            for (int i = 0; i < inventory.getSlots(); i++) {
-                if (i != slot && upgradeType(inventory.getStackInSlot(i)) == type) installed++;
-            }
-            return installed < maximum;
-        });
+        return new ComponentPlacerInventory(stack, UPGRADES_KEY, 1, 1,
+                (inventory, slot, candidate) -> candidate.isEmpty() || isCraftingCard(candidate), true);
     }
 
     public static ItemStack getMarkedCable(ItemStack stack) {
@@ -195,23 +188,43 @@ public final class ComponentPlacerItem extends WirelessTerminalItem {
     }
 
     public static boolean hasCraftingCard(ItemStack stack) {
-        return countUpgrade(stack, Upgrades.CRAFTING) > 0;
+        return isCraftingCard(getUpgrades(stack).getStackInSlot(0));
     }
 
-    public static int countUpgrade(ItemStack stack, Upgrades type) {
-        int result = 0;
-        IItemHandler upgrades = getUpgrades(stack);
-        for (int i = 0; i < upgrades.getSlots(); i++) {
-            if (upgradeType(upgrades.getStackInSlot(i)) == type) result++;
+    public static List<ItemStack> migrateLegacyUpgrades(ItemStack stack) {
+        List<ItemStack> returned = new ArrayList<ItemStack>();
+        CompoundNBT root = stack.getTag();
+        if (root == null || !root.contains(UPGRADES_KEY, 10)) return returned;
+
+        CompoundNBT stored = root.getCompound(UPGRADES_KEY);
+        net.minecraft.nbt.ListNBT items = stored.getList("Items", 10);
+        ItemStack craftingCard = ItemStack.EMPTY;
+        for (int index = 0; index < items.size(); index++) {
+            ItemStack candidate = ItemStack.of(items.getCompound(index));
+            if (candidate.isEmpty()) continue;
+            if (craftingCard.isEmpty() && isCraftingCard(candidate)) {
+                craftingCard = candidate.copy();
+                craftingCard.setCount(1);
+                candidate.shrink(1);
+            }
+            if (!candidate.isEmpty()) returned.add(candidate.copy());
         }
-        return result;
+
+        CompoundNBT normalized = new CompoundNBT();
+        net.minecraft.nbt.ListNBT normalizedItems = new net.minecraft.nbt.ListNBT();
+        if (!craftingCard.isEmpty()) {
+            CompoundNBT cardTag = new CompoundNBT();
+            cardTag.putInt("Slot", 0);
+            normalizedItems.add(craftingCard.save(cardTag));
+        }
+        normalized.put("Items", normalizedItems);
+        normalized.putInt("Size", 1);
+        if (!normalized.equals(stored)) root.put(UPGRADES_KEY, normalized);
+        return returned;
     }
 
-    private static Upgrades upgradeType(ItemStack stack) {
-        if (stack.isEmpty()) return null;
-        if (Api.instance().definitions().materials().cardCapacity().isSameAs(stack)) return Upgrades.CAPACITY;
-        if (Api.instance().definitions().materials().cardCrafting().isSameAs(stack)) return Upgrades.CRAFTING;
-        return null;
+    private static boolean isCraftingCard(ItemStack stack) {
+        return !stack.isEmpty() && Api.instance().definitions().materials().cardCrafting().isSameAs(stack);
     }
 
     public static boolean isUsableCable(ItemStack stack) {

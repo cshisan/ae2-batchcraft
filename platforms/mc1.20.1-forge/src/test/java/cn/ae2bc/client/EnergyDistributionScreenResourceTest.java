@@ -27,8 +27,9 @@ class EnergyDistributionScreenResourceTest {
         assertTrue(unit.contains("\"returnStrict\": {\"left\": 12, \"top\": 50"));
         assertTrue(unit.contains("\"extraction_interval\""));
         assertTrue(unit.contains("\"extraction_amount\""));
-        assertTrue(unit.contains("\"energyDistributionMode\": {\"left\": 12, \"top\": 153"));
-        assertTrue(unit.contains("\"resetTask\": {\"left\": 12, \"top\": 195"));
+        assertTrue(unit.contains("\"energyDistributionMode\": {\"left\": 12, \"top\": 50"));
+        assertTrue(unit.contains("\"slotSharingMode\": {\"left\": 12, \"top\": 153"));
+        assertTrue(unit.contains("\"resetTaskToolbar\": {\"left\": 176, \"top\": 17"));
     }
 
     @Test
@@ -41,7 +42,8 @@ class EnergyDistributionScreenResourceTest {
         assertTrue(input.contains("\"productExtraction\": {\"left\": 128, \"top\": 79"));
         assertTrue(input.contains("\"extraction_interval\""));
         assertTrue(input.contains("\"extraction_amount\""));
-        assertTrue(input.contains("\"resetTask\": {\"left\": 12, \"top\": 154"));
+        assertTrue(input.contains("\"slotSharingMode\": {\"left\": 12, \"top\": 153"));
+        assertTrue(input.contains("\"resetTaskToolbar\": {\"left\": 176, \"top\": 17"));
         String inputSource = resourceSource("src/main/java/cn/ae2bc/client/PatternP2PTunnelInputScreen.java");
         assertTrue(inputSource.contains(
                 "DashedSectionRenderer.trailingContentX(imageWidth, productExtractionWidth)"));
@@ -99,7 +101,7 @@ class EnergyDistributionScreenResourceTest {
         assertTrue(chinese.contains("传电方式"));
         assertTrue(chinese.contains("均分"));
         assertTrue(chinese.contains("轮询"));
-        assertTrue(chinese.contains("间隔：%s 刻"));
+        assertTrue(chinese.contains("每 %s tick"));
         assertTrue(chinese.contains("重置可能销毁未下发材料,请确保材料已完整输出"));
         assertTrue(chinese.contains("能量配置"));
         assertTrue(chinese.contains("任务重置"));

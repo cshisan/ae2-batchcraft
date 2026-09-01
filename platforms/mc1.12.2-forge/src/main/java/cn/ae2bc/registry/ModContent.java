@@ -7,6 +7,7 @@ import cn.ae2bc.item.PatternP2PUnitPortItem;
 import cn.ae2bc.placer.ComponentPlacerItem;
 
 import net.minecraft.item.Item;
+import net.minecraft.item.ItemStack;
 import net.minecraft.creativetab.CreativeTabs;
 import net.minecraftforge.event.RegistryEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -17,6 +18,12 @@ import cn.ae2bc.core.unit.UnitPortType;
 
 @Mod.EventBusSubscriber(modid = Ae2bcMod.MOD_ID)
 public final class ModContent {
+    public static final CreativeTabs CREATIVE_TAB = new CreativeTabs(Ae2bcMod.MOD_ID) {
+        @Override
+        public ItemStack createIcon() {
+            return INPUT == null ? ItemStack.EMPTY : new ItemStack(INPUT);
+        }
+    };
     public static PatternP2PPartItem INPUT;
     public static PatternP2PPartItem OUTPUT;
     public static PatternP2PTunnelEnergyPartItem ENERGY;
@@ -35,25 +42,25 @@ public final class ModContent {
         OUTPUT = new PatternP2PPartItem(true);
         OUTPUT.setRegistryName(Ae2bcMod.MOD_ID, "pattern_p2p_tunnel_output");
         OUTPUT.setTranslationKey("ae2_batchcraft.pattern_p2p_tunnel_output");
-        INPUT.setCreativeTab(CreativeTabs.MISC);
-        OUTPUT.setCreativeTab(CreativeTabs.MISC);
+        INPUT.setCreativeTab(CREATIVE_TAB);
+        OUTPUT.setCreativeTab(CREATIVE_TAB);
         ENERGY = new PatternP2PTunnelEnergyPartItem();
         ENERGY.setRegistryName(Ae2bcMod.MOD_ID, "pattern_p2p_tunnel_energy");
         ENERGY.setTranslationKey("ae2_batchcraft.pattern_p2p_tunnel_energy");
-        ENERGY.setCreativeTab(CreativeTabs.MISC);
+        ENERGY.setCreativeTab(CREATIVE_TAB);
         UNIT_MANAGER = new PatternP2PUnitManagerItem();
         UNIT_MANAGER.setRegistryName(Ae2bcMod.MOD_ID, "pattern_p2p_unit_manager");
         UNIT_MANAGER.setTranslationKey("ae2_batchcraft.pattern_p2p_unit_manager");
-        UNIT_MANAGER.setCreativeTab(CreativeTabs.MISC);
+        UNIT_MANAGER.setCreativeTab(CREATIVE_TAB);
         COMPONENT_PLACER = new ComponentPlacerItem();
         COMPONENT_PLACER.setRegistryName(Ae2bcMod.MOD_ID, "component_placer");
         COMPONENT_PLACER.setTranslationKey("ae2_batchcraft.component_placer");
-        COMPONENT_PLACER.setCreativeTab(CreativeTabs.MISC);
+        COMPONENT_PLACER.setCreativeTab(CREATIVE_TAB);
         for (UnitPortType type : UnitPortType.values()) {
             PatternP2PUnitPortItem port = new PatternP2PUnitPortItem(type);
             port.setRegistryName(Ae2bcMod.MOD_ID, "pattern_p2p_unit_port_" + type.getId());
             port.setTranslationKey("ae2_batchcraft.pattern_p2p_unit_port_" + type.getId());
-            port.setCreativeTab(CreativeTabs.MISC);
+            port.setCreativeTab(CREATIVE_TAB);
             UNIT_PORTS.put(type, port);
         }
         event.getRegistry().register(INPUT);

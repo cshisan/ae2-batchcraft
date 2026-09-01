@@ -1,7 +1,9 @@
 package cn.ae2bc.client;
 
 import appeng.client.gui.AEBaseScreen;
+import appeng.client.gui.Icon;
 import appeng.client.gui.style.ScreenStyle;
+import appeng.client.gui.widgets.TabButton;
 import net.minecraft.client.gui.components.Button;
 import cn.ae2bc.menu.PatternP2PTunnelEnergyMenu;
 import net.minecraft.client.gui.GuiGraphics;
@@ -17,6 +19,8 @@ public final class PatternP2PTunnelEnergyScreen extends AEBaseScreen<PatternP2PT
     public PatternP2PTunnelEnergyScreen(PatternP2PTunnelEnergyMenu menu, Inventory playerInventory,
                                           Component title, ScreenStyle style) {
         super(menu, playerInventory, title, style);
+        widgets.add("close", new TabButton(Icon.CLEAR,
+                Component.translatable("gui.ae2_batchcraft.configuration.close"), button -> onClose()));
         passiveButton = widgets.addButton("passive", Component.translatable(
                 "gui.ae2_batchcraft.energy.mode.passive"), () -> menu.setPullEnabled(false));
         passiveButton.setTooltip(Tooltip.create(Component.translatable(

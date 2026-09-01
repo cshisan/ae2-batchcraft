@@ -3,7 +3,7 @@
   "category": "redstone",
   "ingredients": [
     {
-      "type": "neoforge:difference",
+      "type": "forge:difference",
       "base": {
         "tag": "ae2_batchcraft:pattern_p2p_unit_managers"
       },

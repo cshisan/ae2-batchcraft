@@ -7,6 +7,7 @@ import cn.ae2bc.menu.PatternP2PTunnelInputMenu;
 import cn.ae2bc.menu.PatternP2PTunnelOutputMenu;
 import cn.ae2bc.menu.ProductExtractionMenu;
 import cn.ae2bc.menu.PatternP2PUnitManagerMenu;
+import cn.ae2bc.menu.UnitPortOutputConfigMenu;
 import appeng.core.AppEng;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.resources.ResourceLocation;
@@ -25,7 +26,8 @@ public final class ModMenus {
                 PatternP2PTunnelEnergyMenu.TYPE,
                 ComponentPlacerMenu.TYPE,
                 ProductExtractionMenu.TYPE,
-                PatternP2PUnitManagerMenu.TYPE
+                PatternP2PUnitManagerMenu.TYPE,
+                UnitPortOutputConfigMenu.TYPE
         };
     }
 
@@ -36,6 +38,7 @@ public final class ModMenus {
         verifyRegistration(ModContent.COMPONENT_PLACER_ID, ComponentPlacerMenu.TYPE);
         verifyRegistration("product_extraction", ProductExtractionMenu.TYPE);
         verifyRegistration("pattern_p2p_unit_manager", PatternP2PUnitManagerMenu.TYPE);
+        verifyRegistration("unit_port_output_config", UnitPortOutputConfigMenu.TYPE);
         Ae2bcMod.LOGGER.info("Verified AE2 BatchCraft menu registrations");
     }
 

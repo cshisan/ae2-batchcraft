@@ -32,32 +32,34 @@ public abstract class PatternEncodingTermMenuMixin implements PatternEncodingTer
     @Final
     private PatternEncodingLogic encodingLogic;
 
+    // Keep these IDs in a dedicated high range. AE2 menus are inherited by
+    // addon terminals, so low IDs can collide with a subclass's @GuiSync fields.
     @Unique
-    @GuiSync(80)
+    @GuiSync(30000)
     private long ae2bc$outputDirections0;
     @Unique
-    @GuiSync(81)
+    @GuiSync(30001)
     private long ae2bc$outputDirections1;
     @Unique
-    @GuiSync(82)
+    @GuiSync(30002)
     private long ae2bc$outputDirections2;
     @Unique
-    @GuiSync(83)
+    @GuiSync(30003)
     private long ae2bc$outputDirections3;
     @Unique
-    @GuiSync(84)
+    @GuiSync(30004)
     private long ae2bc$outputForms0;
     @Unique
-    @GuiSync(85)
+    @GuiSync(30005)
     private long ae2bc$outputForms1;
     @Unique
-    @GuiSync(86)
+    @GuiSync(30006)
     private long ae2bc$outputForms2;
     @Unique
-    @GuiSync(87)
+    @GuiSync(30007)
     private long ae2bc$patternBatchCount = PatternBatchCount.DEFAULT;
     @Unique
-    @GuiSync(88)
+    @GuiSync(30008)
     private long ae2bc$maximumPatternBatchCount = PatternBatchCount.DEFAULT;
     @Unique
     private MaterialOutputConfigData ae2bc$cachedMaterialOutputConfig = MaterialOutputConfigData.EMPTY;

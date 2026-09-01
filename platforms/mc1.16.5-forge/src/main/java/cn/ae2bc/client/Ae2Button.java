@@ -7,7 +7,7 @@ import net.minecraft.client.gui.widget.button.Button;
 import net.minecraft.util.text.ITextComponent;
 
 /** Thin constructor adapter that keeps the screens independent of the platform constructor signature. */
-final class Ae2Button extends Button {
+class Ae2Button extends Button {
     Ae2Button(int x, int y, int width, int height, ITextComponent message, IPressable pressed) {
         super(x, y, width, height, message, pressed);
     }

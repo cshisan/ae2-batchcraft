@@ -27,6 +27,8 @@ endpoints and machines without copying the same patterns or spending one AE chan
 | **AE Component Placer**         | Batch-places AE cables and cable-attached parts over a point, line, or plane up to `16 x 16`, using player or AE network materials.                                                     |
 | **Pattern Configuration**       | Configures ingredient input sides and Normal, Drop, or Place output forms. Minecraft `1.21.1` also provides batch distribution and per-pattern batch configuration.                     |
 
+Transfer Ports support **Normal**, **Single Item**, and **Single Type** delivery modes. Output ports can be assigned AE2 priorities and optional material markers; an AE2 Inverter Card reverses the marker filter. The adjacent machine remains the authority for its real inventory or tank capacity.
+
 Collect Ports handle dropped items on every supported version. On Minecraft `1.20.1` and `1.21.1`, they can also collect
 source fluids; on `1.16.5` and `1.12.2`, they collect items only.
 
@@ -55,6 +57,8 @@ source fluids; on `1.16.5` and `1.12.2`, they collect items only.
 4. `Shift + Right-click` the input with an AE2 Memory Card to generate and save a frequency.
 5. Right-click every output with the same Memory Card to assign that frequency.
 6. Request a processing craft. The input selects the next available endpoint and sends the job to it.
+
+Output-type Unit Ports can be opened empty-handed to configure their AE2 priority, material markers, and optional Inverter Card. Return-type ports (Return, Collect, Break, Extract, and Place) follow the active task's return and strict-mode rules.
 
 The input and all endpoints must be on the same AE subnet, powered, and loaded. Frequency `0000` means unconfigured.
 Offline, unloaded, busy, or blocked endpoints are skipped.
@@ -85,7 +89,7 @@ remain bound to that Manager's identity.
 ### Optional Automation
 
 - Configure return mode and product extraction in the Pattern P2P input. Synchronized Unit Managers apply those settings
-  to their bound ports during active tasks.
+  to their bound ports during active tasks, including changes made while the task is running.
 - On Minecraft `1.20.1` and `1.21.1`, install a **Product Extraction Card** in a Pattern Provider to configure its own
   adjacent-machine extraction and product filter.
 - Place a **Pattern P2P Tunnel (Energy)** toward an FE source to power the subnet and eligible machines, then choose
@@ -109,7 +113,7 @@ reset behavior; the `1.21.1` guide also covers batch distribution.
 | Minecraft | Loader               | Applied Energistics 2 | Java      | In-game Guide |
 |-----------|----------------------|-----------------------|-----------|---------------|
 | `1.21.1`  | NeoForge `21.1.238`  | `19.2.17`             | `21`      | Yes           |
-| `1.20.1`  | Forge `47.4.10`      | `15.4.0`              | `8`、`17` | Yes           |
+| `1.20.1`  | Forge `47.4.10`      | `15.4.0`              | `17`      | Yes           |
 | `1.16.5`  | Forge `36.2.42`      | `8.4.7`               | `8`       | No            |
 | `1.12.2`  | Forge `14.23.5.2847` | `rv6-stable-7`        | `8`       | No            |
 

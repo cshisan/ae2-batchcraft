@@ -28,6 +28,7 @@ import appeng.api.networking.ticking.TickRateModulation;
 import appeng.api.networking.ticking.TickingRequest;
 import appeng.api.parts.IPartCollisionHelper;
 import appeng.api.parts.IPartModel;
+import appeng.api.util.AECableType;
 import appeng.parts.PartModel;
 import appeng.me.GridAccessException;
 import appeng.parts.p2p.PartP2PTunnel;
@@ -53,7 +54,9 @@ import cn.ae2bc.pattern.MaterialOutputConfigCodec;
 import cn.ae2bc.pattern.MaterialOutputForm;
 import cn.ae2bc.pattern.PatternInputSlotAllocator;
 import cn.ae2bc.core.unit.UnitPortType;
+import cn.ae2bc.core.unit.OutputSlotSharingMode;
 import cn.ae2bc.core.unit.PatternP2PUnitSettings;
+import cn.ae2bc.core.unit.TransferPortOutputMode;
 import cn.ae2bc.logic.ReturnMode;
 import cn.ae2bc.logic.ReturnBatchTracker;
 import cn.ae2bc.logic.RedstoneOutputMode;
@@ -79,6 +82,8 @@ public final class PatternP2PTunnelPart extends PartP2PTunnel<PatternP2PTunnelPa
     private int pulseWidthTicks = 2;
     private int pulsePeriodTicks = 20;
     private boolean syncInputSettings = true;
+    private TransferPortOutputMode transferPortOutputMode = TransferPortOutputMode.NORMAL;
+    private OutputSlotSharingMode outputSlotSharingMode = OutputSlotSharingMode.DISABLED;
     private final ExtractionDeadlineGate extractionDeadline = new ExtractionDeadlineGate();
     private final ExtractionDeadlineGate returnRecoveryDeadline = new ExtractionDeadlineGate();
     private ItemStack blockedReturnProbe = ItemStack.EMPTY;
@@ -202,7 +207,8 @@ public final class PatternP2PTunnelPart extends PartP2PTunnel<PatternP2PTunnelPa
         if (isPowered() && isActive()) return hasChannel;
         return isPowered() ? on : off;
     }
-    @Override public void getBoxes(IPartCollisionHelper helper) { helper.addBox(2, 2, 2, 14, 14, 14); }
+    @Override public void getBoxes(IPartCollisionHelper helper) { helper.addBox(3, 3, 13, 13, 13, 16); }
+    @Override public float getCableConnectionLength(AECableType cable) { return 1; }
     @Override public boolean acceptsPlans() {
         return !output && isActive() && (!outputs().isEmpty() || hasUnitManagerForFrequency());
     }
@@ -290,6 +296,7 @@ public final class PatternP2PTunnelPart extends PartP2PTunnel<PatternP2PTunnelPa
             List<RoutedInput> routedInputs, long[] packed) {
         List<ItemStack> inputs = new ArrayList<ItemStack>();
         List<UnitPortType> targetTypes = new ArrayList<UnitPortType>();
+        List<Integer> patternSlots = new ArrayList<Integer>();
         long[] forms = MaterialOutputConfigCodec.formWords(packed);
         for (RoutedInput routed : routedInputs) {
             ItemStack stack = routed.stack;
@@ -299,6 +306,7 @@ public final class PatternP2PTunnelPart extends PartP2PTunnel<PatternP2PTunnelPa
             if (!form.supports(stack)) return null;
             inputs.add(stack.copy());
             targetTypes.add(UnitPortType.forOutputFormId(form.getId()));
+            patternSlots.add(routed.patternSlot);
         }
         if (inputs.isEmpty()) return null;
         ItemStack primaryOutput = ItemStack.EMPTY;
@@ -314,7 +322,8 @@ public final class PatternP2PTunnelPart extends PartP2PTunnel<PatternP2PTunnelPa
                 primaryAmount = declaredOutputs[0].getStackSize();
             }
         }
-        return new ManagerDispatch(inputs, targetTypes, primaryOutput, primaryAmount, outputIdentities);
+        return new ManagerDispatch(inputs, targetTypes, patternSlots,
+                primaryOutput, primaryAmount, outputIdentities);
     }
 
     private boolean tryAcceptManager(PatternP2PUnitManagerPart manager, ManagerDispatch dispatch,
@@ -323,7 +332,8 @@ public final class PatternP2PTunnelPart extends PartP2PTunnel<PatternP2PTunnelPa
         for (int i = 0; i < dispatch.inputs.size(); i++) {
             if (!manager.canAcceptInput(dispatch.inputs.get(i), dispatch.targetTypes.get(i))) return false;
         }
-        if (!manager.acceptInputs(dispatch.inputs, dispatch.targetTypes, dispatch.primaryOutput,
+        if (!manager.acceptInputs(dispatch.inputs, dispatch.targetTypes, dispatch.patternSlots,
+                dispatch.primaryOutput,
                 dispatch.primaryAmount, dispatch.outputIdentities)) return false;
         clearInputs(table);
         return true;
@@ -588,14 +598,17 @@ public final class PatternP2PTunnelPart extends PartP2PTunnel<PatternP2PTunnelPa
     private static final class ManagerDispatch {
         private final List<ItemStack> inputs;
         private final List<UnitPortType> targetTypes;
+        private final List<Integer> patternSlots;
         private final ItemStack primaryOutput;
         private final long primaryAmount;
         private final List<ItemStack> outputIdentities;
 
         private ManagerDispatch(List<ItemStack> inputs, List<UnitPortType> targetTypes,
+                List<Integer> patternSlots,
                 ItemStack primaryOutput, long primaryAmount, List<ItemStack> outputIdentities) {
             this.inputs = inputs;
             this.targetTypes = targetTypes;
+            this.patternSlots = patternSlots;
             this.primaryOutput = primaryOutput;
             this.primaryAmount = primaryAmount;
             this.outputIdentities = outputIdentities;
@@ -685,6 +698,12 @@ public final class PatternP2PTunnelPart extends PartP2PTunnel<PatternP2PTunnelPa
                 ? Math.max(1, tag.getInteger("Ae2bcPulsePeriod")) : 20;
         pulseWidthTicks = tag.hasKey("Ae2bcPulseWidth")
                 ? Math.max(1, Math.min(pulsePeriodTicks, tag.getInteger("Ae2bcPulseWidth"))) : 2;
+        transferPortOutputMode = tag.hasKey("Ae2bcTransferPortOutputMode")
+                ? TransferPortOutputMode.fromId(tag.getInteger("Ae2bcTransferPortOutputMode"))
+                : TransferPortOutputMode.NORMAL;
+        outputSlotSharingMode = tag.hasKey("Ae2bcOutputSlotSharingMode")
+                ? OutputSlotSharingMode.fromId(tag.getInteger("Ae2bcOutputSlotSharingMode"))
+                : OutputSlotSharingMode.DISABLED;
         syncInputSettings = !tag.hasKey("Ae2bcSyncInputSettings")
                 || tag.getBoolean("Ae2bcSyncInputSettings");
         readOutputReturnBatch(tag);
@@ -705,6 +724,8 @@ public final class PatternP2PTunnelPart extends PartP2PTunnel<PatternP2PTunnelPa
         tag.setInteger("Ae2bcPulseWidth", pulseWidthTicks);
         tag.setInteger("Ae2bcPulsePeriod", pulsePeriodTicks);
         tag.setBoolean("Ae2bcSyncInputSettings", syncInputSettings);
+        tag.setInteger("Ae2bcTransferPortOutputMode", transferPortOutputMode.getId());
+        tag.setInteger("Ae2bcOutputSlotSharingMode", outputSlotSharingMode.getId());
         writeOutputReturnBatch(tag);
     }
 
@@ -720,6 +741,8 @@ public final class PatternP2PTunnelPart extends PartP2PTunnel<PatternP2PTunnelPa
         data.writeByte(settings.getRedstoneStrength());
         data.writeInt(settings.getPulseWidthTicks());
         data.writeInt(settings.getPulsePeriodTicks());
+        data.writeByte(settings.getTransferPortOutputMode().getId());
+        data.writeByte(settings.getOutputSlotSharingMode().getId());
         data.writeBoolean(syncInputSettings);
     }
 
@@ -732,7 +755,10 @@ public final class PatternP2PTunnelPart extends PartP2PTunnel<PatternP2PTunnelPa
         applySettings(new PatternP2PUnitSettings(
                 ReturnMode.fromId(data.readUnsignedByte()), data.readBoolean(),
                 data.readInt(), data.readInt(), RedstoneOutputMode.fromId(data.readUnsignedByte()),
-                data.readUnsignedByte(), data.readInt(), data.readInt()));
+                data.readUnsignedByte(), data.readInt(), data.readInt(),
+                TransferPortOutputMode.fromId(data.readUnsignedByte()),
+                OutputSlotSharingMode.fromId(data.readUnsignedByte())));
+
         productExtractionSettings = new EndpointProductExtractionSettings(extractionEnabled,
                 productExtractionSettings.getInterval(), productExtractionSettings.getAmount(),
                 productExtractionSettings.getRevision());
@@ -747,7 +773,9 @@ public final class PatternP2PTunnelPart extends PartP2PTunnel<PatternP2PTunnelPa
                 || old.getRedstoneMode() != next.getRedstoneMode()
                 || old.getRedstoneStrength() != next.getRedstoneStrength()
                 || old.getPulseWidthTicks() != next.getPulseWidthTicks()
-                || old.getPulsePeriodTicks() != next.getPulsePeriodTicks();
+                || old.getPulsePeriodTicks() != next.getPulsePeriodTicks()
+                || old.getTransferPortOutputMode() != next.getTransferPortOutputMode()
+                || old.getOutputSlotSharingMode() != next.getOutputSlotSharingMode();
     }
 
     public void setExtractionSettings(boolean enabled, int interval, int amount) {
@@ -769,7 +797,8 @@ public final class PatternP2PTunnelPart extends PartP2PTunnel<PatternP2PTunnelPa
     public PatternP2PUnitSettings getUnitSettings() {
         return new PatternP2PUnitSettings(returnMode, breakRecovery,
                 productExtractionSettings.getInterval(), productExtractionSettings.getAmount(),
-                redstoneMode, redstoneStrength, pulseWidthTicks, pulsePeriodTicks);
+                redstoneMode, redstoneStrength, pulseWidthTicks, pulsePeriodTicks,
+                transferPortOutputMode, outputSlotSharingMode);
     }
     public long getUnitConfigurationRevision() { return unitConfigurationRevision; }
     public void setInputSettings(boolean enabled, PatternP2PUnitSettings settings) {
@@ -800,15 +829,19 @@ public final class PatternP2PTunnelPart extends PartP2PTunnel<PatternP2PTunnelPa
                 && left.getRedstoneMode() == right.getRedstoneMode()
                 && left.getRedstoneStrength() == right.getRedstoneStrength()
                 && left.getPulseWidthTicks() == right.getPulseWidthTicks()
-                && left.getPulsePeriodTicks() == right.getPulsePeriodTicks();
+                && left.getPulsePeriodTicks() == right.getPulsePeriodTicks()
+                && left.getTransferPortOutputMode() == right.getTransferPortOutputMode()
+                && left.getOutputSlotSharingMode() == right.getOutputSlotSharingMode();
     }
 
     private void synchronizeUnitManagers() {
         if (output) return;
+        PatternP2PTopologyGridService.invalidate(getGridNode());
         for (PatternP2PUnitManagerPart manager
                 : PatternP2PTopologyGridService.findAllByFrequency(getGridNode(), getFrequency())) {
             manager.applyMainConfiguration(getUnitSettings(), unitConfigurationRevision);
         }
+        PatternP2PTopologyGridService.invalidate(getGridNode());
     }
     public void setOutputSettings(ReturnMode mode, boolean sync) {
         if (!output) return;
@@ -844,6 +877,8 @@ public final class PatternP2PTunnelPart extends PartP2PTunnel<PatternP2PTunnelPa
         redstoneStrength = settings.getRedstoneStrength();
         pulseWidthTicks = settings.getPulseWidthTicks();
         pulsePeriodTicks = settings.getPulsePeriodTicks();
+        transferPortOutputMode = settings.getTransferPortOutputMode();
+        outputSlotSharingMode = settings.getOutputSlotSharingMode();
     }
     public boolean isExtractionEnabled() { return productExtractionSettings.isEnabled(); }
     public int getExtractionInterval() { return productExtractionSettings.getInterval(); }

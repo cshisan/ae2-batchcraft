@@ -15,6 +15,7 @@ import cn.ae2bc.core.extraction.ProductExtractionLimits;
 import cn.ae2bc.core.unit.PatternP2PUnitSettings;
 import cn.ae2bc.logic.EnergyDistributionMode;
 import net.minecraft.entity.player.EntityPlayerMP;
+import net.minecraft.client.Minecraft;
 import net.minecraft.util.EnumFacing;
 import net.minecraft.util.math.BlockPos;
 import io.netty.buffer.ByteBuf;
@@ -51,6 +52,10 @@ public final class ModNetwork {
                 ComponentPlacerCraftRequestMessage.class, 5, Side.SERVER);
         CHANNEL.registerMessage(ComponentPlacerCraftReturnHandler.class,
                 ComponentPlacerCraftReturnMessage.class, 6, Side.SERVER);
+        CHANNEL.registerMessage(UnitPortPriorityHandler.class,
+                UnitPortPriorityMessage.class, 7, Side.SERVER);
+        CHANNEL.registerMessage(UnitPortStateHandler.class,
+                UnitPortStateMessage.class, 8, Side.CLIENT);
     }
 
     public static void sendComponentPlacerAction(ComponentPlacerMenu menu, int action, int value) {
@@ -206,6 +211,150 @@ public final class ModNetwork {
         CHANNEL.sendToServer(new MaterialOutputConfigMessage(windowId, packed));
     }
 
+    public static void sendUnitPortPriority(cn.ae2bc.menu.UnitPortOutputConfigMenu menu, int priority) {
+        CHANNEL.sendToServer(new UnitPortPriorityMessage(menu.getPos(), menu.getSide(), priority,
+                menu.singleSlot));
+    }
+
+    public static void sendUnitPortState(EntityPlayerMP player,
+            cn.ae2bc.menu.UnitPortOutputConfigMenu menu) {
+        CHANNEL.sendTo(new UnitPortStateMessage(menu.windowId, menu.getPos(), menu.getSide(),
+                menu.priority, menu.singleSlot, menu.singleSlotEditable), player);
+    }
+
+    /** Pushes effective single-slot state to every player viewing a bound output port. */
+    public static void refreshUnitPortStates(PatternP2PUnitManagerPart manager) {
+        if (manager == null || manager.getTile() == null || manager.getTile().getWorld() == null
+                || manager.getTile().getWorld().isRemote) return;
+        for (net.minecraft.entity.player.EntityPlayer online
+                : manager.getTile().getWorld().playerEntities) {
+            if (!(online instanceof EntityPlayerMP)
+                    || !(online.openContainer
+                    instanceof cn.ae2bc.menu.UnitPortOutputConfigMenu)) continue;
+            cn.ae2bc.menu.UnitPortOutputConfigMenu menu =
+                    (cn.ae2bc.menu.UnitPortOutputConfigMenu) online.openContainer;
+            cn.ae2bc.part.PatternP2PUnitPortPart port = menu.getPart();
+            if (port != null && port.findManager() == manager) menu.refreshStateAndSync();
+        }
+    }
+
+    public static final class UnitPortStateMessage implements IMessage {
+        private int windowId;
+        private BlockPos pos;
+        private EnumFacing side;
+        private int priority;
+        private boolean singleSlot;
+        private boolean singleSlotEditable;
+
+        public UnitPortStateMessage() { }
+
+        private UnitPortStateMessage(int windowId, BlockPos pos, EnumFacing side, int priority,
+                boolean singleSlot, boolean singleSlotEditable) {
+            this.windowId = windowId;
+            this.pos = pos;
+            this.side = side;
+            this.priority = priority;
+            this.singleSlot = singleSlot;
+            this.singleSlotEditable = singleSlotEditable;
+        }
+
+        @Override public void fromBytes(ByteBuf buffer) {
+            windowId = buffer.readInt();
+            pos = BlockPos.fromLong(buffer.readLong());
+            side = EnumFacing.values()[buffer.readUnsignedByte() % EnumFacing.values().length];
+            priority = buffer.readInt();
+            singleSlot = buffer.readBoolean();
+            singleSlotEditable = buffer.readBoolean();
+        }
+
+        @Override public void toBytes(ByteBuf buffer) {
+            buffer.writeInt(windowId);
+            buffer.writeLong(pos.toLong());
+            buffer.writeByte(side.ordinal());
+            buffer.writeInt(priority);
+            buffer.writeBoolean(singleSlot);
+            buffer.writeBoolean(singleSlotEditable);
+        }
+    }
+
+    public static final class UnitPortStateHandler
+            implements IMessageHandler<UnitPortStateMessage, IMessage> {
+        @Override public IMessage onMessage(UnitPortStateMessage message, MessageContext context) {
+            Minecraft.getMinecraft().addScheduledTask(() -> {
+                if (Minecraft.getMinecraft().player == null
+                        || !(Minecraft.getMinecraft().player.openContainer
+                        instanceof cn.ae2bc.menu.UnitPortOutputConfigMenu)) return;
+                cn.ae2bc.menu.UnitPortOutputConfigMenu menu =
+                        (cn.ae2bc.menu.UnitPortOutputConfigMenu)
+                                Minecraft.getMinecraft().player.openContainer;
+                if (menu.windowId != message.windowId || !menu.getPos().equals(message.pos)
+                        || menu.getSide() != message.side) return;
+                menu.priority = message.priority;
+                menu.singleSlot = message.singleSlot;
+                menu.singleSlotEditable = message.singleSlotEditable;
+            });
+            return null;
+        }
+    }
+
+    public static final class UnitPortPriorityMessage implements IMessage {
+        private BlockPos pos;
+        private EnumFacing side;
+        private int priority;
+        private boolean singleSlot;
+
+        public UnitPortPriorityMessage() { }
+
+        private UnitPortPriorityMessage(BlockPos pos, EnumFacing side, int priority,
+                boolean singleSlot) {
+            this.pos = pos;
+            this.side = side;
+            this.priority = Math.max(-9999, Math.min(9999, priority));
+            this.singleSlot = singleSlot;
+        }
+
+        @Override public void fromBytes(ByteBuf buffer) {
+            pos = BlockPos.fromLong(buffer.readLong());
+            side = EnumFacing.values()[buffer.readUnsignedByte() % EnumFacing.values().length];
+            priority = buffer.readInt();
+            singleSlot = buffer.readBoolean();
+        }
+
+        @Override public void toBytes(ByteBuf buffer) {
+            buffer.writeLong(pos.toLong());
+            buffer.writeByte(side.ordinal());
+            buffer.writeInt(priority);
+            buffer.writeBoolean(singleSlot);
+        }
+    }
+
+    public static final class UnitPortPriorityHandler
+            implements IMessageHandler<UnitPortPriorityMessage, IMessage> {
+        @Override public IMessage onMessage(UnitPortPriorityMessage message, MessageContext context) {
+            EntityPlayerMP player = context.getServerHandler().player;
+            player.getServerWorld().addScheduledTask(() -> {
+                if (!(player.openContainer instanceof cn.ae2bc.menu.UnitPortOutputConfigMenu)) return;
+                cn.ae2bc.menu.UnitPortOutputConfigMenu menu =
+                        (cn.ae2bc.menu.UnitPortOutputConfigMenu) player.openContainer;
+                if (!menu.getPos().equals(message.pos) || menu.getSide() != message.side
+                        || player.getDistanceSq(message.pos.getX() + .5, message.pos.getY() + .5,
+                        message.pos.getZ() + .5) > 64.0) return;
+                cn.ae2bc.part.PatternP2PUnitPortPart part =
+                        cn.ae2bc.menu.UnitPortOutputConfigMenu.findPart(player, message.pos, message.side);
+                if (part != null && part.getPortType().acceptsTaskInput()) {
+                    PatternP2PUnitManagerPart manager = part.findManager();
+                    if (manager != null && manager.isSyncMainConfiguration()) {
+                        manager.synchronizeFromInput();
+                    }
+                    part.setPriority(Math.max(-9999, Math.min(9999, message.priority)));
+                    if (part.isSingleSlotEditable()) part.setSingleSlot(message.singleSlot);
+                    menu.refreshStateAndSync(true);
+                }
+            });
+            return null;
+        }
+    }
+
     public static void sendEnergy(PatternP2PTunnelEnergyMenu menu, boolean pullEnabled,
             EnergyDistributionMode mode) {
         CHANNEL.sendToServer(new EnergyMessage(menu.windowId, menu.getPos(), menu.getSide(), pullEnabled, mode));
@@ -275,8 +424,9 @@ public final class ModNetwork {
                 PatternP2PUnitManagerPart part = PatternP2PUnitManagerMenu.findPart(player, message.pos);
                 if (part != null) {
                     part.setFrequency(message.frequency);
-                    part.setSettings(message.settings);
                     part.setSyncMainConfiguration(message.syncMainConfiguration);
+                    part.setSettings(message.settings);
+                    part.setEnergyDistributionMode(message.energyMode);
                     if (message.resetTask) part.resetTaskState();
                 }
             });
@@ -401,6 +551,8 @@ public final class ModNetwork {
         buffer.writeByte(settings.getRedstoneStrength());
         buffer.writeInt(settings.getPulseWidthTicks());
         buffer.writeInt(settings.getPulsePeriodTicks());
+        buffer.writeByte(settings.getTransferPortOutputMode().getId());
+        buffer.writeByte(settings.getOutputSlotSharingMode().getId());
     }
 
     private static PatternP2PUnitSettings readSettings(ByteBuf buffer) {
@@ -408,7 +560,9 @@ public final class ModNetwork {
                 cn.ae2bc.logic.ReturnMode.fromId(buffer.readUnsignedByte()), buffer.readBoolean(),
                 buffer.readInt(), buffer.readInt(),
                 cn.ae2bc.logic.RedstoneOutputMode.fromId(buffer.readUnsignedByte()),
-                buffer.readUnsignedByte(), buffer.readInt(), buffer.readInt());
+                buffer.readUnsignedByte(), buffer.readInt(), buffer.readInt(),
+                cn.ae2bc.core.unit.TransferPortOutputMode.fromId(buffer.readUnsignedByte()),
+                cn.ae2bc.core.unit.OutputSlotSharingMode.fromId(buffer.readUnsignedByte()));
     }
 
     public static final class MaterialOutputConfigMessage implements IMessage {

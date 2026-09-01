@@ -6,6 +6,7 @@ import cn.ae2bc.menu.PatternP2PTunnelEnergyMenu;
 import cn.ae2bc.menu.PatternP2PTunnelMenu;
 import cn.ae2bc.menu.PatternP2PUnitManagerMenu;
 import cn.ae2bc.menu.ComponentPlacerMenu;
+import cn.ae2bc.menu.UnitPortOutputConfigMenu;
 import cn.ae2bc.placer.ComponentPlacerItem;
 import cn.ae2bc.part.PatternP2PTunnelEnergyPart;
 import cn.ae2bc.part.PatternP2PTunnelPart;
@@ -14,6 +15,7 @@ import cn.ae2bc.part.PatternP2PUnitPortPart;
 
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemGroup;
+import net.minecraft.item.ItemStack;
 import net.minecraft.inventory.container.ContainerType;
 import net.minecraftforge.common.extensions.IForgeContainerType;
 import net.minecraftforge.eventbus.api.IEventBus;
@@ -29,6 +31,12 @@ import cn.ae2bc.core.unit.UnitPortType;
 
 /** Minimal AE2 8 registration surface. */
 public final class ModContent {
+    public static final ItemGroup CREATIVE_TAB = new ItemGroup("ae2_batchcraft") {
+        @Override
+        public ItemStack makeIcon() {
+            return PATTERN_P2P_INPUT.get().getDefaultInstance();
+        }
+    };
     private static final DeferredRegister<Item> ITEMS =
             DeferredRegister.create(ForgeRegistries.ITEMS, Ae2bcMod.MOD_ID);
     private static final DeferredRegister<ContainerType<?>> CONTAINERS =
@@ -36,20 +44,20 @@ public final class ModContent {
 
     public static final RegistryObject<PatternP2PPartItem<PatternP2PTunnelPart>> PATTERN_P2P_INPUT = ITEMS.register(
             "pattern_p2p_tunnel_input", () -> new PatternP2PPartItem<PatternP2PTunnelPart>(
-                    new Item.Properties().tab(ItemGroup.TAB_MISC),
+                    new Item.Properties().tab(CREATIVE_TAB),
                     stack -> new PatternP2PTunnelPart(stack, false),
                     "tooltip.ae2_batchcraft.pattern_p2p.input"));
     public static final RegistryObject<PatternP2PPartItem<PatternP2PTunnelPart>> PATTERN_P2P_OUTPUT = ITEMS.register(
             "pattern_p2p_tunnel_output", () -> new PatternP2PPartItem<PatternP2PTunnelPart>(
-                    new Item.Properties().tab(ItemGroup.TAB_MISC),
+                    new Item.Properties().tab(CREATIVE_TAB),
                     stack -> new PatternP2PTunnelPart(stack, true),
                     "tooltip.ae2_batchcraft.pattern_p2p.output"));
     public static final RegistryObject<PatternP2PPartItem<PatternP2PTunnelEnergyPart>> PATTERN_P2P_ENERGY = ITEMS.register(
             "pattern_p2p_tunnel_energy", () -> new PatternP2PPartItem<PatternP2PTunnelEnergyPart>(
-                    new Item.Properties().tab(ItemGroup.TAB_MISC), PatternP2PTunnelEnergyPart::new,
+                    new Item.Properties().tab(CREATIVE_TAB), PatternP2PTunnelEnergyPart::new,
                     "tooltip.ae2_batchcraft.pattern_p2p.energy"));
     public static final RegistryObject<ComponentPlacerItem> COMPONENT_PLACER = ITEMS.register(
-            "component_placer", () -> new ComponentPlacerItem(new Item.Properties().tab(ItemGroup.TAB_MISC)));
+            "component_placer", () -> new ComponentPlacerItem(new Item.Properties().tab(CREATIVE_TAB)));
     public static final java.util.Map<AEColor, RegistryObject<PatternP2PUnitManagerItem<PatternP2PUnitManagerPart>>>
             UNIT_MANAGERS = registerUnitManagers();
     public static final RegistryObject<PatternP2PUnitManagerItem<PatternP2PUnitManagerPart>> UNIT_MANAGER =
@@ -68,6 +76,8 @@ public final class ModContent {
     public static final RegistryObject<ContainerType<ComponentPlacerMenu>> COMPONENT_PLACER_MENU =
             CONTAINERS.register("component_placer",
                     () -> IForgeContainerType.create(ComponentPlacerMenu::new));
+    public static final RegistryObject<ContainerType<UnitPortOutputConfigMenu>> UNIT_PORT_OUTPUT_CONFIG =
+            CONTAINERS.register("unit_port_output_config", () -> IForgeContainerType.create(UnitPortOutputConfigMenu::new));
 
     private ModContent() {
     }
@@ -79,7 +89,7 @@ public final class ModContent {
             final UnitPortType captured = type;
             result.put(type, ITEMS.register("pattern_p2p_unit_port_" + type.getId(),
                     () -> new PatternP2PPartItem<PatternP2PUnitPortPart>(
-                            new Item.Properties().tab(ItemGroup.TAB_MISC),
+                            new Item.Properties().tab(CREATIVE_TAB),
                             stack -> new PatternP2PUnitPortPart(stack, captured),
                             "tooltip.ae2_batchcraft.pattern_p2p.unit_port." + captured.getId(),
                             "tooltip.ae2_batchcraft.pattern_p2p.binding")));
@@ -97,7 +107,7 @@ public final class ModContent {
             String id = color == AEColor.TRANSPARENT
                     ? "pattern_p2p_unit_manager" : color.registryPrefix + "_pattern_p2p_unit_manager";
             result.put(color, ITEMS.register(id, () -> new PatternP2PUnitManagerItem<PatternP2PUnitManagerPart>(
-                    new Item.Properties().tab(ItemGroup.TAB_MISC), PatternP2PUnitManagerPart::new, captured,
+                    new Item.Properties().tab(CREATIVE_TAB), PatternP2PUnitManagerPart::new, captured,
                     "tooltip.ae2_batchcraft.pattern_p2p.unit_manager")));
         }
         return java.util.Collections.unmodifiableMap(result);

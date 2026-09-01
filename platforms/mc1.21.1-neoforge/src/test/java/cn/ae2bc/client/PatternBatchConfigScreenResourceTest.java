@@ -49,7 +49,7 @@ class PatternBatchConfigScreenResourceTest {
         assertFalse(batchScreen.contains("atomicPreview("));
         assertFalse(batchScreen.contains("public void mouseClicked("));
         assertFalse(onCloseBody(batchScreen).contains("commitValue()"));
-        assertTrue(inputScreen.contains("widgets.addButton(\"dispatchMode\""));
+        assertTrue(inputScreen.contains("addToRightToolbar(\"dispatchModeToolbar\", dispatchModeToolbar)"));
         assertFalse(inputScreen.contains("dispatchFull\""));
         assertFalse(inputScreen.contains("dispatchBatch\""));
         assertTrue(inputScreen.contains("PatternDispatchMode.BATCH_DISTRIBUTION"));

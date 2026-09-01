@@ -13,7 +13,8 @@ public final class PatternP2PUnitSettings {
     public static final PatternP2PUnitSettings DEFAULT = new PatternP2PUnitSettings(
             ReturnMode.UNBLOCKED, true, ProductExtractionLimits.DEFAULT_INTERVAL,
             ProductExtractionLimits.DEFAULT_AMOUNT, RedstoneOutputMode.SINGLE_TRIGGER,
-            DEFAULT_REDSTONE_STRENGTH, DEFAULT_PULSE_WIDTH, DEFAULT_PULSE_PERIOD);
+            DEFAULT_REDSTONE_STRENGTH, DEFAULT_PULSE_WIDTH, DEFAULT_PULSE_PERIOD,
+            TransferPortOutputMode.NORMAL, OutputSlotSharingMode.DISABLED);
 
     private final ReturnMode returnMode;
     private final boolean breakRecovery;
@@ -23,10 +24,29 @@ public final class PatternP2PUnitSettings {
     private final int redstoneStrength;
     private final int pulseWidthTicks;
     private final int pulsePeriodTicks;
+    private final TransferPortOutputMode transferPortOutputMode;
+    private final OutputSlotSharingMode outputSlotSharingMode;
 
     public PatternP2PUnitSettings(ReturnMode returnMode, boolean breakRecovery,
             int extractionInterval, int extractionAmount, RedstoneOutputMode redstoneMode,
             int redstoneStrength, int pulseWidthTicks, int pulsePeriodTicks) {
+        this(returnMode, breakRecovery, extractionInterval, extractionAmount, redstoneMode,
+                redstoneStrength, pulseWidthTicks, pulsePeriodTicks, TransferPortOutputMode.NORMAL);
+    }
+
+    public PatternP2PUnitSettings(ReturnMode returnMode, boolean breakRecovery,
+            int extractionInterval, int extractionAmount, RedstoneOutputMode redstoneMode,
+            int redstoneStrength, int pulseWidthTicks, int pulsePeriodTicks,
+            TransferPortOutputMode transferPortOutputMode) {
+        this(returnMode, breakRecovery, extractionInterval, extractionAmount, redstoneMode,
+                redstoneStrength, pulseWidthTicks, pulsePeriodTicks, transferPortOutputMode,
+                OutputSlotSharingMode.DISABLED);
+    }
+
+    public PatternP2PUnitSettings(ReturnMode returnMode, boolean breakRecovery,
+            int extractionInterval, int extractionAmount, RedstoneOutputMode redstoneMode,
+            int redstoneStrength, int pulseWidthTicks, int pulsePeriodTicks,
+            TransferPortOutputMode transferPortOutputMode, OutputSlotSharingMode outputSlotSharingMode) {
         this.returnMode = returnMode == null ? ReturnMode.UNBLOCKED : returnMode;
         this.breakRecovery = breakRecovery;
         this.extractionInterval = ProductExtractionLimits.clampInterval(extractionInterval);
@@ -35,6 +55,10 @@ public final class PatternP2PUnitSettings {
         this.redstoneStrength = clamp(redstoneStrength, 0, 15);
         this.pulsePeriodTicks = clamp(pulsePeriodTicks, 1, MAX_PULSE_TICKS);
         this.pulseWidthTicks = clamp(pulseWidthTicks, 1, this.pulsePeriodTicks);
+        this.transferPortOutputMode = transferPortOutputMode == null
+                ? TransferPortOutputMode.NORMAL : transferPortOutputMode;
+        this.outputSlotSharingMode = outputSlotSharingMode == null
+                ? OutputSlotSharingMode.DISABLED : outputSlotSharingMode;
     }
 
     public ReturnMode getReturnMode() { return returnMode; }
@@ -45,6 +69,8 @@ public final class PatternP2PUnitSettings {
     public int getRedstoneStrength() { return redstoneStrength; }
     public int getPulseWidthTicks() { return pulseWidthTicks; }
     public int getPulsePeriodTicks() { return pulsePeriodTicks; }
+    public TransferPortOutputMode getTransferPortOutputMode() { return transferPortOutputMode; }
+    public OutputSlotSharingMode getOutputSlotSharingMode() { return outputSlotSharingMode; }
 
     private static int clamp(int value, int minimum, int maximum) {
         return Math.max(minimum, Math.min(maximum, value));

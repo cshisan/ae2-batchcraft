@@ -1,10 +1,13 @@
 package cn.ae2bc.client;
 
+import appeng.client.gui.Icon;
 import cn.ae2bc.menu.PatternP2PTunnelMenu;
 import cn.ae2bc.network.ModNetwork;
 
 import cn.ae2bc.core.extraction.ProductExtractionLimits;
 import cn.ae2bc.core.unit.PatternP2PUnitSettings;
+import cn.ae2bc.core.unit.TransferPortOutputMode;
+import cn.ae2bc.core.unit.OutputSlotSharingMode;
 import cn.ae2bc.logic.RedstoneOutputMode;
 import cn.ae2bc.logic.ReturnMode;
 import com.mojang.blaze3d.matrix.MatrixStack;
@@ -21,12 +24,18 @@ import java.util.function.IntSupplier;
 
 /** Input and output screens matching the corresponding 1.21 Pattern P2P screens. */
 public final class PatternP2PTunnelScreen extends ContainerScreen<PatternP2PTunnelMenu> {
-    private enum Page { COMMON, BREAK, REDSTONE }
+    private static final int PAGE_BUTTON_TOP = 20;
+    private static final int PAGE_BUTTON_HEIGHT = 20;
+    private static final int PAGE_BUTTON_SPACING = 2;
+    private enum Page { COMMON, TRANSFER, BREAK, REDSTONE }
 
     private Page page = Page.COMMON;
     private final boolean output;
+    private final boolean showSingleSlotControl;
     private boolean extractionEnabled;
     private boolean syncInputSettings;
+    private TransferPortOutputMode transferPortOutputMode;
+    private OutputSlotSharingMode outputSlotSharingMode;
     private ReturnMode returnMode;
     private boolean breakRecovery;
     private RedstoneOutputMode redstoneMode;
@@ -35,7 +44,7 @@ public final class PatternP2PTunnelScreen extends ContainerScreen<PatternP2PTunn
     private int redstoneStrength;
     private int pulseWidth;
     private int pulsePeriod;
-    private boolean resetArmed;
+    private Button resetTaskButton;
     private TextFieldWidget intervalField;
     private TextFieldWidget amountField;
     private TextFieldWidget strengthField;
@@ -46,8 +55,11 @@ public final class PatternP2PTunnelScreen extends ContainerScreen<PatternP2PTunn
         super(menu, inventory, title);
         imageWidth = 176;
         output = menu.isOutput();
+        showSingleSlotControl = menu.isInputConfiguration();
         extractionEnabled = menu.isExtractionEnabled();
         syncInputSettings = menu.isSyncInputSettings();
+        transferPortOutputMode = menu.getSettings().getTransferPortOutputMode();
+        outputSlotSharingMode = menu.getSettings().getOutputSlotSharingMode();
         PatternP2PUnitSettings settings = menu.getSettings();
         returnMode = settings.getReturnMode();
         breakRecovery = settings.isBreakRecovery();
@@ -57,22 +69,31 @@ public final class PatternP2PTunnelScreen extends ContainerScreen<PatternP2PTunn
         redstoneStrength = settings.getRedstoneStrength();
         pulseWidth = settings.getPulseWidthTicks();
         pulsePeriod = settings.getPulsePeriodTicks();
-        imageHeight = output ? 124 : heightFor(page);
+        imageHeight = output ? 124 : resolveHeight(page);
     }
 
     @Override
     protected void init() {
-        imageHeight = output ? 124 : heightFor(page);
+        imageHeight = output ? 124 : resolveHeight(page);
         super.init();
+        addButton(new Ae2Button(leftPos + 152, topPos - 5, 20, 20,
+                new StringTextComponent("X"), button -> onClose()));
+        if (!output) {
+            resetTaskButton = addButton(new Ae2IconButton(leftPos + imageWidth + 2, topPos + 17,
+                    Icon.INVALID.ordinal(), ignored -> TaskResetConfirmation.open(this,
+                            tr("gui.ae2_batchcraft.reset_task.confirm.input"),
+                            () -> sendCurrentSettings(true))));
+            resetTaskButton.setMessage(tr("gui.ae2_batchcraft.reset_task.tooltip"));
+        }
         if (output) initOutput();
         else initInput();
     }
 
     private void initInput() {
-        addButton(new Ae2Button(leftPos + 152, topPos - 5, 20, 20,
-                new StringTextComponent("X"), button -> onClose()));
-        addButton(new Ae2Button(leftPos - 24, topPos + 20, 20, 20,
-                new StringTextComponent(">"), button -> switchPage()));
+        addPageIconButton(2, Page.COMMON, 20, Icon.PERMISSION_BUILD.ordinal());
+        addPageIconButton(3, Page.TRANSFER, 42, Icon.FULLNESS_HALF.ordinal());
+        addPageIconButton(4, Page.BREAK, 64, Icon.PERMISSION_CRAFT.ordinal());
+        addPageIconButton(5, Page.REDSTONE, 86, 1);
         if (page == Page.COMMON) {
             addButton(modeButton(12, 50, 73, ReturnMode.STRICT, true));
             addButton(modeButton(91, 50, 73, ReturnMode.UNBLOCKED, true));
@@ -89,8 +110,20 @@ public final class PatternP2PTunnelScreen extends ContainerScreen<PatternP2PTunn
             amountField = field(104, 113, extractionAmount,
                     ProductExtractionLimits.MIN_AMOUNT, () -> ProductExtractionLimits.MAX_AMOUNT,
                     value -> extractionAmount = value);
-            addButton(new Ae2Button(leftPos + 12, topPos + 154, 152, 20,
-                    resetLabel(), this::armOrReset));
+            if (showSingleSlotControl) {
+                addButton(new Ae2Button(leftPos + 12, topPos + 153, 152, 20,
+                        tr("gui.ae2_batchcraft.pattern_p2p_unit.single_slot."
+                                + outputSlotSharingMode.getSerializedName()),
+                        button -> {
+                            outputSlotSharingMode = outputSlotSharingMode.next();
+                            ModNetwork.sendInputOutputSlotSharingMode(menu, outputSlotSharingMode);
+                            init(minecraft, width, height);
+                        }));
+            }
+        } else if (page == Page.TRANSFER) {
+            addButton(transferButton(12, TransferPortOutputMode.NORMAL));
+            addButton(transferButton(64, TransferPortOutputMode.SINGLE_ITEM));
+            addButton(transferButton(116, TransferPortOutputMode.SAME_TYPE));
         } else if (page == Page.BREAK) {
             ITextComponent label = tr("gui.ae2_batchcraft.pattern_p2p_unit.break_recovery");
             addButton(new ToggleSwitch(leftPos + 12, topPos + 52,
@@ -123,8 +156,11 @@ public final class PatternP2PTunnelScreen extends ContainerScreen<PatternP2PTunn
                 }));
         addButton(modeButton(12, 50, 73, ReturnMode.STRICT, !syncInputSettings));
         addButton(modeButton(91, 50, 73, ReturnMode.UNBLOCKED, !syncInputSettings));
-        addButton(new Ae2Button(leftPos + 12, topPos + 92, 152, 20,
-                resetLabel(), this::armOrReset));
+        resetTaskButton = addButton(new Ae2Button(leftPos + 12, topPos + 92, 152, 20,
+                tr("gui.ae2_batchcraft.reset_task"),
+                ignored -> TaskResetConfirmation.open(this,
+                        tr("gui.ae2_batchcraft.reset_task.confirm.output"),
+                        () -> sendCurrentSettings(true))));
     }
 
     private Button modeButton(int x, int y, int width, ReturnMode mode, boolean editable) {
@@ -147,6 +183,17 @@ public final class PatternP2PTunnelScreen extends ContainerScreen<PatternP2PTunn
                     init(minecraft, width, height);
                 });
         button.active = redstoneMode != mode;
+        return button;
+    }
+
+    private Button transferButton(int x, TransferPortOutputMode mode) {
+        Button button = new Ae2Button(leftPos + x, topPos + 50, 48, 20,
+                tr("gui.ae2_batchcraft.pattern_p2p_unit.transfer_mode." + mode.getSerializedName()), pressed -> {
+                    transferPortOutputMode = mode;
+                    sendCurrentSettings(false);
+                    init(minecraft, width, height);
+                });
+        button.active = transferPortOutputMode != mode;
         return button;
     }
 
@@ -179,21 +226,39 @@ public final class PatternP2PTunnelScreen extends ContainerScreen<PatternP2PTunn
 
     private void switchPage() {
         captureFields();
-        page = page == Page.COMMON ? Page.BREAK : page == Page.BREAK ? Page.REDSTONE : Page.COMMON;
+        page = page == Page.COMMON ? Page.TRANSFER : page == Page.TRANSFER ? Page.BREAK
+                : page == Page.BREAK ? Page.REDSTONE : Page.COMMON;
         init(minecraft, width, height);
     }
 
-    private void armOrReset(Button button) {
-        if (resetArmed) {
-            resetArmed = false;
-            sendCurrentSettings(true);
-        } else resetArmed = true;
-        button.setMessage(resetLabel());
+    private void addPageButton(int id, Page target, int y, String label) {
+        Button button = new Ae2Button(leftPos - 24, topPos + y, 20, 20,
+                new StringTextComponent(label), pressed -> {
+                    captureFields();
+                    page = target;
+                    init(minecraft, width, height);
+                });
+        button.active = page != target;
+        addButton(button);
     }
 
-    private ITextComponent resetLabel() {
-        return tr(resetArmed ? "gui.ae2_batchcraft.reset_task.confirm_button"
-                : "gui.ae2_batchcraft.reset_task");
+    private void addPageIconButton(int id, Page target, int y, int iconIndex) {
+        Button button = new Ae2IconButton(leftPos - 24, topPos + y, iconIndex, pressed -> {
+            captureFields();
+            page = target;
+            init(minecraft, width, height);
+        });
+        button.active = page != target;
+        addButton(button);
+    }
+
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        // Route the right toolbar action before ContainerScreen handles outside-panel clicks.
+        if (resetTaskButton != null && resetTaskButton.mouseClicked(mouseX, mouseY, button)) {
+            return true;
+        }
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
     private void captureFields() {
@@ -216,7 +281,8 @@ public final class PatternP2PTunnelScreen extends ContainerScreen<PatternP2PTunn
                 ProductExtractionLimits.clampInterval(extractionInterval),
                 ProductExtractionLimits.clampAmount(extractionAmount), redstoneMode,
                 Math.max(0, Math.min(15, redstoneStrength)),
-                Math.max(1, Math.min(period, pulseWidth)), period);
+                Math.max(1, Math.min(period, pulseWidth)), period,
+                transferPortOutputMode, outputSlotSharingMode);
         ModNetwork.sendPatternSettings(menu, extractionEnabled, settings, syncInputSettings, resetTask);
     }
 
@@ -229,7 +295,11 @@ public final class PatternP2PTunnelScreen extends ContainerScreen<PatternP2PTunn
         } else if (page == Page.COMMON) {
             section(matrices, "gui.ae2_batchcraft.return_configuration", 43, 74);
             section(matrices, "gui.ae2_batchcraft.product_extraction.title", 22, 85, 137);
-            section(matrices, "gui.ae2_batchcraft.pattern_p2p_unit.section.task_reset", 146, 178);
+            if (showSingleSlotControl) {
+                section(matrices, "gui.ae2_batchcraft.pattern_p2p_unit.section.single_slot", 146, 178);
+            }
+        } else if (page == Page.TRANSFER) {
+            section(matrices, "gui.ae2_batchcraft.pattern_p2p_unit.section.transfer_mode", 43, 74);
         } else if (page == Page.BREAK) {
             section(matrices, "gui.ae2_batchcraft.pattern_p2p_unit.section.drop_handling", 43, 74);
         } else {
@@ -253,7 +323,11 @@ public final class PatternP2PTunnelScreen extends ContainerScreen<PatternP2PTunn
             sectionTitle(matrices, "gui.ae2_batchcraft.product_extraction.title", 81);
             drawValueLabel(matrices, "gui.ae2_batchcraft.product_extraction.interval", 96, "gui.ae2_batchcraft.time.ticks");
             drawValueLabel(matrices, "gui.ae2_batchcraft.product_extraction.amount", 117, "gui.ae2_batchcraft.product_extraction.unit");
-            sectionTitle(matrices, "gui.ae2_batchcraft.pattern_p2p_unit.section.task_reset", 142);
+            if (showSingleSlotControl) {
+                sectionTitle(matrices, "gui.ae2_batchcraft.pattern_p2p_unit.section.single_slot", 142);
+            }
+        } else if (page == Page.TRANSFER) {
+            sectionTitle(matrices, "gui.ae2_batchcraft.pattern_p2p_unit.section.transfer_mode", 39);
         } else if (page == Page.BREAK) {
             sectionTitle(matrices, "gui.ae2_batchcraft.pattern_p2p_unit.section.drop_handling", 39);
         } else {
@@ -298,10 +372,20 @@ public final class PatternP2PTunnelScreen extends ContainerScreen<PatternP2PTunn
             periodField.render(matrices, mouseX, mouseY, partialTick);
         }
         renderTooltip(matrices, mouseX, mouseY);
+        if (resetTaskButton != null && resetTaskButton.isHovered()) {
+            renderTooltip(matrices, tr("gui.ae2_batchcraft.reset_task.tooltip"), mouseX, mouseY);
+        }
     }
 
     private static int heightFor(Page page) {
-        return page == Page.COMMON ? 186 : page == Page.BREAK ? 82 : 166;
+        return page == Page.COMMON ? 186 : page == Page.TRANSFER ? 82 : page == Page.BREAK ? 82 : 166;
+    }
+
+    private static int resolveHeight(Page page) {
+        int pageCount = Page.values().length;
+        int toolbarHeight = PAGE_BUTTON_TOP + pageCount * PAGE_BUTTON_HEIGHT
+                + Math.max(0, pageCount - 1) * PAGE_BUTTON_SPACING;
+        return Math.max(heightFor(page), toolbarHeight);
     }
 
     private static int parse(String value, int fallback) {

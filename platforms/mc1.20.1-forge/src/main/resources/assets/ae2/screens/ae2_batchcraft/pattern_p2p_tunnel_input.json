@@ -22,6 +22,10 @@
     "redstoneSingle": {"left": 12, "top": 50, "width": 48, "height": 18},
     "redstonePeriodic": {"left": 64, "top": 50, "width": 48, "height": 18},
     "redstoneContinuous": {"left": 116, "top": 50, "width": 48, "height": 18},
-    "resetTask": {"left": 12, "top": 154, "width": 152, "height": 18}
+    "transferNormal": {"left": 12, "top": 50, "width": 48, "height": 18},
+    "transferSingleItem": {"left": 64, "top": 50, "width": 48, "height": 18},
+    "transferSameType": {"left": 116, "top": 50, "width": 48, "height": 18},
+    "slotSharingMode": {"left": 12, "top": 153, "width": 152, "height": 18},
+    "resetTaskToolbar": {"left": 176, "top": 17, "width": 22, "height": 22}
   }
 }

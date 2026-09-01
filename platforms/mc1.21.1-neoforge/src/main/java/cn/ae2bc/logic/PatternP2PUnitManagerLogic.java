@@ -19,6 +19,7 @@ import cn.ae2bc.part.PatternP2PUnitManagerPart;
 import cn.ae2bc.part.PatternP2PUnitPortPart;
 import cn.ae2bc.pattern.MaterialOutputForm;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -31,6 +32,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.Comparator;
+import cn.ae2bc.core.unit.TransferPortOutputMode;
 
 /** Owns one durable unit task and gates every bound port while that task is active. */
 public final class PatternP2PUnitManagerLogic implements IGridTickable {
@@ -51,6 +54,10 @@ public final class PatternP2PUnitManagerLogic implements IGridTickable {
     private final PatternP2PUnitManagerPart manager;
     private final IActionSource actionSource;
     private final List<PendingMaterial> pendingInputs = new ArrayList<>();
+    private final Map<PatternP2PUnitPortPart, Integer> dispatchPortSlots = new java.util.IdentityHashMap<>();
+    private final Map<PatternP2PUnitPortPart, AEKey> dispatchPortTypes = new java.util.IdentityHashMap<>();
+    private final Map<Integer, PatternP2PUnitPortPart> dispatchSlotPorts = new java.util.HashMap<>();
+    private final Map<Integer, int[]> persistedSlotPortSides = new java.util.HashMap<>();
     private final Map<AEKey, Long> declaredOutputs = new LinkedHashMap<>();
 
     private boolean syncMainConfiguration = true;
@@ -100,6 +107,9 @@ public final class PatternP2PUnitManagerLogic implements IGridTickable {
             return;
         }
         pendingInputs.clear();
+        dispatchPortTypes.clear();
+        dispatchSlotPorts.clear();
+        persistedSlotPortSides.clear();
         resetPendingRetryBackoff();
         declaredOutputs.clear();
         taskActive = false;
@@ -190,12 +200,8 @@ public final class PatternP2PUnitManagerLogic implements IGridTickable {
             return false;
         }
         Map<UnitPortType, List<PatternP2PUnitPortPart>> boundPorts = getBoundPortsByType();
-        for (PendingMaterial material : plan) {
-            PatternP2PUnitPortPart port = findPort(portsFor(boundPorts, material.form()),
-                    material.stack(), material.form());
-            if (port == null && !retainCompleteRemainder) {
-                return false;
-            }
+        if (!retainCompleteRemainder && !canAllocateCompletely(plan, boundPorts)) {
+            return false;
         }
 
         if (taskActive) {
@@ -252,11 +258,7 @@ public final class PatternP2PUnitManagerLogic implements IGridTickable {
             return false;
         }
         Map<UnitPortType, List<PatternP2PUnitPortPart>> boundPorts = getBoundPortsByType();
-        for (PendingMaterial material : plan) {
-            if (findPort(portsFor(boundPorts, material.form()), material.stack(), material.form()) == null) {
-                return false;
-            }
-        }
+        if (!canAllocateCompletely(plan, boundPorts)) return false;
         return true;
     }
 
@@ -268,8 +270,10 @@ public final class PatternP2PUnitManagerLogic implements IGridTickable {
             List<ProcessingInputMapper.SlotInput> mapped = ProcessingInputMapper.map(
                     processingPattern, inputHolders, manager.getLevel(), divisor, units);
             if (mapped == null) {
-                return metadata.materialOutputConfig().isEmpty()
-                        ? collectDefaultInputs(inputHolders) : null;
+                // A processing task must retain its encoded slot identity. Falling
+                // back to unscoped inputs would bypass per-slot output forms and
+                // the multi-slot sharing rule, especially for repeated materials.
+                return null;
             }
             List<PendingMaterial> result = new ArrayList<>();
             for (ProcessingInputMapper.SlotInput input : mapped) {
@@ -277,7 +281,7 @@ public final class PatternP2PUnitManagerLogic implements IGridTickable {
                 if (!form.supports(input.stack().what())) {
                     return null;
                 }
-                result.add(new PendingMaterial(input.stack(), form));
+                result.add(new PendingMaterial(input.stack(), form, input.slot()));
             }
             return result;
         }
@@ -294,7 +298,7 @@ public final class PatternP2PUnitManagerLogic implements IGridTickable {
             for (var entry : holder) {
                 if (entry.getLongValue() > 0) {
                     result.add(new PendingMaterial(
-                            new GenericStack(entry.getKey(), entry.getLongValue()), MaterialOutputForm.NORMAL));
+                            new GenericStack(entry.getKey(), entry.getLongValue()), MaterialOutputForm.NORMAL, -1));
                 }
             }
         }
@@ -322,34 +326,151 @@ public final class PatternP2PUnitManagerLogic implements IGridTickable {
         return boundPorts.getOrDefault(UnitPortType.forOutputFormId(form.getId()), List.of());
     }
 
-    private @Nullable PatternP2PUnitPortPart findPort(List<PatternP2PUnitPortPart> boundPorts, GenericStack stack,
-                                                       MaterialOutputForm form) {
-        for (PatternP2PUnitPortPart port : boundPorts) {
-            if (port.insertInput(manager, stack, form, Actionable.SIMULATE) >= stack.amount()) {
-                return port;
+    private boolean canUsePortForSlot(int slot, PatternP2PUnitPortPart port,
+                                      Map<PatternP2PUnitPortPart, Integer> owners,
+                                      Map<Integer, PatternP2PUnitPortPart> slotOwners) {
+        if (slot < 0) return true;
+        Integer portOwner = owners.get(port);
+        if (isSingleSlotEnabled(port) && portOwner != null && portOwner != slot) return false;
+        PatternP2PUnitPortPart slotOwner = slotOwners.get(slot);
+        return slotOwner == null || slotOwner == port || !isSingleSlotEnabled(slotOwner);
+    }
+
+    private boolean isSingleSlotEnabled(PatternP2PUnitPortPart port) {
+        return port.getEffectiveSingleSlot();
+    }
+
+    private List<PatternP2PUnitPortPart> sortedPorts(List<PatternP2PUnitPortPart> ports) {
+        List<PatternP2PUnitPortPart> result = new ArrayList<>(ports);
+        result.sort(Comparator.comparingInt(PatternP2PUnitPortPart::getTransferPriority).reversed());
+        return result;
+    }
+
+    private List<PatternP2PUnitPortPart> candidatePorts(List<PatternP2PUnitPortPart> ports,
+                                                        PendingMaterial material) {
+        List<PatternP2PUnitPortPart> filtered = new ArrayList<>();
+        for (PatternP2PUnitPortPart port : ports) {
+            if (port.matchesInput(manager, material.stack(), material.form())) {
+                filtered.add(port);
             }
         }
-        return null;
+        return sortedPorts(filtered);
+    }
+
+    /** Validates aggregate capacity across all ports; one material may span multiple ports. */
+    private boolean canAllocateCompletely(List<PendingMaterial> materials,
+                                          Map<UnitPortType, List<PatternP2PUnitPortPart>> boundPorts) {
+        Map<MaterialOutputForm, List<PendingMaterial>> groups = new java.util.EnumMap<>(MaterialOutputForm.class);
+        for (PendingMaterial material : materials) {
+            groups.computeIfAbsent(material.form(), ignored -> new ArrayList<>()).add(material);
+        }
+        for (var entry : groups.entrySet()) {
+            if (!canAllocateGroup(entry.getValue(), portsFor(boundPorts, entry.getKey()))) return false;
+        }
+        return true;
+    }
+
+    private boolean canAllocateGroup(List<PendingMaterial> materials, List<PatternP2PUnitPortPart> ports) {
+        if (ports.isEmpty()) return false;
+        TransferPortOutputMode mode = getEffectiveConfiguration().transferPortOutputMode();
+        Map<PatternP2PUnitPortPart, Long> remaining = new java.util.IdentityHashMap<>();
+        for (PatternP2PUnitPortPart port : ports) {
+            long capacity = mode == TransferPortOutputMode.SINGLE_ITEM ? 1 : Long.MAX_VALUE;
+            remaining.put(port, capacity);
+        }
+        // Keep encoded slot order. The real dispatch loop uses this order too;
+        // sorting by simulated capacity can otherwise reserve a lower-priority
+        // port before the material that should have claimed the higher priority one.
+        List<PendingMaterial> ordered = materials;
+        Map<PatternP2PUnitPortPart, appeng.api.stacks.AEKey> assignedType = new java.util.IdentityHashMap<>();
+        Map<PatternP2PUnitPortPart, Integer> assignedSlot = new java.util.IdentityHashMap<>();
+        Map<Integer, PatternP2PUnitPortPart> assignedSlotPort = new java.util.HashMap<>();
+        for (PendingMaterial material : ordered) {
+            long left = material.stack().amount();
+            List<PatternP2PUnitPortPart> candidates = candidatePorts(ports, material);
+            for (PatternP2PUnitPortPart port : candidates) {
+                if (left <= 0) break;
+                if (mode == TransferPortOutputMode.SAME_TYPE
+                        && assignedType.containsKey(port)
+                        && !assignedType.get(port).equals(material.stack().what())) continue;
+                if (!canUsePortForSlot(material.slot(), port, assignedSlot, assignedSlotPort)) continue;
+                long simulated = port.insertInput(manager, material.stack(), material.form(), Actionable.SIMULATE);
+                if (simulated <= 0) continue;
+                long portCapacity = remaining.get(port);
+                if (mode != TransferPortOutputMode.SINGLE_ITEM && portCapacity == Long.MAX_VALUE) {
+                    portCapacity = port.estimateTransferCapacity(material.stack().what(), simulated);
+                    remaining.put(port, portCapacity);
+                }
+                long accepted = Math.min(left, Math.min(simulated, portCapacity));
+                if (accepted <= 0) continue;
+                left -= accepted;
+                if (portCapacity != Long.MAX_VALUE) remaining.put(port, portCapacity - accepted);
+                if (mode == TransferPortOutputMode.SAME_TYPE) assignedType.put(port, material.stack().what());
+                if (material.slot() >= 0) {
+                    assignedSlot.putIfAbsent(port, material.slot());
+                    if (isSingleSlotEnabled(port)) {
+                        assignedSlotPort.putIfAbsent(material.slot(), port);
+                        // A single-slot port may not split this material over
+                        // another port, even when its simulated capacity is partial.
+                        break;
+                    }
+                }
+            }
+            if (left > 0 && (material.slot() < 0 || !assignedSlotPort.containsKey(material.slot()))) {
+                return false;
+            }
+        }
+        return true;
     }
 
     private boolean dispatchPending() {
         boolean changed = false;
         Map<UnitPortType, List<PatternP2PUnitPortPart>> boundPorts = getBoundPortsByType();
+        restorePersistedSlotPorts(boundPorts);
         for (var iterator = pendingInputs.listIterator(); iterator.hasNext(); ) {
             PendingMaterial pending = iterator.next();
-            PatternP2PUnitPortPart port = findPort(portsFor(boundPorts, pending.form()),
-                    pending.stack(), pending.form());
-            if (port == null) {
-                continue;
+            long remaining = pending.stack().amount();
+            boolean insertedAny = false;
+
+            // Priority only determines the attempt order. The connected machine is
+            // authoritative: it may reject a material or accept only part of it.
+            for (PatternP2PUnitPortPart port : candidatePorts(
+                    portsFor(boundPorts, pending.form()), pending)) {
+                if (remaining <= 0 || !canUsePortForSlot(pending.slot(), port,
+                        dispatchPortSlots, dispatchSlotPorts)) {
+                    continue;
+                }
+                if (!allowsConfiguredPortType(port, pending.stack().what())) {
+                    continue;
+                }
+                long inserted = port.insertInput(manager,
+                        new GenericStack(pending.stack().what(), remaining),
+                        pending.form(), Actionable.MODULATE);
+                if (inserted <= 0) {
+                    // A simulated candidate can still reject the real insertion;
+                    // continue with the next port instead of retrying this one.
+                    continue;
+                }
+                inserted = Math.min(inserted, remaining);
+                remaining -= inserted;
+                insertedAny = true;
+                if (pending.slot() >= 0) {
+                    dispatchPortSlots.putIfAbsent(port, pending.slot());
+                    if (isSingleSlotEnabled(port)) {
+                        dispatchSlotPorts.putIfAbsent(pending.slot(), port);
+                    }
+                }
+                if (getEffectiveConfiguration().transferPortOutputMode() == TransferPortOutputMode.SAME_TYPE) {
+                    dispatchPortTypes.putIfAbsent(port, pending.stack().what());
+                }
             }
-            GenericStack stack = pending.stack();
-            long inserted = port.insertInput(manager, stack, pending.form(), Actionable.MODULATE);
-            if (inserted >= stack.amount()) {
+
+            if (remaining <= 0) {
                 iterator.remove();
                 changed = true;
-            } else if (inserted > 0) {
+            } else if (insertedAny) {
                 iterator.set(new PendingMaterial(
-                        new GenericStack(stack.what(), stack.amount() - inserted), pending.form()));
+                        new GenericStack(pending.stack().what(), remaining), pending.form(), pending.slot()));
                 changed = true;
             }
         }
@@ -357,6 +478,36 @@ public final class PatternP2PUnitManagerLogic implements IGridTickable {
             finishTaskIfComplete();
         }
         return changed;
+    }
+
+    private void restorePersistedSlotPorts(Map<UnitPortType, List<PatternP2PUnitPortPart>> boundPorts) {
+        if (persistedSlotPortSides.isEmpty()) {
+            return;
+        }
+        for (var entry : persistedSlotPortSides.entrySet()) {
+            int slot = entry.getKey();
+            int[] side = entry.getValue();
+            for (List<PatternP2PUnitPortPart> ports : boundPorts.values()) {
+                for (PatternP2PUnitPortPart port : ports) {
+                    Direction portSide = port.getSide();
+                    if (portSide != null && portSide.get3DDataValue() == side[0]) {
+                        dispatchSlotPorts.putIfAbsent(slot, port);
+                        dispatchPortSlots.putIfAbsent(port, slot);
+                    }
+                }
+            }
+        }
+        persistedSlotPortSides.clear();
+    }
+
+    /** Applies only the explicit SAME_TYPE port mode; machine-specific type rules
+     * remain delegated to the real insertion result below. */
+    private boolean allowsConfiguredPortType(PatternP2PUnitPortPart port, AEKey what) {
+        if (getEffectiveConfiguration().transferPortOutputMode() != TransferPortOutputMode.SAME_TYPE) {
+            return true;
+        }
+        AEKey assigned = dispatchPortTypes.get(port);
+        return assigned == null || assigned.equals(what);
     }
 
     public long filterReturned(AEKey what, long amount) {
@@ -423,6 +574,10 @@ public final class PatternP2PUnitManagerLogic implements IGridTickable {
         remainingPrimary = 0;
         declaredOutputs.clear();
         pendingInputs.clear();
+        dispatchPortSlots.clear();
+        dispatchPortTypes.clear();
+        dispatchSlotPorts.clear();
+        persistedSlotPortSides.clear();
         resetPendingRetryBackoff();
         changed();
         invalidatePortRuntimeState();
@@ -517,13 +672,21 @@ public final class PatternP2PUnitManagerLogic implements IGridTickable {
         primaryKey = primary == null ? null : primary.what();
         remainingPrimary = primary == null ? 0 : primary.amount();
         pendingInputs.clear();
+        dispatchPortSlots.clear();
+        dispatchPortTypes.clear();
+        dispatchSlotPorts.clear();
         var pending = data.getList(PENDING_INPUTS, Tag.TAG_COMPOUND);
         for (int i = 0; i < pending.size(); i++) {
             CompoundTag entry = pending.getCompound(i);
             GenericStack stack = GenericStack.readTag(registries, entry);
             if (stack != null && stack.amount() > 0) {
                 pendingInputs.add(new PendingMaterial(stack,
-                        MaterialOutputForm.fromId(entry.getByte(OUTPUT_FORM))));
+                        MaterialOutputForm.fromId(entry.getByte(OUTPUT_FORM)),
+                        entry.contains("PatternSlot") ? entry.getInt("PatternSlot") : -1));
+                if (entry.contains("BoundPortSide") && entry.contains("PatternSlot")) {
+                    persistedSlotPortSides.put(entry.getInt("PatternSlot"),
+                            new int[] { entry.getInt("BoundPortSide") });
+                }
             }
         }
     }
@@ -559,6 +722,12 @@ public final class PatternP2PUnitManagerLogic implements IGridTickable {
         for (PendingMaterial material : pendingInputs) {
             CompoundTag entry = GenericStack.writeTag(registries, material.stack());
             entry.putByte(OUTPUT_FORM, (byte) material.form().getId());
+            entry.putInt("PatternSlot", material.slot());
+            PatternP2PUnitPortPart boundPort = material.slot() < 0
+                    ? null : dispatchSlotPorts.get(material.slot());
+            if (boundPort != null && boundPort.getSide() != null) {
+                entry.putInt("BoundPortSide", boundPort.getSide().get3DDataValue());
+            }
             pending.add(entry);
         }
         data.put(PENDING_INPUTS, pending);
@@ -573,6 +742,9 @@ public final class PatternP2PUnitManagerLogic implements IGridTickable {
 
     public void clearContent() {
         pendingInputs.clear();
+        dispatchPortSlots.clear();
+        dispatchPortTypes.clear();
+        dispatchSlotPorts.clear();
         resetPendingRetryBackoff();
         declaredOutputs.clear();
         taskActive = false;
@@ -639,6 +811,6 @@ public final class PatternP2PUnitManagerLogic implements IGridTickable {
         return level == null ? 0 : level.getGameTime();
     }
 
-    private record PendingMaterial(GenericStack stack, MaterialOutputForm form) {
+    private record PendingMaterial(GenericStack stack, MaterialOutputForm form, int slot) {
     }
 }

@@ -1,5 +1,6 @@
 package cn.ae2bc;
 
+import cn.ae2bc.core.ModConstants;
 import cn.ae2bc.client.PatternP2PTunnelEnergyScreen;
 import cn.ae2bc.client.PatternP2PUnitManagerScreen;
 import cn.ae2bc.menu.PatternP2PTunnelEnergyMenu;
@@ -34,13 +35,14 @@ import cn.ae2bc.part.PatternP2PTunnelPart;
         dependencies = "required-after:appliedenergistics2@[rv6-stable-7,)"
 )
 public final class Ae2bcMod {
-    public static final String MOD_ID = "ae2_batchcraft";
+    public static final String MOD_ID = ModConstants.MOD_ID;
     public static final int GUI_EXTRACTION_BASE = 4100;
     public static final int GUI_ENERGY_BASE = 4200;
     public static final int GUI_UNIT_MANAGER = 4300;
     public static final int GUI_COMPONENT_PLACER = 4400;
     public static final int GUI_COMPONENT_PLACER_CRAFT_AMOUNT = 4401;
     public static final int GUI_COMPONENT_PLACER_CRAFT_CONFIRM = 4402;
+    public static final int GUI_UNIT_PORT_OUTPUT_BASE = 4500;
     @Mod.Instance(MOD_ID)
     public static Ae2bcMod INSTANCE;
     private static final Class<?> AE2_NODE_API = IGridNode.class;
@@ -91,6 +93,10 @@ public final class Ae2bcMod {
                     return new cn.ae2bc.menu.PatternP2PUnitManagerMenu(
                             player, new BlockPos(x, y, z));
                 }
+                if (id >= GUI_UNIT_PORT_OUTPUT_BASE && id < GUI_UNIT_PORT_OUTPUT_BASE + 6) {
+                    return new cn.ae2bc.menu.UnitPortOutputConfigMenu(player, new BlockPos(x, y, z),
+                            EnumFacing.values()[id - GUI_UNIT_PORT_OUTPUT_BASE]);
+                }
                 if (id >= GUI_ENERGY_BASE && id < GUI_ENERGY_BASE + 6) {
                     return new cn.ae2bc.menu.PatternP2PTunnelEnergyMenu(player, new BlockPos(x, y, z),
                             EnumFacing.values()[id - GUI_ENERGY_BASE]);
@@ -126,6 +132,12 @@ public final class Ae2bcMod {
                                     player, new BlockPos(x, y, z));
                     return new cn.ae2bc.client.PatternP2PUnitManagerScreen(container, player.inventory);
                 }
+                if (id >= GUI_UNIT_PORT_OUTPUT_BASE && id < GUI_UNIT_PORT_OUTPUT_BASE + 6) {
+                    cn.ae2bc.menu.UnitPortOutputConfigMenu container =
+                            new cn.ae2bc.menu.UnitPortOutputConfigMenu(player, new BlockPos(x, y, z),
+                                    EnumFacing.values()[id - GUI_UNIT_PORT_OUTPUT_BASE]);
+                    return new cn.ae2bc.client.UnitPortOutputConfigScreen(container, player.inventory);
+                }
                 if (id >= GUI_ENERGY_BASE && id < GUI_ENERGY_BASE + 6) {
                     cn.ae2bc.menu.PatternP2PTunnelEnergyMenu container =
                             new cn.ae2bc.menu.PatternP2PTunnelEnergyMenu(player,
@@ -144,8 +156,6 @@ public final class Ae2bcMod {
     public void init(FMLInitializationEvent event) {
         AEApi.instance().registries().wireless().registerWirelessHandler(
                 cn.ae2bc.registry.ModContent.COMPONENT_PLACER);
-        appeng.api.config.Upgrades.CAPACITY.registerItem(
-                new net.minecraft.item.ItemStack(cn.ae2bc.registry.ModContent.COMPONENT_PLACER), 2);
         appeng.api.config.Upgrades.CRAFTING.registerItem(
                 new net.minecraft.item.ItemStack(cn.ae2bc.registry.ModContent.COMPONENT_PLACER), 1);
     }

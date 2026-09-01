@@ -1,5 +1,6 @@
 package cn.ae2bc.part;
 
+import cn.ae2bc.core.ProjectLimits;
 import appeng.api.config.Actionable;
 import appeng.api.config.PowerUnits;
 import appeng.api.networking.IGridNode;
@@ -18,6 +19,7 @@ import appeng.parts.p2p.P2PModels;
 import cn.ae2bc.Ae2bcMod;
 import cn.ae2bc.logic.PatternP2PEnergyGridService;
 import cn.ae2bc.menu.PatternP2PTunnelEnergyMenu;
+import cn.ae2bc.placer.ComponentPlacerItem;
 import appeng.menu.MenuOpener;
 import appeng.menu.locator.MenuLocators;
 import net.minecraft.core.Direction;
@@ -36,7 +38,7 @@ import cn.ae2bc.platform.ForgeBlockCapabilityCache;
 import net.minecraftforge.energy.IEnergyStorage;
 
 public final class PatternP2PTunnelEnergyPart extends EnergyAcceptorPart {
-    public static final int PULL_INTERVAL = 5;
+    public static final int PULL_INTERVAL = ProjectLimits.ENERGY_TUNNEL_PULL_INTERVAL;
     private static final String PENDING_FE_TAG = "PendingFe";
     private static final P2PModels MODELS = new P2PModels(
             new ResourceLocation(Ae2bcMod.MOD_ID, "part/p2p/pattern_p2p_tunnel_energy"));
@@ -311,7 +313,10 @@ public final class PatternP2PTunnelEnergyPart extends EnergyAcceptorPart {
     @Override
     public boolean onPartActivate(Player player, InteractionHand hand, Vec3 pos) {
         ItemStack heldItem = player.getItemInHand(hand);
-        if (hand == InteractionHand.MAIN_HAND && heldItem.isEmpty()) {
+        if (heldItem.getItem() instanceof ComponentPlacerItem) {
+            return true;
+        }
+        if (hand == InteractionHand.MAIN_HAND) {
             if (!isClientSide()) {
                 openConfigurationMenu(player);
             }

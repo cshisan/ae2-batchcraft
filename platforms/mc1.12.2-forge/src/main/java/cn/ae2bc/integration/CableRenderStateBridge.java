@@ -1,6 +1,7 @@
 package cn.ae2bc.integration;
 
 import appeng.api.parts.IPart;
+import appeng.api.parts.PartItemStack;
 import appeng.api.util.AEPartLocation;
 import appeng.client.render.cablebus.CableBusRenderState;
 import appeng.parts.CableBusContainer;
@@ -26,12 +27,24 @@ public final class CableRenderStateBridge {
     }
 
     public static boolean shouldRejectPart(CableBusContainer container, ItemStack stack) {
-        if (container.getPart(AEPartLocation.INTERNAL) instanceof PatternP2PUnitManagerPart) return true;
+        if (container.getPart(AEPartLocation.INTERNAL) instanceof PatternP2PUnitManagerPart) {
+            return !isAllowedManagerFacePart(stack);
+        }
         if (!(stack.getItem() instanceof PatternP2PUnitManagerItem)) return false;
         if (!container.getFacadeContainer().isEmpty()) return true;
         for (AEPartLocation location : AEPartLocation.values()) {
-            if (container.getPart(location) != null) return true;
+            IPart part = container.getPart(location);
+            if (part == null) continue;
+            if (location != AEPartLocation.INTERNAL && isAllowedManagerFacePart(part.getItemStack(PartItemStack.NETWORK))) continue;
+            return true;
         }
         return false;
+    }
+
+    private static boolean isAllowedManagerFacePart(ItemStack stack) {
+        if (stack == null || stack.isEmpty() || stack.getItem().getRegistryName() == null) return false;
+        String path = stack.getItem().getRegistryName().getPath();
+        return "ae2".equals(stack.getItem().getRegistryName().getNamespace())
+                && ("cable_anchor".equals(path) || "quartz_fiber".equals(path));
     }
 }

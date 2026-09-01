@@ -30,6 +30,7 @@ import appeng.parts.PartModel;
 import appeng.parts.networking.PartCable;
 import cn.ae2bc.core.frequency.FrequencyLimits;
 import cn.ae2bc.core.unit.PatternP2PUnitSettings;
+import cn.ae2bc.core.unit.OutputSlotSharingMode;
 import cn.ae2bc.logic.PatternP2PUnitDimensions;
 import cn.ae2bc.logic.PatternP2PTopologyGridService;
 import cn.ae2bc.Ae2bcMod;
@@ -62,6 +63,16 @@ public final class PatternP2PUnitManagerPart extends PartCable
     private final List<ItemStack> pendingInputs = new ArrayList<ItemStack>();
     private final List<cn.ae2bc.core.unit.UnitPortType> pendingInputTypes =
             new ArrayList<cn.ae2bc.core.unit.UnitPortType>();
+    /** Stable encoded-pattern slot for each pending input. */
+    private final List<Integer> pendingInputSlots = new ArrayList<Integer>();
+    private final java.util.Map<PatternP2PUnitPortPart, Integer> dispatchPortSlots =
+            new java.util.IdentityHashMap<>();
+    private final java.util.Map<Integer, PatternP2PUnitPortPart> dispatchSlotPorts =
+            new java.util.HashMap<>();
+    private final java.util.Map<PatternP2PUnitPortPart, net.minecraft.item.Item> dispatchPortTypes =
+            new java.util.IdentityHashMap<>();
+    private final java.util.Map<Integer, EnumFacing> persistedSlotPortSides =
+            new java.util.HashMap<>();
     private final List<ItemStack> declaredOutputs = new ArrayList<ItemStack>();
     private boolean taskActive;
     private ItemStack primaryOutput = ItemStack.EMPTY;
@@ -76,8 +87,10 @@ public final class PatternP2PUnitManagerPart extends PartCable
     private int redstoneStrength = 15;
     private int pulseWidthTicks = 2;
     private int pulsePeriodTicks = 20;
+    private OutputSlotSharingMode outputSlotSharingMode = OutputSlotSharingMode.DISABLED;
     private long taskRevision;
     private boolean syncMainConfiguration = true;
+    private boolean synchronizingFromInput;
     private PatternP2PUnitSettings mainConfiguration = PatternP2PUnitSettings.DEFAULT;
     private long mainConfigurationRevision = -1;
 
@@ -117,6 +130,15 @@ public final class PatternP2PUnitManagerPart extends PartCable
     public int getRedstoneStrength() { return getEffectiveSettings().getRedstoneStrength(); }
     public int getPulseWidthTicks() { return getEffectiveSettings().getPulseWidthTicks(); }
     public int getPulsePeriodTicks() { return getEffectiveSettings().getPulsePeriodTicks(); }
+    public OutputSlotSharingMode getOutputSlotSharingMode() {
+        // Keep the effective configuration current when a port GUI reads it directly,
+        // matching the 1.21.1 manager's input-synchronized configuration semantics.
+        if (syncMainConfiguration && !synchronizingFromInput && getTile() != null
+                && getTile().getWorld() != null && !getTile().getWorld().isRemote) {
+            synchronizeFromInput();
+        }
+        return getEffectiveSettings().getOutputSlotSharingMode();
+    }
     public long getTaskRevision() { return taskRevision; }
     public boolean isSyncMainConfiguration() { return syncMainConfiguration; }
     public void setSyncMainConfiguration(boolean value) {
@@ -130,6 +152,7 @@ public final class PatternP2PUnitManagerPart extends PartCable
         saveChanges();
         getHost().markForUpdate();
         wakeBoundPorts();
+        cn.ae2bc.network.ModNetwork.refreshUnitPortStates(this);
     }
 
     public PatternP2PUnitSettings getSettings() {
@@ -142,11 +165,13 @@ public final class PatternP2PUnitManagerPart extends PartCable
         saveChanges();
         getHost().markForUpdate();
         wakeBoundPorts();
+        cn.ae2bc.network.ModNetwork.refreshUnitPortStates(this);
     }
 
     private PatternP2PUnitSettings getLocalSettings() {
         return new PatternP2PUnitSettings(returnMode, breakRecovery, extractionInterval,
-                extractionAmount, redstoneMode, redstoneStrength, pulseWidthTicks, pulsePeriodTicks);
+                extractionAmount, redstoneMode, redstoneStrength, pulseWidthTicks, pulsePeriodTicks,
+                cn.ae2bc.core.unit.TransferPortOutputMode.NORMAL, outputSlotSharingMode);
     }
 
     private PatternP2PUnitSettings getEffectiveSettings() {
@@ -162,6 +187,7 @@ public final class PatternP2PUnitManagerPart extends PartCable
         redstoneStrength = settings.getRedstoneStrength();
         pulseWidthTicks = settings.getPulseWidthTicks();
         pulsePeriodTicks = settings.getPulsePeriodTicks();
+        outputSlotSharingMode = settings.getOutputSlotSharingMode();
     }
 
     public void applyMainConfiguration(PatternP2PUnitSettings settings, long revision) {
@@ -172,15 +198,20 @@ public final class PatternP2PUnitManagerPart extends PartCable
         saveChanges();
         getHost().markForUpdate();
         wakeBoundPorts();
+        cn.ae2bc.network.ModNetwork.refreshUnitPortStates(this);
     }
 
     public void resetTaskState() {
         pendingInputs.clear();
         pendingInputTypes.clear();
+        pendingInputSlots.clear();
         declaredOutputs.clear();
         primaryOutput = ItemStack.EMPTY;
         remainingPrimary = 0;
         taskActive = false;
+        dispatchPortSlots.clear();
+        dispatchSlotPorts.clear();
+        dispatchPortTypes.clear();
         taskRevision++;
         saveChanges();
         getHost().markForUpdate();
@@ -205,19 +236,33 @@ public final class PatternP2PUnitManagerPart extends PartCable
 
     public boolean canAcceptInput(ItemStack stack, cn.ae2bc.core.unit.UnitPortType targetType) {
         if (!canAcceptTask() || stack == null || stack.isEmpty()) return false;
-        return findInputPort(stack, targetType, true) != null;
+        return findInputPort(stack, targetType, -1, null, true) != null;
     }
 
     public boolean acceptInputs(List<ItemStack> inputs, List<cn.ae2bc.core.unit.UnitPortType> targetTypes,
             ItemStack primaryOutput, long primaryAmount, List<ItemStack> outputs) {
+        // Keep the legacy overload's task admission path explicit for callers and
+        // preserve the same input-synchronized behavior as the main overload.
+        synchronizeFromInput();
+        List<Integer> slots = new ArrayList<Integer>();
+        for (int i = 0; i < inputs.size(); i++) slots.add(i);
+        return acceptInputs(inputs, targetTypes, slots, primaryOutput, primaryAmount, outputs);
+    }
+
+    public boolean acceptInputs(List<ItemStack> inputs, List<cn.ae2bc.core.unit.UnitPortType> targetTypes,
+            List<Integer> patternSlots, ItemStack primaryOutput, long primaryAmount,
+            List<ItemStack> outputs) {
         if (!canAcceptTask() || inputs == null || inputs.isEmpty()
-                || targetTypes == null || targetTypes.size() != inputs.size()) return false;
-        for (int i = 0; i < inputs.size(); i++) {
-            if (!canAcceptInput(inputs.get(i), targetTypes.get(i))) return false;
-        }
+                || targetTypes == null || targetTypes.size() != inputs.size()
+                || patternSlots == null || patternSlots.size() != inputs.size()) return false;
+        if (!canAcceptInputsAggregate(inputs, targetTypes, patternSlots)) return false;
         pendingInputs.clear();
         pendingInputTypes.clear();
-        for (ItemStack stack : inputs) pendingInputs.add(stack.copy());
+        pendingInputSlots.clear();
+        for (int i = 0; i < inputs.size(); i++) {
+            pendingInputs.add(inputs.get(i).copy());
+            pendingInputSlots.add(patternSlots.get(i));
+        }
         pendingInputTypes.addAll(targetTypes);
         this.primaryOutput = primaryOutput == null ? ItemStack.EMPTY : primaryOutput.copy();
         if (!this.primaryOutput.isEmpty()) this.primaryOutput.setCount(1);
@@ -235,6 +280,9 @@ public final class PatternP2PUnitManagerPart extends PartCable
         synchronizeFromInput(true);
         taskRevision++;
         taskActive = true;
+        dispatchPortSlots.clear();
+        dispatchSlotPorts.clear();
+        dispatchPortTypes.clear();
         saveChanges();
         wake();
         wakeBoundPorts();
@@ -242,34 +290,181 @@ public final class PatternP2PUnitManagerPart extends PartCable
     }
 
     private PatternP2PUnitPortPart findInputPort(ItemStack stack, cn.ae2bc.core.unit.UnitPortType targetType,
-            boolean simulate) {
-        for (PatternP2PUnitPortPart port
-                : PatternP2PTopologyGridService.findPorts(getGridNode(), unitId)) {
-            if (port.getPortType() == targetType
-                    && port.insertTaskInput(this, stack, simulate) >= stack.getCount()) return port;
+            int slot, java.util.Map<PatternP2PUnitPortPart, Integer> owners, boolean simulate) {
+        java.util.List<PatternP2PUnitPortPart> ports = new ArrayList<>(PatternP2PTopologyGridService.findPorts(getGridNode(), unitId));
+        ports.removeIf(port -> port.getPortType() != targetType);
+        ports.removeIf(port -> !port.matchesInput(this, stack, formForPortType(targetType)));
+        EnumFacing persistedSide = persistedSlotPortSides.get(slot);
+        if (persistedSide != null) {
+            for (PatternP2PUnitPortPart port : ports) {
+                if (port.getSide().getFacing() == persistedSide) {
+                    dispatchSlotPorts.put(slot, port);
+                    break;
+                }
+            }
+        }
+        ports.removeIf(port -> owners != null && !canUsePortForSlot(slot, port, owners, dispatchSlotPorts));
+        ports.sort((left, right) -> Integer.compare(right.getTransferPriority(), left.getTransferPriority()));
+        for (PatternP2PUnitPortPart port : ports) {
+            int amount = port.insertTaskInput(this, stack, formForPortType(targetType), simulate);
+            if (amount > 0) return port;
         }
         return null;
     }
 
+    private static cn.ae2bc.pattern.MaterialOutputForm formForPortType(
+            cn.ae2bc.core.unit.UnitPortType type) {
+        return cn.ae2bc.pattern.MaterialOutputForm.fromId(
+                type == cn.ae2bc.core.unit.UnitPortType.DROP ? 1
+                        : type == cn.ae2bc.core.unit.UnitPortType.PLACE ? 2 : 0);
+    }
+
+    private List<PatternP2PUnitPortPart> candidatePorts(
+            List<PatternP2PUnitPortPart> ports, ItemStack stack,
+            cn.ae2bc.pattern.MaterialOutputForm form) {
+        List<PatternP2PUnitPortPart> result = new ArrayList<>();
+        for (PatternP2PUnitPortPart port : ports) {
+            if (port.matchesInput(this, stack, form)) result.add(port);
+        }
+        result.sort((left, right) -> Integer.compare(right.getTransferPriority(), left.getTransferPriority()));
+        return result;
+    }
+
+    private boolean canAcceptInputsAggregate(List<ItemStack> inputs,
+            List<cn.ae2bc.core.unit.UnitPortType> targetTypes,
+            List<Integer> patternSlots) {
+        java.util.Map<cn.ae2bc.core.unit.UnitPortType, List<PatternP2PUnitPortPart>> portsByType =
+                new java.util.EnumMap<>(cn.ae2bc.core.unit.UnitPortType.class);
+        for (PatternP2PUnitPortPart port : PatternP2PTopologyGridService.findPorts(getGridNode(), unitId)) {
+            portsByType.computeIfAbsent(port.getPortType(), ignored -> new ArrayList<>()).add(port);
+        }
+        for (cn.ae2bc.core.unit.UnitPortType type : cn.ae2bc.core.unit.UnitPortType.values()) {
+            java.util.List<Integer> indexes = new ArrayList<>();
+            for (int i = 0; i < inputs.size(); i++) if (targetTypes.get(i) == type) indexes.add(i);
+            if (indexes.isEmpty()) continue;
+            List<PatternP2PUnitPortPart> ports = portsByType.get(type);
+            if (ports == null || ports.isEmpty()) return false;
+            java.util.Map<PatternP2PUnitPortPart, Integer> remaining = new java.util.IdentityHashMap<>();
+            java.util.Map<PatternP2PUnitPortPart, Integer> assignedSlots = new java.util.IdentityHashMap<>();
+            java.util.Map<Integer, PatternP2PUnitPortPart> assignedSlotPorts = new java.util.HashMap<>();
+            java.util.Map<PatternP2PUnitPortPart, net.minecraft.item.Item> assignedTypes = new java.util.IdentityHashMap<>();
+            cn.ae2bc.core.unit.TransferPortOutputMode outputMode = getEffectiveSettings().getTransferPortOutputMode();
+            for (PatternP2PUnitPortPart port : ports) {
+                remaining.put(port, type == cn.ae2bc.core.unit.UnitPortType.TRANSFER && outputMode
+                        == cn.ae2bc.core.unit.TransferPortOutputMode.SINGLE_ITEM ? 1 : Integer.MAX_VALUE);
+            }
+            for (Integer index : indexes) {
+                ItemStack stack = inputs.get(index).copy();
+                int slot = patternSlots.get(index);
+                int left = stack.getCount();
+                for (PatternP2PUnitPortPart port : candidatePorts(ports, stack, formForPortType(type))) {
+                    if (left <= 0) break;
+                    if (!canUsePortForSlot(slot, port, assignedSlots, assignedSlotPorts)) continue;
+                    if (outputMode == cn.ae2bc.core.unit.TransferPortOutputMode.SAME_TYPE
+                            && assignedTypes.containsKey(port)
+                            && assignedTypes.get(port) != stack.getItem()) continue;
+                    int simulated = port.insertTaskInput(this, stack, formForPortType(type), true);
+                    int capacity = remaining.get(port);
+                    if (type == cn.ae2bc.core.unit.UnitPortType.TRANSFER
+                            && capacity == Integer.MAX_VALUE) {
+                        capacity = port.estimateTransferCapacity(stack, simulated);
+                        remaining.put(port, capacity);
+                    }
+                    if (type == cn.ae2bc.core.unit.UnitPortType.TRANSFER
+                            && outputMode == cn.ae2bc.core.unit.TransferPortOutputMode.SINGLE_ITEM) {
+                        capacity = Math.min(capacity, 1);
+                    }
+                    int accepted = Math.min(left, Math.min(simulated, capacity));
+                    left -= accepted;
+                    if (capacity != Integer.MAX_VALUE) remaining.put(port, capacity - accepted);
+                    if (accepted > 0) {
+                        assignedSlots.putIfAbsent(port, slot);
+                        if (port.getEffectiveSingleSlot()) {
+                            assignedSlotPorts.putIfAbsent(slot, port);
+                            persistedSlotPortSides.putIfAbsent(slot, port.getSide().getFacing());
+                            // A single-slot port may not split one pattern slot across ports.
+                            break;
+                        }
+                    }
+                    if (outputMode == cn.ae2bc.core.unit.TransferPortOutputMode.SAME_TYPE
+                            && accepted > 0) assignedTypes.put(port, stack.getItem());
+                }
+                boolean singleSlot = false;
+                for (PatternP2PUnitPortPart port : ports) {
+                    if (port.getEffectiveSingleSlot()) { singleSlot = true; break; }
+                }
+                if (left > 0 && !singleSlot) return false;
+                if (left > 0 && !assignedSlotPorts.containsKey(slot)) return false;
+            }
+        }
+        return true;
+    }
+
     private boolean dispatchPending() {
         boolean changed = false;
-        for (ListIterator<ItemStack> iterator = pendingInputs.listIterator(); iterator.hasNext();) {
-            int index = iterator.nextIndex();
-            ItemStack stack = iterator.next();
+        for (int index = 0; index < pendingInputs.size();) {
+            ItemStack stack = pendingInputs.get(index);
             cn.ae2bc.core.unit.UnitPortType targetType = pendingInputTypes.get(index);
-            PatternP2PUnitPortPart port = findInputPort(stack, targetType, true);
-            if (port == null) continue;
-            int moved = port.insertTaskInput(this, stack, false);
-            if (moved >= stack.getCount()) {
-                iterator.remove();
-                pendingInputTypes.remove(index);
-                changed = true;
+            int slot = pendingInputSlots.get(index);
+            cn.ae2bc.pattern.MaterialOutputForm form = formForPortType(targetType);
+            int remaining = stack.getCount();
+            boolean insertedAny = false;
+            List<PatternP2PUnitPortPart> ports = new ArrayList<>(
+                    PatternP2PTopologyGridService.findPorts(getGridNode(), unitId));
+            ports.removeIf(port -> port.getPortType() != targetType);
+            ports = candidatePorts(ports, stack, form);
+            for (PatternP2PUnitPortPart port : ports) {
+                if (remaining <= 0 || !canUsePortForSlot(slot, port,
+                        dispatchPortSlots, dispatchSlotPorts)) continue;
+                if (getEffectiveSettings().getTransferPortOutputMode()
+                        == cn.ae2bc.core.unit.TransferPortOutputMode.SAME_TYPE
+                        && dispatchPortTypes.containsKey(port)
+                        && dispatchPortTypes.get(port) != stack.getItem()) continue;
+                ItemStack portion = stack.copy();
+                portion.setCount(remaining);
+                int moved = port.insertTaskInput(this, portion, form, false);
+                if (moved <= 0) continue;
+                moved = Math.min(moved, remaining);
+                remaining -= moved;
+                insertedAny = true;
+                dispatchPortSlots.putIfAbsent(port, slot);
+                if (port.getEffectiveSingleSlot()) {
+                    dispatchSlotPorts.putIfAbsent(slot, port);
+                    if (port.getSide() != null) persistedSlotPortSides.putIfAbsent(slot, port.getSide().getFacing());
+                    // Keep the complete material on this port when single-slot is enabled.
+                    break;
+                }
+                if (getEffectiveSettings().getTransferPortOutputMode()
+                        == cn.ae2bc.core.unit.TransferPortOutputMode.SAME_TYPE) {
+                    dispatchPortTypes.put(port, stack.getItem());
+                }
             }
-            else if (moved > 0) { stack.shrink(moved); changed = true; }
+            if (remaining <= 0) {
+                pendingInputs.remove(index);
+                pendingInputTypes.remove(index);
+                pendingInputSlots.remove(index);
+                changed = true;
+            } else {
+                if (insertedAny) {
+                    stack.setCount(remaining);
+                    changed = true;
+                }
+                index++;
+            }
         }
         if (finishTaskIfComplete()) changed = true;
         if (changed) { saveChanges(); getHost().markForUpdate(); }
         return changed;
+    }
+
+    private boolean canUsePortForSlot(int slot, PatternP2PUnitPortPart port,
+            java.util.Map<PatternP2PUnitPortPart, Integer> owners,
+            java.util.Map<Integer, PatternP2PUnitPortPart> slotOwners) {
+        if (slot < 0 || owners == null) return true;
+        Integer owner = owners.get(port);
+        if (port.getEffectiveSingleSlot() && owner != null && owner.intValue() != slot) return false;
+        PatternP2PUnitPortPart slotOwner = slotOwners.get(slot);
+        return slotOwner == null || slotOwner == port || !slotOwner.getEffectiveSingleSlot();
     }
 
     public ItemStack returnProduct(ItemStack stack, boolean simulate) {
@@ -303,7 +498,13 @@ public final class PatternP2PUnitManagerPart extends PartCable
     }
 
     public void synchronizeFromInput() {
-        synchronizeFromInput(false);
+        if (synchronizingFromInput) return;
+        synchronizingFromInput = true;
+        try {
+            synchronizeFromInput(false);
+        } finally {
+            synchronizingFromInput = false;
+        }
     }
 
     private void synchronizeFromInput(boolean forceRefresh) {
@@ -319,6 +520,10 @@ public final class PatternP2PUnitManagerPart extends PartCable
         primaryOutput = ItemStack.EMPTY;
         remainingPrimary = 0;
         declaredOutputs.clear();
+        pendingInputSlots.clear();
+        dispatchPortSlots.clear();
+        dispatchSlotPorts.clear();
+        dispatchPortTypes.clear();
         invalidateBoundPortRuntimeState();
         return true;
     }
@@ -336,7 +541,8 @@ public final class PatternP2PUnitManagerPart extends PartCable
                 && left.getRedstoneMode() == right.getRedstoneMode()
                 && left.getRedstoneStrength() == right.getRedstoneStrength()
                 && left.getPulseWidthTicks() == right.getPulseWidthTicks()
-                && left.getPulsePeriodTicks() == right.getPulsePeriodTicks();
+                && left.getPulsePeriodTicks() == right.getPulsePeriodTicks()
+                && left.getOutputSlotSharingMode() == right.getOutputSlotSharingMode();
     }
 
     private static boolean containsSameItem(List<ItemStack> stacks, ItemStack candidate) {
@@ -502,7 +708,7 @@ public final class PatternP2PUnitManagerPart extends PartCable
 
     @Override public boolean onPartActivate(EntityPlayer player, EnumHand hand, Vec3d hit) {
         if (handleMemoryCard(player, hand, false)) return true;
-        if (hand == EnumHand.MAIN_HAND && player.getHeldItem(hand).isEmpty()) {
+        if (hand == EnumHand.MAIN_HAND) {
             if (!player.world.isRemote) {
                 player.openGui(Ae2bcMod.INSTANCE, Ae2bcMod.GUI_UNIT_MANAGER,
                         player.world, getTile().getPos().getX(), getTile().getPos().getY(), getTile().getPos().getZ());
@@ -563,12 +769,17 @@ public final class PatternP2PUnitManagerPart extends PartCable
         taskActive = data.getBoolean("PatternP2PUnitTaskActive");
         pendingInputs.clear();
         pendingInputTypes.clear();
+        pendingInputSlots.clear();
         net.minecraft.nbt.NBTTagList pending = data.getTagList("PatternP2PUnitPendingInputs", 10);
         for (int i = 0; i < pending.tagCount(); i++) {
             NBTTagCompound entry = pending.getCompoundTagAt(i);
             ItemStack stack = new ItemStack(entry);
             if (!stack.isEmpty()) {
                 pendingInputs.add(stack);
+                // New tasks persist their encoded slot. Legacy tasks are migrated by
+                // preserving the old pending-list order as the best available identity.
+                pendingInputSlots.add(entry.hasKey("PatternSlot")
+                        ? entry.getInteger("PatternSlot") : i);
                 try { pendingInputTypes.add(cn.ae2bc.core.unit.UnitPortType.fromId(
                         entry.getString("PatternP2PUnitPortType"))); }
                 catch (IllegalArgumentException ignored) {
@@ -606,6 +817,15 @@ public final class PatternP2PUnitManagerPart extends PartCable
         pulseWidthTicks = data.hasKey("PatternP2PUnitPulseWidth")
                 ? Math.max(1, Math.min(pulsePeriodTicks, data.getInteger("PatternP2PUnitPulseWidth"))) : 2;
         taskRevision = data.getLong("PatternP2PUnitTaskRevision");
+        persistedSlotPortSides.clear();
+        net.minecraft.nbt.NBTTagList bindings = data.getTagList("PatternP2PUnitSlotPortBindings", 10);
+        for (int i = 0; i < bindings.tagCount(); i++) {
+            NBTTagCompound entry = bindings.getCompoundTagAt(i);
+            if (entry.hasKey("Slot") && entry.hasKey("Side")) {
+                persistedSlotPortSides.put(entry.getInteger("Slot"),
+                        EnumFacing.values()[entry.getInteger("Side") % EnumFacing.values().length]);
+            }
+        }
         syncMainConfiguration = !data.hasKey("PatternP2PUnitSyncMain")
                 || data.getBoolean("PatternP2PUnitSyncMain");
         PatternP2PUnitSettings localSettings = getLocalSettings();
@@ -625,6 +845,7 @@ public final class PatternP2PUnitManagerPart extends PartCable
         for (int i = 0; i < pendingInputs.size(); i++) {
             NBTTagCompound entry = pendingInputs.get(i).writeToNBT(new NBTTagCompound());
             entry.setString("PatternP2PUnitPortType", pendingInputTypes.get(i).getId());
+            entry.setInteger("PatternSlot", pendingInputSlots.get(i));
             pending.appendTag(entry);
         }
         data.setTag("PatternP2PUnitPendingInputs", pending);
@@ -647,6 +868,14 @@ public final class PatternP2PUnitManagerPart extends PartCable
         data.setInteger("PatternP2PUnitPulseWidth", pulseWidthTicks);
         data.setInteger("PatternP2PUnitPulsePeriod", pulsePeriodTicks);
         data.setLong("PatternP2PUnitTaskRevision", taskRevision);
+        net.minecraft.nbt.NBTTagList bindings = new net.minecraft.nbt.NBTTagList();
+        for (java.util.Map.Entry<Integer, EnumFacing> entry : persistedSlotPortSides.entrySet()) {
+            NBTTagCompound value = new NBTTagCompound();
+            value.setInteger("Slot", entry.getKey());
+            value.setInteger("Side", entry.getValue().getIndex());
+            bindings.appendTag(value);
+        }
+        data.setTag("PatternP2PUnitSlotPortBindings", bindings);
         data.setBoolean("PatternP2PUnitSyncMain", syncMainConfiguration);
         data.setTag(MAIN_CONFIGURATION, writeSettings(mainConfiguration));
         data.setLong(MAIN_CONFIGURATION_REVISION, mainConfigurationRevision);
@@ -668,6 +897,8 @@ public final class PatternP2PUnitManagerPart extends PartCable
         data.writeByte(settings.getRedstoneStrength());
         data.writeInt(settings.getPulseWidthTicks());
         data.writeInt(settings.getPulsePeriodTicks());
+        data.writeByte(settings.getTransferPortOutputMode().getId());
+        data.writeByte(settings.getOutputSlotSharingMode().getId());
         data.writeBoolean(syncMainConfiguration);
     }
 
@@ -684,7 +915,9 @@ public final class PatternP2PUnitManagerPart extends PartCable
                 cn.ae2bc.logic.ReturnMode.fromId(data.readUnsignedByte()), data.readBoolean(),
                 data.readInt(), data.readInt(),
                 cn.ae2bc.logic.RedstoneOutputMode.fromId(data.readUnsignedByte()),
-                data.readUnsignedByte(), data.readInt(), data.readInt()));
+                data.readUnsignedByte(), data.readInt(), data.readInt(),
+                cn.ae2bc.core.unit.TransferPortOutputMode.fromId(data.readUnsignedByte()),
+                OutputSlotSharingMode.fromId(data.readUnsignedByte())));
         boolean oldSync = syncMainConfiguration;
         syncMainConfiguration = data.readBoolean();
         PatternP2PUnitSettings nextSettings = getSettings();
@@ -698,7 +931,8 @@ public final class PatternP2PUnitManagerPart extends PartCable
                 || oldSettings.getRedstoneMode() != nextSettings.getRedstoneMode()
                 || oldSettings.getRedstoneStrength() != nextSettings.getRedstoneStrength()
                 || oldSettings.getPulseWidthTicks() != nextSettings.getPulseWidthTicks()
-                || oldSettings.getPulsePeriodTicks() != nextSettings.getPulsePeriodTicks();
+                || oldSettings.getPulsePeriodTicks() != nextSettings.getPulsePeriodTicks()
+                || oldSettings.getOutputSlotSharingMode() != nextSettings.getOutputSlotSharingMode();
     }
 
     private void setSettingsFromStream(PatternP2PUnitSettings settings) {
@@ -716,6 +950,8 @@ public final class PatternP2PUnitManagerPart extends PartCable
         data.setInteger("RedstoneStrength", settings.getRedstoneStrength());
         data.setInteger("PulseWidth", settings.getPulseWidthTicks());
         data.setInteger("PulsePeriod", settings.getPulsePeriodTicks());
+        data.setInteger("TransferPortOutputMode", settings.getTransferPortOutputMode().getId());
+        data.setInteger("OutputSlotSharingMode", settings.getOutputSlotSharingMode().getId());
         return data;
     }
 
@@ -739,7 +975,13 @@ public final class PatternP2PUnitManagerPart extends PartCable
                 data.hasKey("PulseWidth") ? data.getInteger("PulseWidth")
                         : fallback.getPulseWidthTicks(),
                 data.hasKey("PulsePeriod") ? data.getInteger("PulsePeriod")
-                        : fallback.getPulsePeriodTicks());
+                        : fallback.getPulsePeriodTicks(),
+                data.hasKey("TransferPortOutputMode")
+                        ? cn.ae2bc.core.unit.TransferPortOutputMode.fromId(data.getInteger("TransferPortOutputMode"))
+                        : fallback.getTransferPortOutputMode(),
+                data.hasKey("OutputSlotSharingMode")
+                        ? OutputSlotSharingMode.fromId(data.getInteger("OutputSlotSharingMode"))
+                        : fallback.getOutputSlotSharingMode());
     }
 
     @Override public void getDrops(List<ItemStack> drops, boolean wrenched) {

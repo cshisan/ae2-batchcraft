@@ -1,10 +1,11 @@
 package cn.ae2bc.placer;
 
+import cn.ae2bc.core.ProjectLimits;
 import net.minecraft.nbt.CompoundNBT;
 import net.minecraft.util.Direction;
 
 public final class ComponentPlacerSettings {
-    public static final int MAX_OFFSET = 16;
+    public static final int MAX_OFFSET = ProjectLimits.COMPONENT_PLACER_MAX_OFFSET;
     public static final ComponentPlacerSettings DEFAULT = new ComponentPlacerSettings(Direction.UP, 0, 1, 0);
 
     private final Direction direction;

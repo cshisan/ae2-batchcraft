@@ -1,5 +1,6 @@
 package cn.ae2bc.part;
 
+import cn.ae2bc.core.ProjectLimits;
 import appeng.api.config.Actionable;
 import appeng.api.config.PowerUnit;
 import appeng.api.networking.IGridNode;
@@ -34,7 +35,7 @@ import net.neoforged.neoforge.capabilities.BlockCapabilityCache;
 import net.neoforged.neoforge.energy.IEnergyStorage;
 
 public final class PatternP2PTunnelEnergyPart extends EnergyAcceptorPart {
-    public static final int PULL_INTERVAL = 5;
+    public static final int PULL_INTERVAL = ProjectLimits.ENERGY_TUNNEL_PULL_INTERVAL;
     private static final String PENDING_FE_TAG = "PendingFe";
     private static final P2PModels MODELS = new P2PModels(
             ResourceLocation.fromNamespaceAndPath(Ae2bcMod.MOD_ID, "part/p2p/pattern_p2p_tunnel_energy"));

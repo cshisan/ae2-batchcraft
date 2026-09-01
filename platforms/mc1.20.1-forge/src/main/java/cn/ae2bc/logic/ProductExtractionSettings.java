@@ -18,7 +18,7 @@ public record ProductExtractionSettings(boolean enabled, int interval, int amoun
     public static final int MAX_INTERVAL = ProductExtractionLimits.MAX_INTERVAL;
     public static final int MIN_AMOUNT = ProductExtractionLimits.MIN_AMOUNT;
     public static final int MAX_AMOUNT = ProductExtractionLimits.MAX_AMOUNT;
-    public static final int MARKER_SLOT_COUNT = 18;
+    public static final int MARKER_SLOT_COUNT = ProductExtractionLimits.MARKER_SLOT_COUNT;
 
     public ProductExtractionSettings {
         interval = clampInterval(interval);

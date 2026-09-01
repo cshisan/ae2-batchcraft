@@ -19,6 +19,7 @@
     }
   },
   "widgets": {
+    "close": {"left": 176, "top": -5, "width": 20, "height": 20},
     "passive": {
       "left": 12,
       "top": 35,

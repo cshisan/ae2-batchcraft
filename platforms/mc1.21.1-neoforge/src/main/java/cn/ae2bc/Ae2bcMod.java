@@ -1,5 +1,6 @@
 package cn.ae2bc;
 
+import cn.ae2bc.core.ModConstants;
 import appeng.api.AECapabilities;
 import appeng.api.parts.RegisterPartCapabilitiesEvent;
 import appeng.api.features.GridLinkables;
@@ -30,7 +31,7 @@ import org.slf4j.Logger;
 
 @Mod(Ae2bcMod.MOD_ID)
 public final class Ae2bcMod {
-    public static final String MOD_ID = "ae2_batchcraft";
+    public static final String MOD_ID = ModConstants.MOD_ID;
     public static final Logger LOGGER = LogUtils.getLogger();
 
     public Ae2bcMod(IEventBus modBus) {

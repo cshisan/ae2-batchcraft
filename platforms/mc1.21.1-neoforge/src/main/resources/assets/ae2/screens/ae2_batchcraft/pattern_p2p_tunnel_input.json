@@ -1,7 +1,7 @@
 {
   "$schema": "../schema.json",
   "includes": ["../common/common.json"],
-  "generatedBackground": {"width": 176, "height": 228},
+  "generatedBackground": {"width": 176, "height": 186},
   "text": {
     "dialog_title": {"text": {"translate": "item.ae2_batchcraft.pattern_p2p_tunnel_input"}, "position": {"left": 8, "top": 6}},
     "page_title": {"text": {"translate": "gui.ae2_batchcraft.pattern_p2p_unit.page.common"}, "scale": 1.2, "position": {"left": 8, "top": 23}},
@@ -22,7 +22,10 @@
     "redstoneSingle": {"left": 12, "top": 50, "width": 48, "height": 18},
     "redstonePeriodic": {"left": 64, "top": 50, "width": 48, "height": 18},
     "redstoneContinuous": {"left": 116, "top": 50, "width": 48, "height": 18},
-    "dispatchMode": {"left": 12, "top": 153, "width": 152, "height": 18},
-    "resetTask": {"left": 12, "top": 196, "width": 152, "height": 18}
+    "transferNormal": {"left": 12, "top": 50, "width": 48, "height": 18},
+    "transferSingleItem": {"left": 64, "top": 50, "width": 48, "height": 18},
+    "transferSameType": {"left": 116, "top": 50, "width": 48, "height": 18},
+    "singleSlotMode": {"left": 12, "top": 153, "width": 152, "height": 18},
+    "rightToolbar": {"right": 2, "top": 0}
   }
 }

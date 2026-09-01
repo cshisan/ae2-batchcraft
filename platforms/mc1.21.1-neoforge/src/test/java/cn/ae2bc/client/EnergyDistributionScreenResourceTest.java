@@ -27,8 +27,9 @@ class EnergyDistributionScreenResourceTest {
         assertTrue(unit.contains("\"returnStrict\": {\"left\": 12, \"top\": 50"));
         assertTrue(unit.contains("\"extraction_interval\""));
         assertTrue(unit.contains("\"extraction_amount\""));
-        assertTrue(unit.contains("\"energyDistributionMode\": {\"left\": 12, \"top\": 153"));
-        assertTrue(unit.contains("\"resetTask\": {\"left\": 12, \"top\": 195"));
+        assertTrue(unit.contains("\"energyDistributionMode\": {\"left\": 12, \"top\": 50"));
+        assertTrue(unit.contains("\"singleSlotMode\": {\"left\": 12, \"top\": 153"));
+        assertTrue(unit.contains("\"rightToolbar\": {\"right\": 2, \"top\": 0"));
     }
 
     @Test
@@ -41,11 +42,8 @@ class EnergyDistributionScreenResourceTest {
         assertTrue(input.contains("\"productExtraction\": {\"left\": 128, \"top\": 79"));
         assertTrue(input.contains("\"extraction_interval\""));
         assertTrue(input.contains("\"extraction_amount\""));
-        assertTrue(input.contains(
-                "\"dispatchMode\": {\"left\": 12, \"top\": 153, \"width\": 152"));
-        org.junit.jupiter.api.Assertions.assertFalse(input.contains("\"dispatchFull\""));
-        org.junit.jupiter.api.Assertions.assertFalse(input.contains("\"dispatchBatch\""));
-        assertTrue(input.contains("\"resetTask\": {\"left\": 12, \"top\": 196"));
+        assertTrue(input.contains("\"rightToolbar\": {\"right\": 2, \"top\": 0"));
+        assertTrue(input.contains("\"singleSlotMode\": {\"left\": 12, \"top\": 153"));
         String inputSource = resourceSource("src/main/java/cn/ae2bc/client/PatternP2PTunnelInputScreen.java");
         assertTrue(inputSource.contains(
                 "DashedSectionRenderer.trailingContentX(imageWidth, productExtractionWidth)"));
@@ -103,13 +101,15 @@ class EnergyDistributionScreenResourceTest {
         assertTrue(chinese.contains("传电方式"));
         assertTrue(chinese.contains("均分"));
         assertTrue(chinese.contains("轮询"));
-        assertTrue(chinese.contains("间隔：%s 刻"));
+        assertTrue(chinese.contains("每 %s tick"));
         assertTrue(chinese.contains("重置可能销毁未下发材料,请确保材料已完整输出"));
         assertTrue(chinese.contains("能量配置"));
         assertTrue(chinese.contains("任务重置"));
         assertTrue(chinese.contains("严格模式"));
+        assertTrue(chinese.contains("pattern_p2p_unit.single_slot.disabled\": \"全部关闭\""));
         assertTrue(english.contains("energy_distribution_mode.even"));
         assertTrue(english.contains("energy_distribution_mode.round_robin"));
+        assertTrue(english.contains("pattern_p2p_unit.single_slot.disabled\": \"All Disabled\""));
     }
 
     private static String resource(String name) throws Exception {

@@ -42,6 +42,8 @@ The input provides defaults for:
 - Extraction interval and amount for outputs and Unit Extraction Ports.
 - Unit break recovery and redstone behavior.
 
+These settings are synchronized dynamically while a task is active. The Unit Manager and its bound ports apply later changes without requiring a new task.
+
 Normal outputs and Unit Managers follow the relevant settings while synchronization is enabled. Their local settings become effective when synchronization is disabled.
 
 ## Reset Task State

@@ -56,6 +56,10 @@ With synchronization enabled, the Manager uses the input's return, extraction in
 
 Energy distribution mode is synchronized across the current AE grid. It affects the Manager's Energy Ports even while this Manager has no task.
 
+The Manager's output-side ports can be prioritized independently. Output filter markers and the AE2 Inverter Card are configured from an output port's priority screen. The Inverter Card reverses the marker filter in the same way as AE2 filter upgrades.
+
+Return, Collect, Break, Extract, and Place ports are input-side ports: they accept resources from the world or adjacent machine and are controlled by the active task's return and strict-mode rules. Strict mode applies to every return-type port and to normal Output returns, not only to one specific port.
+
 ## Reset
 
 Reset clears only this Unit's active state and pending materials.

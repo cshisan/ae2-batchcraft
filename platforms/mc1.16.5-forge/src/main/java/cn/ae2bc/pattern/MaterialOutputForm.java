@@ -1,13 +1,14 @@
 package cn.ae2bc.pattern;
 
+import cn.ae2bc.core.pattern.MaterialOutputFormIds;
 import net.minecraft.item.BlockItem;
 import net.minecraft.item.ItemStack;
 
 /** How a unit port should expose one processing-pattern input. */
 public enum MaterialOutputForm {
-    NORMAL(0, "normal"),
-    DROP(1, "drop"),
-    PLACE(2, "place");
+    NORMAL(MaterialOutputFormIds.NORMAL, MaterialOutputFormIds.serializedName(MaterialOutputFormIds.NORMAL)),
+    DROP(MaterialOutputFormIds.DROP, MaterialOutputFormIds.serializedName(MaterialOutputFormIds.DROP)),
+    PLACE(MaterialOutputFormIds.PLACE, MaterialOutputFormIds.serializedName(MaterialOutputFormIds.PLACE));
 
     private final int id;
     private final String serializedName;
@@ -26,9 +27,9 @@ public enum MaterialOutputForm {
     }
 
     public static MaterialOutputForm fromId(int id) {
-        switch (id) {
-            case 1: return DROP;
-            case 2: return PLACE;
+        switch (MaterialOutputFormIds.normalize(id)) {
+            case MaterialOutputFormIds.DROP: return DROP;
+            case MaterialOutputFormIds.PLACE: return PLACE;
             default: return NORMAL;
         }
     }

@@ -22,9 +22,7 @@ import java.util.Map;
 public final class ComponentPlacerScreen extends GuiContainer {
     private static final ResourceLocation INVENTORY_TEXTURE =
             new ResourceLocation("textures/gui/container/inventory.png");
-    private static final ResourceLocation UPGRADE_TEXTURE =
-            new ResourceLocation("appliedenergistics2", "textures/guis/bus.png");
-    private static final int UPGRADE_PANEL_HEIGHT = 68;
+    private static final int UPGRADE_PANEL_HEIGHT = 32;
     private final ComponentPlacerMenu menu;
     private final Map<EnumFacing, GuiButton> directionButtons = new EnumMap<EnumFacing, GuiButton>(EnumFacing.class);
     private final Map<Integer, String> tooltips = new HashMap<Integer, String>();
@@ -113,9 +111,7 @@ public final class ComponentPlacerScreen extends GuiContainer {
         for (int i = 0; i < 9; i++) drawSlot(8 + i * 18, 115);
         for (int row = 0; row < 3; row++) for (int column = 0; column < 9; column++) drawSlot(8 + column * 18, 146 + row * 18);
         for (int column = 0; column < 9; column++) drawSlot(8 + column * 18, 204);
-        mc.getTextureManager().bindTexture(UPGRADE_TEXTURE);
-        drawTexturedModalRect(guiLeft + 177, guiTop, 177, 0, 35, 61);
-        drawTexturedModalRect(guiLeft + 177, guiTop + 61, 177, 79, 35, 7);
+        Ae2GuiSkin.drawInterfaceUpgradePanel(guiLeft, guiTop, 177, 1);
         drawFrequency();
     }
     private void drawSlot(int x, int y) {

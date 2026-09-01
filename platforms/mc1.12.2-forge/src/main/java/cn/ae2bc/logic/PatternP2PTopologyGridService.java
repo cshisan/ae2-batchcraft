@@ -35,8 +35,9 @@ public final class PatternP2PTopologyGridService {
 
     public static PatternP2PUnitManagerPart find(IGridNode ownNode, UUID id, long ignoredTick) {
         if (ownNode == null || ownNode.getGrid() == null || id == null) return null;
-        PatternP2PUnitManagerPart manager = snapshot(ownNode.getGrid()).managers.get(id);
-        return manager != null && manager.isOperational() ? manager : null;
+        // Topology lookup answers identity only. Runtime availability is checked by
+        // the caller, matching the 1.21.1 service contract and allowing GUI sync while offline.
+        return snapshot(ownNode.getGrid()).managers.get(id);
     }
 
     public static List<PatternP2PUnitManagerPart> findByFrequency(
@@ -79,9 +80,7 @@ public final class PatternP2PTopologyGridService {
 
     public static PatternP2PTunnelPart findInput(IGridNode ownNode, short frequency) {
         if (ownNode == null || ownNode.getGrid() == null || frequency == 0) return null;
-        PatternP2PTunnelPart input = snapshot(ownNode.getGrid()).inputs.get(frequency);
-        return input != null && input.getGridNode() != null && input.getGridNode().isActive()
-                ? input : null;
+        return snapshot(ownNode.getGrid()).inputs.get(frequency);
     }
 
     public static int countByFrequency(IGridNode ownNode, short frequency, long ignoredTick) {

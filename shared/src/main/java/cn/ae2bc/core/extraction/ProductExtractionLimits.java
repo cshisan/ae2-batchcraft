@@ -10,6 +10,7 @@ public final class ProductExtractionLimits {
     public static final int MAX_INTERVAL = 2000;
     public static final int MIN_AMOUNT = 1;
     public static final int MAX_AMOUNT = Integer.MAX_VALUE;
+    public static final int MARKER_SLOT_COUNT = 18;
     public static final int MAX_TRANSFER_ENTRIES_PER_RUN = 256;
     public static final int MAX_TRANSFER_ROUNDS_PER_ENDPOINT_TICK = 64;
     public static final int MAX_TRANSFER_ROUNDS_PER_GRID_TICK = 256;
