@@ -43,6 +43,9 @@ final class BatchDispatchContext {
     private long remainingUnits;
     private long roundUnits;
     private final Map<String, Long> roundAllocations;
+    private transient IPatternDetails decodedPattern;
+    private transient boolean patternDecoded;
+    private transient PatternDispatchMetadata cachedMetadata;
 
     private BatchDispatchContext(AEItemKey patternDefinition, UUID sessionId, long configuredBatchCount,
                                  long taskUnits,
@@ -66,11 +69,17 @@ final class BatchDispatchContext {
 
     static BatchDispatchContext create(IPatternDetails taskPattern, KeyCounter[] taskInputs, Level level,
                                        UUID sessionId) {
-        var encodedPattern = PatternDispatchMetadata.decodeProcessingPattern(taskPattern, level);
+        return create(taskPattern, taskInputs, level, sessionId,
+                PatternDispatchMetadata.create(taskPattern, level));
+    }
+
+    static BatchDispatchContext create(IPatternDetails taskPattern, KeyCounter[] taskInputs, Level level,
+                                       UUID sessionId, PatternDispatchMetadata metadata) {
+        var encodedPattern = metadata.processingPattern();
         if (encodedPattern == null) {
             return null;
         }
-        long configuredBatchCount = PatternDispatchMetadata.getBatchCount(encodedPattern, level);
+        long configuredBatchCount = metadata.batchCount();
         if (configuredBatchCount <= 1 || taskInputs == null
                 || taskInputs.length != encodedPattern.getInputs().length) {
             return null;
@@ -101,7 +110,7 @@ final class BatchDispatchContext {
         if (atomicInputs == null) {
             return null;
         }
-        PatternDispatchMetadata atomicMetadata = PatternDispatchMetadata.create(encodedPattern, level).forAtomicUnits(1);
+        PatternDispatchMetadata atomicMetadata = metadata.forAtomicUnits(1);
         if (!atomicMetadata.isValid()) {
             return null;
         }
@@ -145,12 +154,19 @@ final class BatchDispatchContext {
     }
 
     IPatternDetails decodePattern(Level level) {
-        return appeng.api.crafting.PatternDetailsHelper.decodePattern(patternDefinition, level);
+        if (!patternDecoded) {
+            decodedPattern = appeng.api.crafting.PatternDetailsHelper.decodePattern(patternDefinition, level);
+            patternDecoded = true;
+        }
+        return decodedPattern;
     }
 
     PatternDispatchMetadata dispatchMetadata(Level level) {
-        IPatternDetails pattern = decodePattern(level);
-        return pattern == null ? null : PatternDispatchMetadata.create(pattern, level);
+        if (cachedMetadata == null) {
+            IPatternDetails pattern = decodePattern(level);
+            cachedMetadata = pattern == null ? null : PatternDispatchMetadata.create(pattern, level);
+        }
+        return cachedMetadata;
     }
 
     KeyCounter[] atomicInputs() {

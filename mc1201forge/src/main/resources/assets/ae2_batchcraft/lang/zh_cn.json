@@ -188,6 +188,6 @@
   "gui.ae2_batchcraft.pattern_p2p_unit.section.single_slot": "单端口单槽",
   "gui.ae2_batchcraft.pattern_p2p_unit.single_slot.tooltip": "设置输出端口是否只能对应一个样板材料槽位",
   "gui.ae2_batchcraft.pattern_p2p_unit.single_slot.all": "全部启用",
-  "gui.ae2_batchcraft.pattern_p2p_unit.single_slot.disabled": "关闭",
+  "gui.ae2_batchcraft.pattern_p2p_unit.single_slot.disabled": "全部关闭",
   "gui.ae2_batchcraft.pattern_p2p_unit.single_slot.follow_port": "跟随端口配置"
 }

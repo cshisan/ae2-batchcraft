@@ -22,6 +22,8 @@ sourceSets {
     }
 }
 
+evaluationDependsOn(':shared')
+
 repositories {
     exclusiveContent {
         forRepository {
@@ -66,6 +68,7 @@ neoForge {
     mods {
         "${mod_id}" {
             sourceSet sourceSets.main
+            sourceSet project(':shared').sourceSets.main
         }
     }
 }
@@ -80,8 +83,6 @@ dependencies {
     testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
     testRuntimeOnly 'org.slf4j:slf4j-api:2.0.9'
 }
-
-evaluationDependsOn(':shared')
 
 tasks.named('test', Test) {
     useJUnitPlatform()

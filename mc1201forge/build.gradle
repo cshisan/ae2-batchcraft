@@ -17,6 +17,8 @@ java {
     }
 }
 
+evaluationDependsOn(':shared')
+
 minecraft {
     mappings channel: 'official', version: minecraft_version
 
@@ -30,6 +32,7 @@ minecraft {
             mods {
                 "${mod_id}" {
                     source sourceSets.main
+                    source project(':shared').sourceSets.main
                 }
             }
         }
@@ -63,8 +66,6 @@ mixin {
     add sourceSets.main, "${mod_id}.refmap.json"
     config "${mod_id}.mixins.json"
 }
-
-evaluationDependsOn(':shared')
 
 tasks.named('test', Test) {
     useJUnitPlatform()

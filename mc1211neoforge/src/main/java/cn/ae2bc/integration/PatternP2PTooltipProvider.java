@@ -79,9 +79,8 @@ public final class PatternP2PTooltipProvider implements TooltipProvider {
             return 0;
         }
         short frequency = input.getFrequency();
-        return (int) grid.getMachines(PatternP2PUnitManagerPart.class).stream()
-                .filter(manager -> manager.getFrequency() == frequency)
-                .count();
+        return grid.getService(cn.ae2bc.logic.PatternP2PTopologyGridService.class)
+                .getManagers(frequency).size();
     }
 
     private static void provideManagerData(Player player, PatternP2PUnitManagerPart manager,

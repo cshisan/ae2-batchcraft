@@ -10,7 +10,7 @@ Minecraft 1.21.1 NeoForge | Minecraft 1.20.1 / 1.16.5 / 1.12.2 Forge | Applied E
 
 AE2 BatchCraft adds a **one-to-many processing-pattern P2P network** to Applied Energistics 2.
 
-A Pattern P2P input receives processing jobs from an AE2 Pattern Provider, or an ME Interface on older AE2 versions, and
+A Pattern P2P input receives processing jobs from an AE2 Pattern Provider on Minecraft `1.20.1` and `1.21.1`, or an ME Interface on `1.12.2` and `1.16.5`, and
 distributes them among multiple machine outputs or Pattern P2P Units. You can expand a production line by adding
 endpoints and machines without copying the same patterns or spending one AE channel per machine.
 
@@ -27,7 +27,7 @@ endpoints and machines without copying the same patterns or spending one AE chan
 | **AE Component Placer**         | Batch-places AE cables and cable-attached parts over a point, line, or plane up to `16 x 16`, using player or AE network materials.                                                     |
 | **Pattern Configuration**       | Configures ingredient input sides and Normal, Drop, or Place output forms. Minecraft `1.21.1` also provides batch distribution and per-pattern batch configuration.                     |
 
-Transfer Ports support **Normal**, **Single Item**, and **Single Type** delivery modes. Output ports can be assigned AE2 priorities and optional material markers; an AE2 Inverter Card reverses the marker filter. The adjacent machine remains the authority for its real inventory or tank capacity.
+Transfer Ports support **Normal**, **Single Item**, and **Single Type** delivery modes. Separately, the Manager-level **Single-port single-slot** policy controls whether one output port may serve multiple encoded pattern slots: it can enable the restriction for all ports, disable it for all ports, or follow each port's own setting. Output ports can be assigned AE2 priorities and optional material markers; an AE2 Inverter Card reverses the marker filter. The adjacent machine remains the authority for its real inventory or tank capacity.
 
 Collect Ports handle dropped items on every supported version. On Minecraft `1.20.1` and `1.21.1`, they can also collect
 source fluids; on `1.16.5` and `1.12.2`, they collect items only.
@@ -37,7 +37,7 @@ source fluids; on `1.16.5` and `1.12.2`, they collect items only.
 - **Parallel processing:** processing jobs are distributed among available machines instead of always using the first
   one.
 - **Fewer channels:** only the Pattern P2P input uses `1` channel; outputs, Unit Managers, and Unit Ports use none.
-- **Centralized patterns:** keep processing patterns in one AE2 Pattern Provider instead of copying them to every
+- **Centralized patterns:** keep processing patterns in one AE2 Pattern Provider, or one ME Interface on `1.12.2` and `1.16.5`, instead of copying them to every
   machine.
 - **Flexible automation:** Unit Ports can route materials, interact with the world, return products, emit redstone, and
   supply FE.
@@ -49,7 +49,7 @@ source fluids; on `1.16.5` and `1.12.2`, they collect items only.
 
 ### Build a Parallel Machine Group
 
-1. Put processing patterns in an AE2 **Pattern Provider**, or an **ME Interface** on older AE2 versions, on the main
+1. Put processing patterns in an AE2 **Pattern Provider** on `1.20.1` and `1.21.1`, or an **ME Interface** on `1.12.2` and `1.16.5`, on the main
    network.
 2. Build a powered AE subnet and install a **Pattern P2P Tunnel (Input)** with its front face against that block's
    output face.
@@ -58,7 +58,7 @@ source fluids; on `1.16.5` and `1.12.2`, they collect items only.
 5. Right-click every output with the same Memory Card to assign that frequency.
 6. Request a processing craft. The input selects the next available endpoint and sends the job to it.
 
-Output-type Unit Ports can be opened empty-handed to configure their AE2 priority, material markers, and optional Inverter Card. Return-type ports (Return, Collect, Break, Extract, and Place) follow the active task's return and strict-mode rules.
+Output-type Unit Ports (Transfer, Drop, and Place) can be opened empty-handed to configure their AE2 priority, material markers, and optional Inverter Card. Return-type ports (Return, Collect, Break, and Extraction) follow the active task's return and strict-mode rules.
 
 The input and all endpoints must be on the same AE subnet, powered, and loaded. Frequency `0000` means unconfigured.
 Offline, unloaded, busy, or blocked endpoints are skipped.
@@ -113,7 +113,7 @@ reset behavior; the `1.21.1` guide also covers batch distribution.
 | Minecraft | Loader               | Applied Energistics 2 | Java      | In-game Guide |
 |-----------|----------------------|-----------------------|-----------|---------------|
 | `1.21.1`  | NeoForge `21.1.238`  | `19.2.17`             | `21`      | Yes           |
-| `1.20.1`  | Forge `47.4.10`      | `15.4.0`              | `17`      | Yes           |
+| `1.20.1`  | Forge `47.4.10`      | `15.4.10`             | `17`      | Yes           |
 | `1.16.5`  | Forge `36.2.42`      | `8.4.7`               | `8`       | No            |
 | `1.12.2`  | Forge `14.23.5.2847` | `rv6-stable-7`        | `8`       | No            |
 

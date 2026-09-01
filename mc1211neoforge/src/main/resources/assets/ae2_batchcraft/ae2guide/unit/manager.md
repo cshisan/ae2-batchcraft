@@ -58,7 +58,9 @@ Energy distribution mode is synchronized across the current AE grid. It affects 
 
 The Manager's output-side ports can be prioritized independently. Output filter markers and the AE2 Inverter Card are configured from an output port's priority screen. The Inverter Card reverses the marker filter in the same way as AE2 filter upgrades.
 
-Return, Collect, Break, Extract, and Place ports are input-side ports: they accept resources from the world or adjacent machine and are controlled by the active task's return and strict-mode rules. Strict mode applies to every return-type port and to normal Output returns, not only to one specific port.
+The Manager-level **Single-port single-slot** setting is separate from the Transfer Port output mode. **All Enabled** reserves each output port for one encoded pattern slot, **All Disabled** allows slot sharing, and **Follow Port Configuration** uses each output port's own toggle. A port's toggle is editable only in the follow-port mode.
+
+Transfer, Drop, and Place are output-side ports: they send encoded ingredients from the AE network to a machine or the world. Return, Collect, Break, and Extraction are input-side ports: they accept products from a machine or the world and are controlled by the active task's return and strict-mode rules. Strict mode also applies to normal Output returns.
 
 ## Reset
 

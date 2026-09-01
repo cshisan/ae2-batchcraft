@@ -1,6 +1,6 @@
 package cn.ae2bc.core.unit;
 
-/** Controls whether one task-input port may serve more than one encoded pattern slot. */
+/** Controls whether output ports may serve more than one encoded pattern material slot. */
 public enum OutputSlotSharingMode {
     ALL(0, "all"),
     DISABLED(1, "disabled"),

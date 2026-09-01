@@ -237,7 +237,7 @@ public final class PatternP2PTunnelOutputLogic implements ProductExtractionTask 
             return false;
         }
         List<RoutedInput> selected = metadata.hasExplicitDirections()
-                ? reconstructProcessingInputs(PatternDispatchMetadata.decodeProcessingPattern(pattern, level), inputs, metadata.outputDirections(),
+                ? reconstructProcessingInputs(metadata.processingPattern(), inputs, metadata.outputDirections(),
                         divisor, atomicUnits)
                 : null;
         if (selected == null && metadata.hasExplicitDirections()) {
@@ -339,7 +339,7 @@ public final class PatternP2PTunnelOutputLogic implements ProductExtractionTask 
         Direction automaticFace = outputSide.getOpposite();
         TargetCache targets = getTargetCache(level, output.getBlockEntity().getBlockPos().relative(outputSide));
         List<RoutedInput> selected = scaledMetadata.hasExplicitDirections()
-                ? reconstructProcessingInputs(PatternDispatchMetadata.decodeProcessingPattern(pattern, level), scaledInputs,
+                ? reconstructProcessingInputs(scaledMetadata.processingPattern(), scaledInputs,
                         scaledMetadata.outputDirections(), scaledMetadata.batchCount(), units)
                 : collectCounterInputs(scaledInputs);
         if (selected == null || selected.isEmpty()) {

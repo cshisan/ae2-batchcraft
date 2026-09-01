@@ -17,22 +17,24 @@ import net.minecraft.world.level.Level;
 
 public final class PatternDispatchMetadata {
     private static final PatternDispatchMetadata INVALID = new PatternDispatchMetadata(
-            Map.of(), null, MaterialOutputConfigData.EMPTY, false, PatternBatchCount.DEFAULT);
+            Map.of(), null, MaterialOutputConfigData.EMPTY, false, PatternBatchCount.DEFAULT, null);
 
     private final Map<AEKey, Long> declaredOutputs;
     private final GenericStack primaryOutput;
     private final MaterialOutputConfigData materialOutputConfig;
     private final boolean explicitDirections;
     private final long batchCount;
+    private final AEProcessingPattern processingPattern;
 
     private PatternDispatchMetadata(Map<AEKey, Long> declaredOutputs, GenericStack primaryOutput,
                                     MaterialOutputConfigData materialOutputConfig, boolean explicitDirections,
-                                    long batchCount) {
+                                    long batchCount, AEProcessingPattern processingPattern) {
         this.declaredOutputs = declaredOutputs;
         this.primaryOutput = primaryOutput;
         this.materialOutputConfig = materialOutputConfig;
         this.explicitDirections = explicitDirections;
         this.batchCount = batchCount;
+        this.processingPattern = processingPattern;
     }
 
     static PatternDispatchMetadata create(IPatternDetails pattern) {
@@ -54,12 +56,12 @@ public final class PatternDispatchMetadata {
                 return INVALID;
             }
 
-            MaterialOutputConfigData config = getMaterialOutputConfig(pattern);
-            long batchCount = getBatchCount(pattern, level);
             AEProcessingPattern processingPattern = decodeProcessingPattern(pattern, level);
+            MaterialOutputConfigData config = getMaterialOutputConfig(pattern);
+            long batchCount = getBatchCount(pattern, processingPattern);
             return new PatternDispatchMetadata(
                     Collections.unmodifiableMap(outputs), primary, config,
-                    hasExplicitDirections(processingPattern, config.directions()), batchCount);
+                    hasExplicitDirections(processingPattern, config.directions()), batchCount, processingPattern);
         } catch (ArithmeticException exception) {
             Ae2bcMod.LOGGER.warn("Pattern output amounts overflow while preparing dispatch metadata", exception);
             return INVALID;
@@ -68,6 +70,10 @@ public final class PatternDispatchMetadata {
 
     static long getBatchCount(IPatternDetails pattern, Level level) {
         AEProcessingPattern processingPattern = decodeProcessingPattern(pattern, level);
+        return getBatchCount(pattern, processingPattern);
+    }
+
+    private static long getBatchCount(IPatternDetails pattern, AEProcessingPattern processingPattern) {
         if (processingPattern == null) {
             return PatternBatchCount.DEFAULT;
         }
@@ -164,9 +170,13 @@ public final class PatternDispatchMetadata {
             var primary = new GenericStack(primaryOutput.what(),
                     Math.multiplyExact(primaryOutput.amount() / batchCount, units));
             return new PatternDispatchMetadata(Collections.unmodifiableMap(scaled), primary,
-                    materialOutputConfig, explicitDirections, batchCount);
+                    materialOutputConfig, explicitDirections, batchCount, processingPattern);
         } catch (ArithmeticException exception) {
             return INVALID;
         }
+    }
+
+    AEProcessingPattern processingPattern() {
+        return processingPattern;
     }
 }

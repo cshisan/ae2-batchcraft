@@ -265,7 +265,7 @@ public final class PatternP2PUnitManagerLogic implements IGridTickable {
     private @Nullable List<PendingMaterial> collectInputs(IPatternDetails pattern, PatternDispatchMetadata metadata,
                                                            KeyCounter[] inputHolders,
                                                            long divisor, long units) {
-        AEProcessingPattern processingPattern = PatternDispatchMetadata.decodeProcessingPattern(pattern, manager.getLevel());
+        AEProcessingPattern processingPattern = metadata.processingPattern();
         if (processingPattern != null) {
             List<ProcessingInputMapper.SlotInput> mapped = ProcessingInputMapper.map(
                     processingPattern, inputHolders, manager.getLevel(), divisor, units);

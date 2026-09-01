@@ -188,6 +188,6 @@
   ,"gui.ae2_batchcraft.pattern_p2p_unit.section.single_slot":"Single-port single-slot"
   ,"gui.ae2_batchcraft.pattern_p2p_unit.single_slot.tooltip":"Controls whether an output port may serve only one encoded pattern material slot"
   ,"gui.ae2_batchcraft.pattern_p2p_unit.single_slot.all":"All Enabled"
-  ,"gui.ae2_batchcraft.pattern_p2p_unit.single_slot.disabled":"Disabled"
+  ,"gui.ae2_batchcraft.pattern_p2p_unit.single_slot.disabled":"All Disabled"
   ,"gui.ae2_batchcraft.pattern_p2p_unit.single_slot.follow_port":"Follow Port Configuration"
 }

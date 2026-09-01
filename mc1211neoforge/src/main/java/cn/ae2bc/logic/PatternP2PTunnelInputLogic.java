@@ -52,6 +52,7 @@ public final class PatternP2PTunnelInputLogic {
     private final IManagedGridNode mainNode;
     private final PatternP2PTunnelPart input;
     private final IActionSource actionSource;
+    private final PatternMetadataCache patternMetadataCache = new PatternMetadataCache();
     private final MEStorage batchStorage = new BatchStorage();
     private List<PatternP2PTunnelPart> outputSnapshot = List.of();
     private boolean outputSnapshotDirty = true;
@@ -260,20 +261,22 @@ public final class PatternP2PTunnelInputLogic {
 
         List<PatternTaskEndpoint> outputs = getTaskEndpoints();
         int size = outputs.size();
-        var metadata = PatternDispatchMetadata.create(pattern, input.getLevel());
+        var metadata = patternMetadataCache.get(pattern, input.getLevel());
         if (!metadata.isValid()) {
             return false;
         }
         if (dispatchMode == PatternDispatchMode.BATCH_DISTRIBUTION && metadata.batchCount() > 1) {
             UUID sessionId = batchSeries == null ? UUID.randomUUID() : batchSeries.sessionId();
-            BatchDispatchContext context = BatchDispatchContext.create(pattern, inputs, input.getLevel(), sessionId);
+            BatchDispatchContext context = BatchDispatchContext.create(
+                    pattern, inputs, input.getLevel(), sessionId, metadata);
             if (context != null) {
                 if (batchSeries != null && !batchSeries.matches(context)) {
                     if (hasActiveBatchSession(batchSeries.sessionId())) {
                         return false;
                     }
                     batchProviderNode = null;
-                    context = BatchDispatchContext.create(pattern, inputs, input.getLevel(), UUID.randomUUID());
+                    context = BatchDispatchContext.create(
+                            pattern, inputs, input.getLevel(), UUID.randomUUID(), metadata);
                     if (context == null) {
                         return false;
                     }
