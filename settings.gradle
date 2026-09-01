@@ -1,0 +1,52 @@
+pluginManagement {
+    repositories {
+        gradlePluginPortal()
+        mavenCentral()
+        maven { url = 'https://maven.minecraftforge.net' }
+        maven { url = 'https://maven.neoforged.net/releases' }
+        maven { url = 'https://maven.parchmentmc.org' }
+        maven { url = 'https://repo.spongepowered.org/repository/maven-public/' }
+        maven {
+            name = 'GTNH Maven'
+            url = 'https://nexus.gtnewhorizons.com/repository/public/'
+            content {
+                includeGroup 'com.gtnewhorizons'
+                includeGroupByRegex 'com\\.gtnewhorizons\\..+'
+            }
+        }
+    }
+}
+
+plugins {
+    id 'org.gradle.toolchains.foojay-resolver-convention' version '1.0.0'
+}
+
+rootProject.name = 'ae2-batchcraft'
+
+include 'shared'
+include 'mc1122forge'
+include 'mc1165forge'
+include 'mc1201forge'
+include 'mc1211neoforge'
+
+def commonPropertyNames = ['mod_id', 'mod_name', 'mod_group_id']
+
+gradle.beforeProject { project ->
+    if (project == gradle.rootProject) {
+        return
+    }
+
+    def propertiesFile = new File(project.projectDir, 'gradle.properties')
+    if (!propertiesFile.isFile()) {
+        return
+    }
+
+    def properties = new Properties()
+    propertiesFile.withReader('UTF-8') { properties.load(it) }
+    commonPropertyNames.each { key ->
+        if (properties.containsKey(key)) {
+            throw new GradleException("${key} must be defined only in ${new File(settingsDir, 'gradle.properties')}")
+        }
+    }
+    properties.each { key, value -> project.ext.set(key as String, value) }
+}

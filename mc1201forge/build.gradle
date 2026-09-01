@@ -1,6 +1,4 @@
 plugins {
-    id 'eclipse'
-    id 'idea'
     id 'maven-publish'
     id 'net.minecraftforge.gradle' version '[6.0,6.2)'
     id 'org.spongepowered.mixin' version '0.7.+'
@@ -13,12 +11,16 @@ base {
     archivesName = "ae2-batchcraft-${minecraft_version}"
 }
 
-java.toolchain.languageVersion = JavaLanguageVersion.of(17)
+java {
+    toolchain {
+        languageVersion = JavaLanguageVersion.of(java_version as int)
+    }
+}
 
 minecraft {
     mappings channel: 'official', version: minecraft_version
 
-    copyIdeResources = true
+    copyIdeResources = false
 
     runs {
         configureEach {
@@ -26,19 +28,26 @@ minecraft {
             property 'forge.logging.markers', 'REGISTRIES'
             property 'forge.logging.console.level', 'info'
             mods {
-                "${mod_id}" { source sourceSets.main }
+                "${mod_id}" {
+                    source sourceSets.main
+                }
             }
         }
         client { }
-        server { args '--nogui' }
+        server {
+            args '--nogui'
+        }
     }
 }
 
 repositories {
-    maven { url = 'https://api.modrinth.com/maven' }
+    maven {
+        url = 'https://api.modrinth.com/maven'
+    }
 }
 
 dependencies {
+    implementation project(':shared')
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
     implementation fg.deobf("maven.modrinth:ae2:${ae2_version}")
     implementation fg.deobf("maven.modrinth:guideme:${guideme_version}")
@@ -55,26 +64,24 @@ mixin {
     config "${mod_id}.mixins.json"
 }
 
-sourceSets.main.java.srcDir file('../../shared/src/main/java')
-sourceSets.test.java.srcDir file('../../shared/src/test/java')
+evaluationDependsOn(':shared')
 
-tasks.named('test', Test) { useJUnitPlatform() }
-
-tasks.withType(JavaCompile).configureEach {
-    options.encoding = 'UTF-8'
+tasks.named('test', Test) {
+    useJUnitPlatform()
 }
 
-jar {
-    archiveVersion = "${mod_version}-forge"
+tasks.named('jar', Jar) {
+    from(project(':shared').sourceSets.main.output)
+    archiveVersion.set("${mod_version}-forge")
     manifest {
         attributes([
                 'Specification-Title': mod_name,
                 'Specification-Vendor': 'AE2BC',
                 'Specification-Version': '1',
                 'Implementation-Title': project.name,
-                'Implementation-Version': project.jar.archiveVersion,
+                'Implementation-Version': project.version,
                 'Implementation-Vendor': 'AE2BC',
-                'MixinConfigs': 'ae2_batchcraft.mixins.json'
+                'MixinConfigs': "${mod_id}.mixins.json"
         ])
     }
 }

@@ -1,0 +1,28 @@
+plugins {
+    id 'base'
+    id 'java-base'
+}
+
+allprojects {
+    apply from: rootProject.file('gradle/utf8.gradle')
+}
+
+def buildModulePaths = [
+        ':shared',
+        ':mc1122forge',
+        ':mc1165forge',
+        ':mc1201forge',
+        ':mc1211neoforge'
+]
+
+tasks.register('buildAll') {
+    group = 'build'
+    description = 'Builds shared code and every supported platform.'
+    dependsOn buildModulePaths.collect { "${it}:build" }
+}
+
+tasks.register('cleanAll') {
+    group = 'build setup'
+    description = 'Cleans the root project and every subproject.'
+    dependsOn 'clean', buildModulePaths.collect { "${it}:clean" }
+}
