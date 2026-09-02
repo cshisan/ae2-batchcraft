@@ -33,6 +33,19 @@ class PatternP2PUnitScreenResourceTest {
     }
 
     @Test
+    void inputScreenExposesTheTaskAllocationToolbarButton() throws Exception {
+        String input = readText(INPUT_SCREEN);
+        assertTrue(input.contains("\"taskAllocationModeToolbar\": {\"left\": 176, \"top\": 41"));
+    }
+
+    @Test
+    void taskAllocationToolbarDoesNotUseFocusedSelectionBackground() throws Exception {
+        String source = java.nio.file.Files.readString(java.nio.file.Path.of(
+                "src/main/java/cn/ae2bc/client/ScaledTabButton.java"));
+        assertTrue(source.contains("background = Icon.HORIZONTAL_TAB;"));
+    }
+
+    @Test
     void inputCommonPageContainsExtractionControlsWithoutFilterSlots() throws Exception {
         String screen = readText(INPUT_SCREEN);
         String source = java.nio.file.Files.readString(java.nio.file.Path.of(

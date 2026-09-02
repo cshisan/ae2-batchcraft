@@ -7,6 +7,7 @@ import cn.ae2bc.logic.PatternP2PUnitConfiguration;
 import cn.ae2bc.logic.RedstoneOutputMode;
 import cn.ae2bc.logic.ReturnMode;
 import cn.ae2bc.logic.PatternDispatchMode;
+import cn.ae2bc.core.dispatch.TaskAllocationMode;
 import cn.ae2bc.core.unit.TransferPortOutputMode;
 import cn.ae2bc.core.unit.OutputSlotSharingMode;
 import cn.ae2bc.menu.PatternP2PTunnelInputMenu;
@@ -28,6 +29,7 @@ public final class PatternP2PTunnelInputScreen extends PatternP2PUnitPagedScreen
             new EnumMap<>(TransferPortOutputMode.class);
     private final IconButton resetTaskToolbar;
     private final IconButton dispatchModeToolbar;
+    private final IconButton taskAllocationModeToolbar;
     private final AE2Button singleSlotMode;
     private final VerticallyAlignedCheckbox productExtraction;
     private ValidatedIntegerField strengthInput;
@@ -78,6 +80,12 @@ public final class PatternP2PTunnelInputScreen extends PatternP2PUnitPagedScreen
                         : PatternDispatchMode.FULL_DISPATCH));
         dispatchModeToolbar.setMessage(Component.translatable("gui.ae2_batchcraft.dispatch_mode"));
         addToRightToolbar("dispatchModeToolbar", dispatchModeToolbar);
+        taskAllocationModeToolbar = new RightToolbarIconButton(appeng.client.gui.Icon.S_PROCESSOR,
+                0.6f, 0, 0,
+                ignored -> menu.setTaskAllocationMode(menu.taskAllocationMode.next()));
+        taskAllocationModeToolbar.setMessage(Component.translatable(
+                "gui.ae2_batchcraft.task_allocation_mode"));
+        addToRightToolbar("taskAllocationModeToolbar", taskAllocationModeToolbar);
         resetTaskToolbar = new RightToolbarIconButton(appeng.client.gui.Icon.SCHEDULING_DEFAULT, 0.9f, 0, 0,
                 ignored ->
                 TaskResetConfirmation.open(this, Component.translatable(
@@ -147,6 +155,7 @@ public final class PatternP2PTunnelInputScreen extends PatternP2PUnitPagedScreen
         unblockedButton.visible = common;
         resetTaskToolbar.visible = true;
         dispatchModeToolbar.visible = true;
+        taskAllocationModeToolbar.visible = true;
         singleSlotMode.visible = common;
         productExtraction.visible = common;
         breakRecovery.visible = breakPort;
@@ -200,6 +209,13 @@ public final class PatternP2PTunnelInputScreen extends PatternP2PUnitPagedScreen
         dispatchModeToolbar.setMessage(Component.translatable(
                 "gui.ae2_batchcraft.dispatch_mode.switch.tooltip",
                 dispatchModeName(menu.dispatchMode), dispatchModeName(nextMode)));
+        TaskAllocationMode nextAllocationMode = menu.taskAllocationMode.next();
+        taskAllocationModeToolbar.setMessage(Component.translatable(
+                "gui.ae2_batchcraft.task_allocation_mode.switch.tooltip",
+                taskAllocationModeName(menu.taskAllocationMode),
+                Component.translatable("gui.ae2_batchcraft.task_allocation_mode."
+                        + menu.taskAllocationMode.name().toLowerCase(java.util.Locale.ROOT) + ".tooltip"),
+                taskAllocationModeName(nextAllocationMode)));
         singleSlotMode.setMessage(Component.translatable(
                 "gui.ae2_batchcraft.pattern_p2p_unit.single_slot." +
                         menu.outputSlotSharingMode.getSerializedName()));
@@ -275,6 +291,11 @@ public final class PatternP2PTunnelInputScreen extends PatternP2PUnitPagedScreen
         return Component.translatable("gui.ae2_batchcraft.dispatch_mode."
                 + (mode == PatternDispatchMode.BATCH_DISTRIBUTION
                 ? "batch_distribution" : "full_dispatch"));
+    }
+
+    private static Component taskAllocationModeName(TaskAllocationMode mode) {
+        return Component.translatable("gui.ae2_batchcraft.task_allocation_mode."
+                + mode.name().toLowerCase(java.util.Locale.ROOT));
     }
 
     private static String camel(String value) {

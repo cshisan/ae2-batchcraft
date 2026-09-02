@@ -8,6 +8,7 @@ import cn.ae2bc.core.extraction.ProductExtractionLimits;
 import cn.ae2bc.core.unit.OutputSlotSharingMode;
 import cn.ae2bc.core.unit.PatternP2PUnitSettings;
 import cn.ae2bc.core.unit.TransferPortOutputMode;
+import cn.ae2bc.core.dispatch.TaskAllocationMode;
 import cn.ae2bc.logic.RedstoneOutputMode;
 import cn.ae2bc.logic.ReturnMode;
 import appeng.client.gui.widgets.GuiNumberBox;
@@ -19,6 +20,7 @@ import net.minecraft.util.text.TextComponentTranslation;
 import org.lwjgl.input.Keyboard;
 
 import java.util.Collections;
+import java.util.Arrays;
 
 /** 1.12.2 input/output configuration screen ported from the 1.21 layouts. */
 public final class PatternP2PTunnelScreen extends GuiContainer {
@@ -34,6 +36,7 @@ public final class PatternP2PTunnelScreen extends GuiContainer {
     private boolean syncInputSettings;
     private OutputSlotSharingMode slotSharingMode;
     private TransferPortOutputMode transferPortOutputMode;
+    private TaskAllocationMode taskAllocationMode;
     private ReturnMode returnMode;
     private boolean breakRecovery;
     private RedstoneOutputMode redstoneMode;
@@ -61,6 +64,8 @@ public final class PatternP2PTunnelScreen extends GuiContainer {
         PatternP2PUnitSettings settings = part == null ? PatternP2PUnitSettings.DEFAULT : part.getUnitSettings();
         slotSharingMode = settings.getOutputSlotSharingMode();
         transferPortOutputMode = settings.getTransferPortOutputMode();
+        taskAllocationMode = part == null ? TaskAllocationMode.ROUND_ROBIN
+                : part.getTaskAllocationMode();
         returnMode = settings.getReturnMode();
         breakRecovery = settings.isBreakRecovery();
         extractionInterval = settings.getExtractionInterval();
@@ -84,6 +89,8 @@ public final class PatternP2PTunnelScreen extends GuiContainer {
         buttonList.add(new Ae2Button(1, guiLeft + 152, guiTop - 5, 20, 20, "X"));
         if (!output) {
             buttonList.add(new Ae2IconButton(6, guiLeft + xSize + 2, guiTop + 17, Ae2IconButton.ICON_128));
+            buttonList.add(new Ae2IconButton(7, guiLeft + xSize + 2, guiTop + 39,
+                    Ae2IconButton.FUZZY_PERCENT_99));
         }
         if (output) initOutput(); else initInput();
     }
@@ -215,6 +222,10 @@ public final class PatternP2PTunnelScreen extends GuiContainer {
                     output ? "gui.ae2_batchcraft.reset_task.confirm.output"
                             : "gui.ae2_batchcraft.reset_task.confirm.input",
                     () -> sendCurrentSettings(true));
+        }
+        else if (button.id == 7) {
+            taskAllocationMode = taskAllocationMode.next();
+            ModNetwork.sendTaskAllocationMode(menu, taskAllocationMode);
         }
         else if (button.id == 15) {
             slotSharingMode = slotSharingMode.next();
@@ -385,6 +396,16 @@ public final class PatternP2PTunnelScreen extends GuiContainer {
             String key = null;
             if (button.id == 6 || button.id == 43) {
                 key = "gui.ae2_batchcraft.reset_task.tooltip";
+            } else if (button.id == 7) {
+                TaskAllocationMode nextMode = taskAllocationMode.next();
+                String tooltip = tr("gui.ae2_batchcraft.task_allocation_mode.switch.tooltip",
+                        allocationModeName(taskAllocationMode),
+                        tr("gui.ae2_batchcraft.task_allocation_mode."
+                                + taskAllocationMode.name().toLowerCase(java.util.Locale.ROOT) + ".tooltip"),
+                        allocationModeName(nextMode));
+                tooltip = tooltip.replace("\\n", "\n");
+                drawHoveringText(Arrays.asList(tooltip.split("\\n", -1)), mouseX, mouseY);
+                return;
             } else if (button.id == 15) {
                 key = "gui.ae2_batchcraft.pattern_p2p_unit.single_slot.tooltip";
             } else if (button.id >= 25 && button.id <= 27) {
@@ -412,5 +433,12 @@ public final class PatternP2PTunnelScreen extends GuiContainer {
     private static int parse(String value, int fallback) { try { return Integer.parseInt(value); } catch (NumberFormatException ignored) { return fallback; } }
     private static String check(String key, boolean value) { return (value ? "[x] " : "[ ] ") + tr(key); }
     private static String tr(String key) { return new TextComponentTranslation(key).getUnformattedText(); }
+    private static String tr(String key, Object... args) {
+        return new TextComponentTranslation(key, args).getUnformattedText();
+    }
+    private static String allocationModeName(TaskAllocationMode mode) {
+        return tr("gui.ae2_batchcraft.task_allocation_mode."
+                + mode.name().toLowerCase(java.util.Locale.ROOT));
+    }
 
 }

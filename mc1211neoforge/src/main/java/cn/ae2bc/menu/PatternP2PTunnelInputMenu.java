@@ -9,6 +9,7 @@ import cn.ae2bc.logic.RedstoneOutputMode;
 import cn.ae2bc.logic.PatternP2PUnitConfiguration;
 import cn.ae2bc.logic.ProductExtractionSettings;
 import cn.ae2bc.logic.PatternDispatchMode;
+import cn.ae2bc.core.dispatch.TaskAllocationMode;
 import cn.ae2bc.core.unit.TransferPortOutputMode;
 import cn.ae2bc.core.unit.OutputSlotSharingMode;
 import cn.ae2bc.part.PatternP2PTunnelPart;
@@ -30,6 +31,7 @@ public final class PatternP2PTunnelInputMenu extends AEBaseMenu {
     private static final String SET_DISPATCH_MODE = "setDispatchMode";
     private static final String SET_TRANSFER_PORT_OUTPUT_MODE = "setTransferPortOutputMode";
     private static final String SET_OUTPUT_SLOT_SHARING_MODE = "setOutputSlotSharingMode";
+    private static final String SET_TASK_ALLOCATION_MODE = "setTaskAllocationMode";
 
     public static final MenuType<PatternP2PTunnelInputMenu> TYPE = MenuTypeBuilder
             .create(PatternP2PTunnelInputMenu::new, PatternP2PTunnelPart.class)
@@ -52,6 +54,7 @@ public final class PatternP2PTunnelInputMenu extends AEBaseMenu {
     @GuiSync(9) public PatternDispatchMode dispatchMode = PatternDispatchMode.FULL_DISPATCH;
     @GuiSync(10) public TransferPortOutputMode transferPortOutputMode = TransferPortOutputMode.NORMAL;
     @GuiSync(11) public OutputSlotSharingMode outputSlotSharingMode = OutputSlotSharingMode.DISABLED;
+    @GuiSync(12) public TaskAllocationMode taskAllocationMode = TaskAllocationMode.ROUND_ROBIN;
 
     public PatternP2PTunnelInputMenu(int id, Inventory playerInventory, PatternP2PTunnelPart host) {
         super(TYPE, id, playerInventory, host);
@@ -79,6 +82,8 @@ public final class PatternP2PTunnelInputMenu extends AEBaseMenu {
                 value -> updateConfiguration(configuration().withTransferPortOutputMode(value)));
         registerClientAction(SET_OUTPUT_SLOT_SHARING_MODE, OutputSlotSharingMode.class,
                 value -> updateConfiguration(configuration().withOutputSlotSharingMode(value)));
+        registerClientAction(SET_TASK_ALLOCATION_MODE, TaskAllocationMode.class,
+                this::handleSetTaskAllocationMode);
     }
 
     @Override
@@ -92,6 +97,7 @@ public final class PatternP2PTunnelInputMenu extends AEBaseMenu {
             productExtractionInterval = extraction.interval();
             productExtractionAmount = extraction.amount();
             dispatchMode = logic.getDispatchMode();
+            taskAllocationMode = logic.getTaskAllocationMode();
         }
         super.broadcastChanges();
     }
@@ -157,6 +163,13 @@ public final class PatternP2PTunnelInputMenu extends AEBaseMenu {
         }
     }
 
+    public void setTaskAllocationMode(TaskAllocationMode mode) {
+        if (mode != null) {
+            taskAllocationMode = mode;
+            sendClientAction(SET_TASK_ALLOCATION_MODE, mode);
+        }
+    }
+
     private void handleSetReturnMode(ReturnMode mode) {
         if (isServerSide() && !host.isOutput() && mode != null) {
             host.getInputLogic().setReturnMode(mode);
@@ -172,6 +185,12 @@ public final class PatternP2PTunnelInputMenu extends AEBaseMenu {
     private void handleSetDispatchMode(PatternDispatchMode mode) {
         if (isServerSide() && !host.isOutput() && mode != null) {
             host.getInputLogic().setDispatchMode(mode);
+        }
+    }
+
+    private void handleSetTaskAllocationMode(TaskAllocationMode mode) {
+        if (isServerSide() && !host.isOutput() && mode != null) {
+            host.getInputLogic().setTaskAllocationMode(mode);
         }
     }
 

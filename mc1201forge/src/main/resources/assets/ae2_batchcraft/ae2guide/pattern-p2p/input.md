@@ -20,6 +20,7 @@ Receives complete processing jobs from the Pattern Provider in front of it and d
 | Frequency | Required; `0000` is disabled |
 | Adjacent block | Pattern Provider output face |
 | Job splitting | Between complete jobs only |
+| Task allocation | Round Robin, Random, or Priority |
 
 <GameScene zoom="6" background="transparent">
   <ImportStructure src="../assets/assemblies/input-provider.snbt" />
@@ -28,13 +29,16 @@ Receives complete processing jobs from the Pattern Provider in front of it and d
 
 ## Task Distribution
 
-For each job, the input walks the available endpoints in round-robin order. It skips endpoints that are offline, unloaded, busy, not on the same grid, or unable to accept the complete material plan. A selected endpoint receives the full quantities of that processing push.
+The task allocation button in the right toolbar controls endpoint selection. **Round Robin** rotates through the stable endpoint order. **Random** independently selects one currently available endpoint for each allocation and may select the same endpoint repeatedly. **Priority** starts from the first endpoint on every allocation and only continues to later endpoints when an earlier one cannot accept the task.
+
+Offline, unloaded, busy, or incompatible endpoints are unavailable. A selected endpoint receives the full quantities of that processing push.
 
 ## General Configuration
 
 The input provides defaults for:
 
 - Product return mode.
+- Round Robin, Random, or Priority task allocation.
 - Whether normal outputs may actively extract products.
 - Extraction interval and amount for outputs and Unit Extraction Ports.
 - Unit break recovery and redstone behavior.

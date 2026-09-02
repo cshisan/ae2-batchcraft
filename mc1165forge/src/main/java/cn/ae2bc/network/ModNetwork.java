@@ -16,6 +16,7 @@ import java.util.function.Supplier;
 import cn.ae2bc.core.extraction.ProductExtractionLimits;
 import cn.ae2bc.core.unit.PatternP2PUnitSettings;
 import cn.ae2bc.core.unit.OutputSlotSharingMode;
+import cn.ae2bc.core.dispatch.TaskAllocationMode;
 import cn.ae2bc.logic.EnergyDistributionMode;
 import cn.ae2bc.Ae2bcMod;
 import net.minecraft.entity.player.ServerPlayerEntity;
@@ -70,6 +71,9 @@ public final class ModNetwork {
         CHANNEL.registerMessage(7, InputOutputSlotSharingModePacket.class,
                 InputOutputSlotSharingModePacket::encode, InputOutputSlotSharingModePacket::decode,
                 InputOutputSlotSharingModePacket::handle);
+        CHANNEL.registerMessage(8, TaskAllocationModePacket.class,
+                TaskAllocationModePacket::encode, TaskAllocationModePacket::decode,
+                TaskAllocationModePacket::handle);
     }
 
     public static void sendUnitPortPriority(UnitPortOutputConfigMenu menu, int priority) {
@@ -188,6 +192,56 @@ public final class ModNetwork {
             OutputSlotSharingMode mode) {
         CHANNEL.sendToServer(new InputOutputSlotSharingModePacket(menu.containerId, menu.getPos(),
                 menu.getSide(), mode));
+    }
+
+    public static void sendTaskAllocationMode(PatternP2PTunnelMenu menu, TaskAllocationMode mode) {
+        CHANNEL.sendToServer(new TaskAllocationModePacket(menu.containerId, menu.getPos(),
+                menu.getSide(), mode));
+    }
+
+    private static final class TaskAllocationModePacket {
+        private final int windowId;
+        private final BlockPos pos;
+        private final Direction side;
+        private final TaskAllocationMode mode;
+
+        private TaskAllocationModePacket(int windowId, BlockPos pos, Direction side,
+                TaskAllocationMode mode) {
+            this.windowId = windowId;
+            this.pos = pos;
+            this.side = side;
+            this.mode = mode == null ? TaskAllocationMode.ROUND_ROBIN : mode;
+        }
+
+        private static void encode(TaskAllocationModePacket packet, PacketBuffer buffer) {
+            buffer.writeInt(packet.windowId);
+            buffer.writeBlockPos(packet.pos);
+            buffer.writeByte(packet.side.ordinal());
+            buffer.writeByte(packet.mode.getId());
+        }
+
+        private static TaskAllocationModePacket decode(PacketBuffer buffer) {
+            return new TaskAllocationModePacket(buffer.readInt(), buffer.readBlockPos(),
+                    Direction.values()[buffer.readUnsignedByte() % Direction.values().length],
+                    TaskAllocationMode.fromId(buffer.readUnsignedByte()));
+        }
+
+        private static void handle(TaskAllocationModePacket packet,
+                Supplier<NetworkEvent.Context> contextSupplier) {
+            NetworkEvent.Context context = contextSupplier.get();
+            ServerPlayerEntity sender = context.getSender();
+            context.enqueueWork(() -> {
+                if (sender == null || !(sender.containerMenu instanceof PatternP2PTunnelMenu)
+                        || sender.containerMenu.containerId != packet.windowId
+                        || !((PatternP2PTunnelMenu) sender.containerMenu).getPos().equals(packet.pos)
+                        || ((PatternP2PTunnelMenu) sender.containerMenu).getSide() != packet.side
+                        || sender.distanceToSqr(packet.pos.getX() + 0.5, packet.pos.getY() + 0.5,
+                        packet.pos.getZ() + 0.5) > 64.0) return;
+                PatternP2PTunnelPart part = PatternP2PTunnelMenu.findPart(sender, packet.pos, packet.side);
+                if (part != null && !part.isOutput()) part.setTaskAllocationMode(packet.mode);
+            });
+            context.setPacketHandled(true);
+        }
     }
 
     private static final class InputOutputSlotSharingModePacket {

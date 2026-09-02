@@ -8,6 +8,7 @@ import cn.ae2bc.core.extraction.ProductExtractionLimits;
 import cn.ae2bc.core.unit.PatternP2PUnitSettings;
 import cn.ae2bc.core.unit.TransferPortOutputMode;
 import cn.ae2bc.core.unit.OutputSlotSharingMode;
+import cn.ae2bc.core.dispatch.TaskAllocationMode;
 import cn.ae2bc.logic.RedstoneOutputMode;
 import cn.ae2bc.logic.ReturnMode;
 import com.mojang.blaze3d.matrix.MatrixStack;
@@ -36,6 +37,7 @@ public final class PatternP2PTunnelScreen extends ContainerScreen<PatternP2PTunn
     private boolean syncInputSettings;
     private TransferPortOutputMode transferPortOutputMode;
     private OutputSlotSharingMode outputSlotSharingMode;
+    private TaskAllocationMode taskAllocationMode;
     private ReturnMode returnMode;
     private boolean breakRecovery;
     private RedstoneOutputMode redstoneMode;
@@ -45,6 +47,7 @@ public final class PatternP2PTunnelScreen extends ContainerScreen<PatternP2PTunn
     private int pulseWidth;
     private int pulsePeriod;
     private Button resetTaskButton;
+    private Button taskAllocationModeButton;
     private TextFieldWidget intervalField;
     private TextFieldWidget amountField;
     private TextFieldWidget strengthField;
@@ -60,6 +63,7 @@ public final class PatternP2PTunnelScreen extends ContainerScreen<PatternP2PTunn
         syncInputSettings = menu.isSyncInputSettings();
         transferPortOutputMode = menu.getSettings().getTransferPortOutputMode();
         outputSlotSharingMode = menu.getSettings().getOutputSlotSharingMode();
+        taskAllocationMode = menu.getTaskAllocationMode();
         PatternP2PUnitSettings settings = menu.getSettings();
         returnMode = settings.getReturnMode();
         breakRecovery = settings.isBreakRecovery();
@@ -84,6 +88,12 @@ public final class PatternP2PTunnelScreen extends ContainerScreen<PatternP2PTunn
                             tr("gui.ae2_batchcraft.reset_task.confirm.input"),
                             () -> sendCurrentSettings(true))));
             resetTaskButton.setMessage(tr("gui.ae2_batchcraft.reset_task.tooltip"));
+            taskAllocationModeButton = addButton(new Ae2IconButton(
+                    leftPos + imageWidth + 2, topPos + 39, Icon.FUZZY_PERCENT_99.ordinal(),
+                    ignored -> {
+                        taskAllocationMode = taskAllocationMode.next();
+                        ModNetwork.sendTaskAllocationMode(menu, taskAllocationMode);
+                    }));
         }
         if (output) initOutput();
         else initInput();
@@ -258,6 +268,8 @@ public final class PatternP2PTunnelScreen extends ContainerScreen<PatternP2PTunn
         if (resetTaskButton != null && resetTaskButton.mouseClicked(mouseX, mouseY, button)) {
             return true;
         }
+        if (taskAllocationModeButton != null
+                && taskAllocationModeButton.mouseClicked(mouseX, mouseY, button)) return true;
         return super.mouseClicked(mouseX, mouseY, button);
     }
 
@@ -375,6 +387,25 @@ public final class PatternP2PTunnelScreen extends ContainerScreen<PatternP2PTunn
         if (resetTaskButton != null && resetTaskButton.isHovered()) {
             renderTooltip(matrices, tr("gui.ae2_batchcraft.reset_task.tooltip"), mouseX, mouseY);
         }
+        if (taskAllocationModeButton != null && taskAllocationModeButton.isHovered()) {
+            TaskAllocationMode nextMode = taskAllocationMode.next();
+            String tooltip = new TranslationTextComponent(
+                    "gui.ae2_batchcraft.task_allocation_mode.switch.tooltip",
+                    allocationModeName(taskAllocationMode),
+                    tr("gui.ae2_batchcraft.task_allocation_mode."
+                            + taskAllocationMode.name().toLowerCase(java.util.Locale.ROOT) + ".tooltip"),
+                    allocationModeName(nextMode)).getString().replace("\\n", "\n");
+            renderTooltip(matrices,
+                    java.util.Arrays.stream(tooltip.split("\\n", -1))
+                            .map(line -> new StringTextComponent(line).getVisualOrderText())
+                            .collect(java.util.stream.Collectors.toList()),
+                    mouseX, mouseY);
+        }
+    }
+
+    private static ITextComponent allocationModeName(TaskAllocationMode mode) {
+        return tr("gui.ae2_batchcraft.task_allocation_mode."
+                + mode.name().toLowerCase(java.util.Locale.ROOT));
     }
 
     private static int heightFor(Page page) {

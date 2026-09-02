@@ -8,6 +8,7 @@ import cn.ae2bc.logic.RedstoneOutputMode;
 import cn.ae2bc.logic.ReturnMode;
 import cn.ae2bc.core.unit.TransferPortOutputMode;
 import cn.ae2bc.core.unit.OutputSlotSharingMode;
+import cn.ae2bc.core.dispatch.TaskAllocationMode;
 import cn.ae2bc.menu.PatternP2PTunnelInputMenu;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Tooltip;
@@ -26,6 +27,7 @@ public final class PatternP2PTunnelInputScreen extends PatternP2PUnitPagedScreen
     private final Map<TransferPortOutputMode, Button> transferModeButtons =
             new EnumMap<>(TransferPortOutputMode.class);
     private final TabButton resetTaskToolbar;
+    private final TabButton taskAllocationModeToolbar;
     private final Button slotSharingMode;
     private final VerticallyAlignedCheckbox productExtraction;
     private ValidatedIntegerField strengthInput;
@@ -74,6 +76,10 @@ public final class PatternP2PTunnelInputScreen extends PatternP2PUnitPagedScreen
                 TaskResetConfirmation.open(this, Component.translatable(
                         "gui.ae2_batchcraft.reset_task.confirm.input"), menu::resetTaskState));
         addToRightToolbar("resetTaskToolbar", resetTaskToolbar);
+        taskAllocationModeToolbar = new ScaledTabButton(appeng.client.gui.Icon.FUZZY_PERCENT_99,
+                1.0f, Component.translatable("gui.ae2_batchcraft.task_allocation_mode"),
+                ignored -> menu.setTaskAllocationMode(menu.taskAllocationMode.next()));
+        addToRightToolbar("taskAllocationModeToolbar", taskAllocationModeToolbar);
         slotSharingMode = widgets.addButton("slotSharingMode", Component.empty(),
                 () -> menu.setOutputSlotSharingMode(menu.outputSlotSharingMode.next()));
         slotSharingMode.setTooltip(Tooltip.create(Component.translatable(
@@ -135,6 +141,7 @@ public final class PatternP2PTunnelInputScreen extends PatternP2PUnitPagedScreen
         strictButton.visible = common;
         unblockedButton.visible = common;
         resetTaskToolbar.visible = true;
+        taskAllocationModeToolbar.visible = true;
         slotSharingMode.visible = common;
         productExtraction.visible = common;
         breakRecovery.visible = breakPort;
@@ -178,6 +185,13 @@ public final class PatternP2PTunnelInputScreen extends PatternP2PUnitPagedScreen
         slotSharingMode.setMessage(Component.translatable(
                 "gui.ae2_batchcraft.pattern_p2p_unit.single_slot." +
                         menu.outputSlotSharingMode.getSerializedName()));
+        TaskAllocationMode nextMode = menu.taskAllocationMode.next();
+        taskAllocationModeToolbar.setMessage(Component.translatable(
+                "gui.ae2_batchcraft.task_allocation_mode.switch.tooltip",
+                taskAllocationModeName(menu.taskAllocationMode),
+                Component.translatable("gui.ae2_batchcraft.task_allocation_mode."
+                        + menu.taskAllocationMode.name().toLowerCase(java.util.Locale.ROOT) + ".tooltip"),
+                taskAllocationModeName(nextMode)));
         strengthInput.syncValue(menu.redstoneStrength);
         pulseTimeInput.syncValue(menu.pulseWidth);
         pulsePeriodInput.syncValue(menu.pulsePeriod);
@@ -246,6 +260,11 @@ public final class PatternP2PTunnelInputScreen extends PatternP2PUnitPagedScreen
                 "gui.ae2_batchcraft.pattern_p2p_unit.redstone_mode." + mode.getSerializedName()),
                 () -> menu.setRedstoneMode(mode));
         redstoneModeButtons.put(mode, button);
+    }
+
+    private static Component taskAllocationModeName(TaskAllocationMode mode) {
+        return Component.translatable("gui.ae2_batchcraft.task_allocation_mode."
+                + mode.name().toLowerCase(java.util.Locale.ROOT));
     }
 
     private static String camel(String value) {

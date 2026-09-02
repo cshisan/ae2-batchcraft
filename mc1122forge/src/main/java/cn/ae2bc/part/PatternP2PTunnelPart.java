@@ -12,6 +12,7 @@ import java.util.Comparator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 
 import javax.annotation.Nonnull;
 import io.netty.buffer.ByteBuf;
@@ -55,6 +56,7 @@ import cn.ae2bc.pattern.MaterialOutputForm;
 import cn.ae2bc.pattern.PatternInputSlotAllocator;
 import cn.ae2bc.core.unit.UnitPortType;
 import cn.ae2bc.core.unit.OutputSlotSharingMode;
+import cn.ae2bc.core.dispatch.TaskAllocationMode;
 import cn.ae2bc.core.unit.PatternP2PUnitSettings;
 import cn.ae2bc.core.unit.TransferPortOutputMode;
 import cn.ae2bc.logic.ReturnMode;
@@ -88,6 +90,7 @@ public final class PatternP2PTunnelPart extends PartP2PTunnel<PatternP2PTunnelPa
     private final ExtractionDeadlineGate returnRecoveryDeadline = new ExtractionDeadlineGate();
     private ItemStack blockedReturnProbe = ItemStack.EMPTY;
     private int roundRobinCursor;
+    private TaskAllocationMode taskAllocationMode = TaskAllocationMode.ROUND_ROBIN;
     private final ReturnBatchTracker<StackKey, StackKey> returnBatch =
             new ReturnBatchTracker<StackKey, StackKey>();
     public static final net.minecraft.util.ResourceLocation INPUT_MODEL_ID = new net.minecraft.util.ResourceLocation(
@@ -229,19 +232,38 @@ public final class PatternP2PTunnelPart extends PartP2PTunnel<PatternP2PTunnelPa
         int inputCount = countInputs(table);
         final int outputCount = outputs.size();
         final List<RoutedInput> selectedInputs = routedInputs;
-        int acceptedIndex = cn.ae2bc.core.dispatch.RoundRobinSelector.select(
-                roundRobinCursor, endpointCount, candidateIndex -> {
+        List<Integer> candidates = new ArrayList<Integer>();
+        if (taskAllocationMode == TaskAllocationMode.RANDOM) {
+            for (int index = 0; index < endpointCount; index++) {
+                if (index < outputs.size()) {
+                    PatternP2PTunnelPart candidate = outputs.get(index);
+                    if (candidate.isOutput() && candidate.isActive()
+                            && candidate.canAcceptOutputTask(details)) candidates.add(index);
+                } else if (managerDispatch != null
+                        && managers.get(index - outputs.size()).canAcceptTask()) {
+                    candidates.add(index);
+                }
+            }
+        }
+        final boolean randomMode = taskAllocationMode == TaskAllocationMode.RANDOM;
+        final int candidateCount = randomMode ? candidates.size() : endpointCount;
+        int selectedIndex = cn.ae2bc.core.dispatch.TaskEndpointSelector.select(
+                taskAllocationMode, roundRobinCursor, candidateCount,
+                ThreadLocalRandom.current()::nextInt, selectedCandidate -> {
+            int candidateIndex = randomMode ? candidates.get(selectedCandidate) : selectedCandidate;
             if (candidateIndex < outputCount) {
                 return tryAcceptOutput(outputs.get(candidateIndex), details, table, selectedInputs, directions);
             }
             return managerDispatch != null && tryAcceptManager(
                     managers.get(candidateIndex - outputCount), managerDispatch, table);
         });
-        if (acceptedIndex < 0) return false;
+        if (selectedIndex < 0) return false;
         int moved = inputCount - countInputs(table);
         if (moved <= 0) return false;
-        roundRobinCursor = cn.ae2bc.core.dispatch.RoundRobinPolicy.advance(
-                acceptedIndex, endpointCount);
+        if (taskAllocationMode == TaskAllocationMode.ROUND_ROBIN) {
+            roundRobinCursor = cn.ae2bc.core.dispatch.RoundRobinPolicy.advance(
+                    selectedIndex, endpointCount);
+        }
         saveChanges();
         queueTunnelDrain(PowerUnits.RF, moved);
         return true;
@@ -688,6 +710,9 @@ public final class PatternP2PTunnelPart extends PartP2PTunnel<PatternP2PTunnelPa
                 tag.getLong("Ae2bcExtractionRevision"));
         unitConfigurationRevision = tag.getLong("Ae2bcUnitConfigurationRevision");
         roundRobinCursor = tag.getInteger("Ae2bcRoundRobinCursor");
+        taskAllocationMode = tag.hasKey("Ae2bcTaskAllocationMode")
+                ? TaskAllocationMode.fromId(tag.getInteger("Ae2bcTaskAllocationMode"))
+                : TaskAllocationMode.ROUND_ROBIN;
         returnMode = tag.hasKey("Ae2bcReturnMode")
                 ? ReturnMode.fromId(tag.getInteger("Ae2bcReturnMode")) : ReturnMode.UNBLOCKED;
         breakRecovery = !tag.hasKey("Ae2bcBreakRecovery") || tag.getBoolean("Ae2bcBreakRecovery");
@@ -717,6 +742,7 @@ public final class PatternP2PTunnelPart extends PartP2PTunnel<PatternP2PTunnelPa
         tag.setLong("Ae2bcExtractionRevision", productExtractionSettings.getRevision());
         tag.setLong("Ae2bcUnitConfigurationRevision", unitConfigurationRevision);
         tag.setInteger("Ae2bcRoundRobinCursor", roundRobinCursor);
+        tag.setInteger("Ae2bcTaskAllocationMode", taskAllocationMode.getId());
         tag.setInteger("Ae2bcReturnMode", returnMode.getId());
         tag.setBoolean("Ae2bcBreakRecovery", breakRecovery);
         tag.setInteger("Ae2bcRedstoneMode", redstoneMode.getId());
@@ -744,6 +770,7 @@ public final class PatternP2PTunnelPart extends PartP2PTunnel<PatternP2PTunnelPa
         data.writeByte(settings.getTransferPortOutputMode().getId());
         data.writeByte(settings.getOutputSlotSharingMode().getId());
         data.writeBoolean(syncInputSettings);
+        data.writeByte(taskAllocationMode.getId());
     }
 
     @Override public boolean readFromStream(ByteBuf data) throws java.io.IOException {
@@ -751,6 +778,7 @@ public final class PatternP2PTunnelPart extends PartP2PTunnel<PatternP2PTunnelPa
         boolean oldEnabled = productExtractionSettings.isEnabled();
         PatternP2PUnitSettings old = getUnitSettings();
         boolean oldSync = syncInputSettings;
+        TaskAllocationMode oldTaskAllocationMode = taskAllocationMode;
         boolean extractionEnabled = data.readBoolean();
         applySettings(new PatternP2PUnitSettings(
                 ReturnMode.fromId(data.readUnsignedByte()), data.readBoolean(),
@@ -763,9 +791,11 @@ public final class PatternP2PTunnelPart extends PartP2PTunnel<PatternP2PTunnelPa
                 productExtractionSettings.getInterval(), productExtractionSettings.getAmount(),
                 productExtractionSettings.getRevision());
         syncInputSettings = data.readBoolean();
+        taskAllocationMode = TaskAllocationMode.fromId(data.readUnsignedByte());
         PatternP2PUnitSettings next = getUnitSettings();
         return changed || oldEnabled != productExtractionSettings.isEnabled()
                 || oldSync != syncInputSettings
+                || oldTaskAllocationMode != taskAllocationMode
                 || old.getReturnMode() != next.getReturnMode()
                 || old.isBreakRecovery() != next.isBreakRecovery()
                 || old.getExtractionInterval() != next.getExtractionInterval()
@@ -801,6 +831,13 @@ public final class PatternP2PTunnelPart extends PartP2PTunnel<PatternP2PTunnelPa
                 transferPortOutputMode, outputSlotSharingMode);
     }
     public long getUnitConfigurationRevision() { return unitConfigurationRevision; }
+    public TaskAllocationMode getTaskAllocationMode() { return taskAllocationMode; }
+    public void setTaskAllocationMode(TaskAllocationMode mode) {
+        if (output || mode == null || taskAllocationMode == mode) return;
+        taskAllocationMode = mode;
+        saveChanges();
+        getHost().markForUpdate();
+    }
     public void setInputSettings(boolean enabled, PatternP2PUnitSettings settings) {
         if (output || settings == null) return;
         boolean unitChanged = !sameSettings(getUnitSettings(), settings);

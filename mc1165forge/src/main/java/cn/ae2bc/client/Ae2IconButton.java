@@ -13,10 +13,16 @@ class Ae2IconButton extends Ae2Button {
     private static final ResourceLocation STATES = new ResourceLocation(
             "appliedenergistics2", "textures/guis/states.png");
     protected int iconIndex;
+    private final float iconScale;
 
     Ae2IconButton(int x, int y, int iconIndex, IPressable pressed) {
+        this(x, y, iconIndex, 1.0F, pressed);
+    }
+
+    Ae2IconButton(int x, int y, int iconIndex, float iconScale, IPressable pressed) {
         super(x, y, 20, 20, StringTextComponent.EMPTY, pressed);
         this.iconIndex = iconIndex;
+        this.iconScale = iconScale;
     }
 
     void setIconIndex(int iconIndex) {
@@ -38,7 +44,10 @@ class Ae2IconButton extends Ae2Button {
         RenderSystem.color4f(1.0F, 1.0F, 1.0F, alpha * opacity);
         RenderSystem.enableBlend();
         RenderSystem.defaultBlendFunc();
-        blit(matrices, x + 2, y + 2, (iconIndex % 16) * 16, (iconIndex / 16) * 16,
+        int size = Math.max(1, Math.round(16 * iconScale));
+        int offset = (16 - size) / 2;
+        blit(matrices, x + 2 + offset, y + 2 + offset,
+                size, size, (iconIndex % 16) * 16, (iconIndex / 16) * 16,
                 16, 16, 256, 256);
     }
 }

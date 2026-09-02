@@ -10,6 +10,7 @@ import cn.ae2bc.logic.PatternP2PUnitConfiguration;
 import cn.ae2bc.logic.ProductExtractionSettings;
 import cn.ae2bc.core.unit.TransferPortOutputMode;
 import cn.ae2bc.core.unit.OutputSlotSharingMode;
+import cn.ae2bc.core.dispatch.TaskAllocationMode;
 import cn.ae2bc.part.PatternP2PTunnelPart;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
@@ -28,6 +29,7 @@ public final class PatternP2PTunnelInputMenu extends AEBaseMenu {
     private static final String RESET_TASK_STATE = "resetTaskState";
     private static final String SET_TRANSFER_PORT_OUTPUT_MODE = "setTransferPortOutputMode";
     private static final String SET_OUTPUT_SLOT_SHARING_MODE = "setOutputSlotSharingMode";
+    private static final String SET_TASK_ALLOCATION_MODE = "setTaskAllocationMode";
 
     public static final MenuType<PatternP2PTunnelInputMenu> TYPE = MenuTypeBuilder
             .create(PatternP2PTunnelInputMenu::new, PatternP2PTunnelPart.class)
@@ -48,6 +50,7 @@ public final class PatternP2PTunnelInputMenu extends AEBaseMenu {
     @GuiSync(8) public int productExtractionAmount = ProductExtractionSettings.DEFAULT_AMOUNT;
     @GuiSync(9) public TransferPortOutputMode transferPortOutputMode = TransferPortOutputMode.NORMAL;
     @GuiSync(10) public OutputSlotSharingMode outputSlotSharingMode = OutputSlotSharingMode.DISABLED;
+    @GuiSync(11) public TaskAllocationMode taskAllocationMode = TaskAllocationMode.ROUND_ROBIN;
 
     public PatternP2PTunnelInputMenu(int id, Inventory playerInventory, PatternP2PTunnelPart host) {
         super(TYPE, id, playerInventory, host);
@@ -74,6 +77,8 @@ public final class PatternP2PTunnelInputMenu extends AEBaseMenu {
                 value -> updateConfiguration(configuration().withTransferPortOutputMode(value)));
         registerClientAction(SET_OUTPUT_SLOT_SHARING_MODE, OutputSlotSharingMode.class,
                 value -> updateConfiguration(configuration().withOutputSlotSharingMode(value)));
+        registerClientAction(SET_TASK_ALLOCATION_MODE, TaskAllocationMode.class,
+                this::handleSetTaskAllocationMode);
     }
 
     @Override
@@ -86,6 +91,7 @@ public final class PatternP2PTunnelInputMenu extends AEBaseMenu {
             productExtractionEnabled = extraction.enabled();
             productExtractionInterval = extraction.interval();
             productExtractionAmount = extraction.amount();
+            taskAllocationMode = logic.getTaskAllocationMode();
         }
         super.broadcastChanges();
     }
@@ -144,6 +150,13 @@ public final class PatternP2PTunnelInputMenu extends AEBaseMenu {
         }
     }
 
+    public void setTaskAllocationMode(TaskAllocationMode mode) {
+        if (mode != null) {
+            taskAllocationMode = mode;
+            sendClientAction(SET_TASK_ALLOCATION_MODE, mode);
+        }
+    }
+
     private void handleSetReturnMode(ReturnMode mode) {
         if (isServerSide() && !host.isOutput() && mode != null) {
             host.getInputLogic().setReturnMode(mode);
@@ -153,6 +166,12 @@ public final class PatternP2PTunnelInputMenu extends AEBaseMenu {
     private void handleResetTaskState() {
         if (isServerSide() && !host.isOutput()) {
             host.getInputLogic().resetAllTaskStates();
+        }
+    }
+
+    private void handleSetTaskAllocationMode(TaskAllocationMode mode) {
+        if (isServerSide() && !host.isOutput() && mode != null) {
+            host.getInputLogic().setTaskAllocationMode(mode);
         }
     }
 

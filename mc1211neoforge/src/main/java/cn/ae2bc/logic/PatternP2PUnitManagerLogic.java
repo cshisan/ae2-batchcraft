@@ -15,6 +15,7 @@ import appeng.api.stacks.KeyCounter;
 import appeng.crafting.pattern.AEProcessingPattern;
 import appeng.me.helpers.MachineSource;
 import cn.ae2bc.core.unit.UnitPortType;
+import cn.ae2bc.core.unit.UnitPortAdmissionPolicy;
 import cn.ae2bc.part.PatternP2PUnitManagerPart;
 import cn.ae2bc.part.PatternP2PUnitPortPart;
 import cn.ae2bc.pattern.MaterialOutputForm;
@@ -375,8 +376,7 @@ public final class PatternP2PUnitManagerLogic implements IGridTickable {
         TransferPortOutputMode mode = getEffectiveConfiguration().transferPortOutputMode();
         Map<PatternP2PUnitPortPart, Long> remaining = new java.util.IdentityHashMap<>();
         for (PatternP2PUnitPortPart port : ports) {
-            long capacity = mode == TransferPortOutputMode.SINGLE_ITEM ? 1 : Long.MAX_VALUE;
-            remaining.put(port, capacity);
+            remaining.put(port, UnitPortAdmissionPolicy.initialCapacity(port.getType(), mode));
         }
         // Keep encoded slot order. The real dispatch loop uses this order too;
         // sorting by simulated capacity can otherwise reserve a lower-priority
@@ -390,22 +390,30 @@ public final class PatternP2PUnitManagerLogic implements IGridTickable {
             List<PatternP2PUnitPortPart> candidates = candidatePorts(ports, material);
             for (PatternP2PUnitPortPart port : candidates) {
                 if (left <= 0) break;
-                if (mode == TransferPortOutputMode.SAME_TYPE
+                if (UnitPortAdmissionPolicy.usesTransferOutputMode(port.getType())
+                        && mode == TransferPortOutputMode.SAME_TYPE
                         && assignedType.containsKey(port)
                         && !assignedType.get(port).equals(material.stack().what())) continue;
                 if (!canUsePortForSlot(material.slot(), port, assignedSlot, assignedSlotPort)) continue;
                 long simulated = port.insertInput(manager, material.stack(), material.form(), Actionable.SIMULATE);
                 if (simulated <= 0) continue;
                 long portCapacity = remaining.get(port);
-                if (mode != TransferPortOutputMode.SINGLE_ITEM && portCapacity == Long.MAX_VALUE) {
+                if (UnitPortAdmissionPolicy.usesTransferOutputMode(port.getType())
+                        && mode != TransferPortOutputMode.SINGLE_ITEM && portCapacity == Long.MAX_VALUE) {
                     portCapacity = port.estimateTransferCapacity(material.stack().what(), simulated);
                     remaining.put(port, portCapacity);
                 }
                 long accepted = Math.min(left, Math.min(simulated, portCapacity));
                 if (accepted <= 0) continue;
                 left -= accepted;
-                if (portCapacity != Long.MAX_VALUE) remaining.put(port, portCapacity - accepted);
-                if (mode == TransferPortOutputMode.SAME_TYPE) assignedType.put(port, material.stack().what());
+                if (UnitPortAdmissionPolicy.usesTransferOutputMode(port.getType())
+                        && portCapacity != Long.MAX_VALUE) {
+                    remaining.put(port, portCapacity - accepted);
+                }
+                if (UnitPortAdmissionPolicy.usesTransferOutputMode(port.getType())
+                        && mode == TransferPortOutputMode.SAME_TYPE) {
+                    assignedType.put(port, material.stack().what());
+                }
                 if (material.slot() >= 0) {
                     assignedSlot.putIfAbsent(port, material.slot());
                     if (isSingleSlotEnabled(port)) {
@@ -460,7 +468,8 @@ public final class PatternP2PUnitManagerLogic implements IGridTickable {
                         dispatchSlotPorts.putIfAbsent(pending.slot(), port);
                     }
                 }
-                if (getEffectiveConfiguration().transferPortOutputMode() == TransferPortOutputMode.SAME_TYPE) {
+                if (UnitPortAdmissionPolicy.usesTransferOutputMode(port.getType())
+                        && getEffectiveConfiguration().transferPortOutputMode() == TransferPortOutputMode.SAME_TYPE) {
                     dispatchPortTypes.putIfAbsent(port, pending.stack().what());
                 }
             }
@@ -503,7 +512,8 @@ public final class PatternP2PUnitManagerLogic implements IGridTickable {
     /** Applies only the explicit SAME_TYPE port mode; machine-specific type rules
      * remain delegated to the real insertion result below. */
     private boolean allowsConfiguredPortType(PatternP2PUnitPortPart port, AEKey what) {
-        if (getEffectiveConfiguration().transferPortOutputMode() != TransferPortOutputMode.SAME_TYPE) {
+        if (!UnitPortAdmissionPolicy.usesTransferOutputMode(port.getType())
+                || getEffectiveConfiguration().transferPortOutputMode() != TransferPortOutputMode.SAME_TYPE) {
             return true;
         }
         AEKey assigned = dispatchPortTypes.get(port);

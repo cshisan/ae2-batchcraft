@@ -6,7 +6,8 @@ import appeng.api.networking.security.IActionSource;
 import appeng.api.stacks.KeyCounter;
 import appeng.me.helpers.MachineSource;
 import cn.ae2bc.core.dispatch.RoundRobinPolicy;
-import cn.ae2bc.core.dispatch.RoundRobinSelector;
+import cn.ae2bc.core.dispatch.TaskAllocationMode;
+import cn.ae2bc.core.dispatch.TaskEndpointSelector;
 import cn.ae2bc.core.unit.UnitPortType;
 import cn.ae2bc.part.PatternP2PTunnelPart;
 import cn.ae2bc.part.PatternTaskEndpoint;
@@ -17,6 +18,7 @@ import net.minecraft.nbt.CompoundTag;
 
 import java.util.List;
 import java.util.Objects;
+import java.util.concurrent.ThreadLocalRandom;
 
 /**
  * Owns the main-side task admission and round-robin dispatch.
@@ -30,13 +32,17 @@ public final class PatternP2PTunnelInputLogic {
     private static final String PRODUCT_EXTRACTION_INTERVAL = "ProductExtractionInterval";
     private static final String PRODUCT_EXTRACTION_AMOUNT = "ProductExtractionAmount";
     private static final String PRODUCT_EXTRACTION_REVISION = "ProductExtractionRevision";
+    private static final String TASK_ALLOCATION_MODE = "TaskAllocationMode";
 
     private final IManagedGridNode mainNode;
     private final PatternP2PTunnelPart input;
     private final IActionSource actionSource;
     private final PatternMetadataCache patternMetadataCache = new PatternMetadataCache();
     private List<PatternP2PTunnelPart> outputSnapshot = List.of();
+    private List<PatternTaskEndpoint> taskEndpointSnapshot = List.of();
+    private List<PatternTaskEndpoint> availableTaskEndpoints = List.of();
     private boolean outputSnapshotDirty = true;
+    private boolean taskEndpointSnapshotDirty = true;
     private boolean outputAvailabilityDirty = true;
     private boolean hasAvailableOutput;
     private int roundRobinCursor;
@@ -45,6 +51,7 @@ public final class PatternP2PTunnelInputLogic {
     private PatternP2PUnitConfiguration patternP2PUnitConfiguration = PatternP2PUnitConfiguration.DEFAULT;
     private long patternP2PUnitConfigurationRevision;
     private EndpointProductExtractionSettings productExtractionSettings = EndpointProductExtractionSettings.DEFAULT;
+    private TaskAllocationMode taskAllocationMode = TaskAllocationMode.ROUND_ROBIN;
 
     public PatternP2PTunnelInputLogic(IManagedGridNode mainNode, PatternP2PTunnelPart input) {
         this.mainNode = mainNode;
@@ -53,20 +60,7 @@ public final class PatternP2PTunnelInputLogic {
     }
 
     public boolean hasAvailableOutput() {
-        if (!mainNode.isActive() || !input.hasConfiguredFrequency()) {
-            return false;
-        }
-        if (outputAvailabilityDirty) {
-            hasAvailableOutput = false;
-            for (var output : getTaskEndpoints()) {
-                if (output.isOperationalTaskEndpoint() && output.canAcceptTask()) {
-                    hasAvailableOutput = true;
-                    break;
-                }
-            }
-            outputAvailabilityDirty = false;
-        }
-        return hasAvailableOutput;
+        return !getAvailableTaskEndpoints().isEmpty();
     }
 
     public ReturnMode getReturnMode() {
@@ -92,6 +86,18 @@ public final class PatternP2PTunnelInputLogic {
 
     public EndpointProductExtractionSettings getProductExtractionSettings() {
         return productExtractionSettings;
+    }
+
+    public TaskAllocationMode getTaskAllocationMode() {
+        return taskAllocationMode;
+    }
+
+    public void setTaskAllocationMode(TaskAllocationMode mode) {
+        Objects.requireNonNull(mode, "mode");
+        if (taskAllocationMode != mode) {
+            taskAllocationMode = mode;
+            input.getHost().markForSave();
+        }
     }
 
     public void setProductExtractionEnabled(boolean enabled) {
@@ -165,6 +171,7 @@ public final class PatternP2PTunnelInputLogic {
 
     public void invalidateOutputs() {
         outputSnapshotDirty = true;
+        taskEndpointSnapshotDirty = true;
         outputAvailabilityDirty = true;
     }
 
@@ -203,13 +210,15 @@ public final class PatternP2PTunnelInputLogic {
             return false;
         }
 
-        List<PatternTaskEndpoint> outputs = getTaskEndpoints();
+        List<PatternTaskEndpoint> outputs = taskAllocationMode == TaskAllocationMode.RANDOM
+                ? getAvailableTaskEndpoints() : getTaskEndpoints();
         int size = outputs.size();
         var metadata = patternMetadataCache.get(pattern);
         if (!metadata.isValid()) {
             return false;
         }
-        int acceptedIndex = RoundRobinSelector.select(roundRobinCursor, size, index -> {
+        int acceptedIndex = TaskEndpointSelector.select(taskAllocationMode, roundRobinCursor,
+                size, ThreadLocalRandom.current()::nextInt, index -> {
             var output = outputs.get(index);
             if (!output.isOperationalTaskEndpoint() || !output.canAcceptTask()) {
                 return false;
@@ -217,8 +226,11 @@ public final class PatternP2PTunnelInputLogic {
             return output.tryAcceptPattern(pattern, metadata, inputs, actionSource);
         });
         if (acceptedIndex >= 0) {
-            roundRobinCursor = RoundRobinPolicy.advance(acceptedIndex, size);
-            markCursorForSave();
+            outputAvailabilityDirty = true;
+            if (taskAllocationMode == TaskAllocationMode.ROUND_ROBIN) {
+                roundRobinCursor = RoundRobinPolicy.advance(acceptedIndex, size);
+                markCursorForSave();
+            }
             return true;
         }
         return false;
@@ -236,9 +248,30 @@ public final class PatternP2PTunnelInputLogic {
     }
 
     private List<PatternTaskEndpoint> getTaskEndpoints() {
-        var outputs = new java.util.ArrayList<PatternTaskEndpoint>(getOutputSnapshot());
-        outputs.addAll(getPatternP2PUnitManagers());
-        return outputs;
+        if (taskEndpointSnapshotDirty) {
+            var endpoints = new java.util.ArrayList<PatternTaskEndpoint>(getOutputSnapshot());
+            endpoints.addAll(getPatternP2PUnitManagers());
+            taskEndpointSnapshot = List.copyOf(endpoints);
+            taskEndpointSnapshotDirty = false;
+            outputAvailabilityDirty = true;
+        }
+        return taskEndpointSnapshot;
+    }
+
+    private List<PatternTaskEndpoint> getAvailableTaskEndpoints() {
+        if (!mainNode.isActive() || !input.hasConfiguredFrequency()) {
+            hasAvailableOutput = false;
+            return List.of();
+        }
+        if (outputAvailabilityDirty) {
+            availableTaskEndpoints = getTaskEndpoints().stream()
+                    .filter(PatternTaskEndpoint::isOperationalTaskEndpoint)
+                    .filter(PatternTaskEndpoint::canAcceptTask)
+                    .toList();
+            hasAvailableOutput = !availableTaskEndpoints.isEmpty();
+            outputAvailabilityDirty = false;
+        }
+        return availableTaskEndpoints;
     }
 
     private List<PatternP2PUnitManagerPart> getPatternP2PUnitManagers() {
@@ -264,6 +297,9 @@ public final class PatternP2PTunnelInputLogic {
 
     public void readFromNBT(CompoundTag data) {
         roundRobinCursor = data.getInt(ROUND_ROBIN_CURSOR);
+        taskAllocationMode = data.contains(TASK_ALLOCATION_MODE)
+                ? TaskAllocationMode.fromId(data.getByte(TASK_ALLOCATION_MODE))
+                : TaskAllocationMode.ROUND_ROBIN;
         returnMode = data.contains(RETURN_MODE)
                 ? ReturnMode.fromId(data.getByte(RETURN_MODE)) : ReturnMode.UNBLOCKED;
         patternP2PUnitConfiguration = data.contains(PATTERN_P2P_UNIT_CONFIGURATION)
@@ -288,6 +324,7 @@ public final class PatternP2PTunnelInputLogic {
 
     public void writeToNBT(CompoundTag data) {
         data.putInt(ROUND_ROBIN_CURSOR, roundRobinCursor);
+        data.putByte(TASK_ALLOCATION_MODE, (byte) taskAllocationMode.getId());
         data.putByte(RETURN_MODE, (byte) returnMode.getId());
         data.put(PATTERN_P2P_UNIT_CONFIGURATION, patternP2PUnitConfiguration.write());
         data.putLong(PATTERN_P2P_UNIT_CONFIGURATION_REVISION, patternP2PUnitConfigurationRevision);

@@ -13,6 +13,7 @@ import net.minecraft.tileentity.TileEntity;
 import net.minecraft.util.Direction;
 import net.minecraft.util.math.BlockPos;
 import cn.ae2bc.core.unit.PatternP2PUnitSettings;
+import cn.ae2bc.core.dispatch.TaskAllocationMode;
 
 public final class PatternP2PTunnelMenu extends Container {
     private final PlayerEntity player;
@@ -23,6 +24,7 @@ public final class PatternP2PTunnelMenu extends Container {
     private final boolean output;
     private final PatternP2PUnitSettings settings;
     private final boolean syncInputSettings;
+    private final TaskAllocationMode taskAllocationMode;
 
     public PatternP2PTunnelMenu(int id, PlayerInventory inventory, PacketBuffer buffer) {
         super(ModContent.PATTERN_P2P_SETTINGS.get(), id);
@@ -33,6 +35,7 @@ public final class PatternP2PTunnelMenu extends Container {
         this.extractionEnabled = buffer.readBoolean();
         this.settings = readSettings(buffer);
         this.syncInputSettings = buffer.readBoolean();
+        this.taskAllocationMode = TaskAllocationMode.fromId(buffer.readUnsignedByte());
         this.part = findPart(player, pos, side);
     }
 
@@ -46,6 +49,7 @@ public final class PatternP2PTunnelMenu extends Container {
         this.extractionEnabled = part.isExtractionEnabled();
         this.settings = part.getUnitSettings();
         this.syncInputSettings = part.isSyncInputSettings();
+        this.taskAllocationMode = part.getTaskAllocationMode();
     }
 
     public boolean isExtractionEnabled() { return extractionEnabled; }
@@ -58,6 +62,7 @@ public final class PatternP2PTunnelMenu extends Container {
     }
     public PatternP2PUnitSettings getSettings() { return settings; }
     public boolean isSyncInputSettings() { return syncInputSettings; }
+    public TaskAllocationMode getTaskAllocationMode() { return taskAllocationMode; }
     public BlockPos getPos() { return pos; }
     public Direction getSide() { return side; }
 

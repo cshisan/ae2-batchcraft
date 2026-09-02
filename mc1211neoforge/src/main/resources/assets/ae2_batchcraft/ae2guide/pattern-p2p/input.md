@@ -20,6 +20,7 @@ Receives processing jobs from the AE2 Pattern Provider in front of it and distri
 | Frequency | Required; `0000` is disabled |
 | Adjacent block | Pattern Provider output face |
 | Dispatch mode | Full Dispatch or Batch Distribution |
+| Task allocation | Round Robin, Random, or Priority |
 
 <GameScene zoom="6" background="transparent">
   <ImportStructure src="../assets/assemblies/input-provider.snbt" />
@@ -28,9 +29,11 @@ Receives processing jobs from the AE2 Pattern Provider in front of it and distri
 
 ## Task Distribution
 
-In **Full Dispatch**, the input walks available endpoints in round-robin order. It skips endpoints that are offline, unloaded, busy, on another AE grid, or unable to accept the complete material plan. One selected endpoint receives the full processing push.
+In **Full Dispatch**, one selected endpoint receives the complete processing push. Offline, unloaded, busy, or incompatible endpoints are unavailable.
 
 In **Batch Distribution**, the input requests only the next planned share from the adjacent AE2 Pattern Provider and distributes integer multiples of the configured smallest share. Unsent materials remain in the Pattern Provider until endpoint capacity becomes available. See [Batch Distribution](batch-distribution.md) before enabling this mode.
+
+The task allocation button in the right toolbar controls endpoint selection. **Round Robin** rotates through the stable endpoint order. **Random** independently selects one currently available endpoint for each allocation and may select the same endpoint repeatedly. **Priority** starts from the first endpoint on every allocation and only continues to later endpoints when an earlier one cannot accept the task.
 
 ## General Configuration
 
@@ -38,6 +41,7 @@ The input provides defaults for:
 
 - Product return mode.
 - Full Dispatch or Batch Distribution.
+- Round Robin, Random, or Priority task allocation.
 - Whether normal outputs may actively extract products.
 - Extraction interval and amount for outputs and Unit Extraction Ports.
 - Unit break recovery and redstone behavior.

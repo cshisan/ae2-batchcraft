@@ -12,16 +12,23 @@ class Ae2IconButton extends Ae2Button {
     static final int FULLNESS_HALF = 81;
     static final int ICON_128 = 128;
     static final int INVALID = 129;
+    static final int FUZZY_PERCENT_99 = 99;
     // The legacy AE2 docs names are one tile earlier than the newer Icon enum names.
     static final int BLOCK_NO = 20;
     static final int BLOCK_YES = 21;
     private static final ResourceLocation STATES = new ResourceLocation(
             "appliedenergistics2", "textures/guis/states.png");
     protected int iconIndex;
+    private final float iconScale;
 
     Ae2IconButton(int id, int x, int y, int iconIndex) {
+        this(id, x, y, iconIndex, 1.0F);
+    }
+
+    Ae2IconButton(int id, int x, int y, int iconIndex, float iconScale) {
         super(id, x, y, 20, 20, "");
         this.iconIndex = iconIndex;
+        this.iconScale = iconScale;
     }
 
     void setIconIndex(int iconIndex) {
@@ -43,8 +50,12 @@ class Ae2IconButton extends Ae2Button {
         GlStateManager.pushAttrib();
         minecraft.getTextureManager().bindTexture(STATES);
         GlStateManager.color(1.0F, 1.0F, 1.0F, opacity);
-        drawTexturedModalRect(x + 2, y + 2, (iconIndex % 16) * 16, (iconIndex / 16) * 16,
-                16, 16);
+        int offset = Math.round((16 - 16 * iconScale) / 2.0F);
+        GlStateManager.pushMatrix();
+        GlStateManager.translate(x + 2 + offset, y + 2 + offset, 0);
+        GlStateManager.scale(iconScale, iconScale, 1.0F);
+        drawTexturedModalRect(0, 0, (iconIndex % 16) * 16, (iconIndex / 16) * 16, 16, 16);
+        GlStateManager.popMatrix();
         // Do not leak a disabled icon's alpha or blend state into later widgets.
         GlStateManager.popAttrib();
     }

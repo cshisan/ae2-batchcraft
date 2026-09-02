@@ -188,6 +188,14 @@
   "gui.ae2_batchcraft.dispatch_mode.full_dispatch": "Full Dispatch",
   "gui.ae2_batchcraft.dispatch_mode.batch_distribution": "Batch Distribution",
   "gui.ae2_batchcraft.dispatch_mode.switch.tooltip": "Current: %1$s\nClick to switch to %2$s",
+  "gui.ae2_batchcraft.task_allocation_mode": "Task Allocation",
+  "gui.ae2_batchcraft.task_allocation_mode.round_robin": "Round Robin",
+  "gui.ae2_batchcraft.task_allocation_mode.random": "Random",
+  "gui.ae2_batchcraft.task_allocation_mode.priority": "Priority",
+  "gui.ae2_batchcraft.task_allocation_mode.round_robin.tooltip": "Cycles through available endpoints",
+  "gui.ae2_batchcraft.task_allocation_mode.random.tooltip": "Randomly selects an available endpoint",
+  "gui.ae2_batchcraft.task_allocation_mode.priority.tooltip": "Prioritizes earlier endpoints",
+  "gui.ae2_batchcraft.task_allocation_mode.switch.tooltip": "Task Allocation\nCurrent: %1$s\n%2$s\nClick to switch to %3$s",
   "tooltip.ae2_batchcraft.pattern_batch_count": "Batch count: %s"
   ,"gui.ae2_batchcraft.priority": "Priority"
   ,"gui.ae2_batchcraft.enabled": "Enabled"

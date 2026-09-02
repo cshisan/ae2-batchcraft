@@ -50,11 +50,22 @@ class PatternBatchConfigScreenResourceTest {
         assertFalse(batchScreen.contains("public void mouseClicked("));
         assertFalse(onCloseBody(batchScreen).contains("commitValue()"));
         assertTrue(inputScreen.contains("addToRightToolbar(\"dispatchModeToolbar\", dispatchModeToolbar)"));
+        assertTrue(inputScreen.contains("addToRightToolbar(\"taskAllocationModeToolbar\", taskAllocationModeToolbar)"));
+        assertTrue(inputScreen.contains("appeng.client.gui.Icon.S_PROCESSOR"));
+        assertTrue(inputScreen.contains("0.6f, 0, 0"));
         assertFalse(inputScreen.contains("dispatchFull\""));
         assertFalse(inputScreen.contains("dispatchBatch\""));
         assertTrue(inputScreen.contains("PatternDispatchMode.BATCH_DISTRIBUTION"));
         assertTrue(inputLogic.contains("data.putByte(DISPATCH_MODE"));
-        assertTrue(inputLogic.contains("BatchDistributionPlanner.distribute"));
+        assertTrue(inputLogic.contains("TaskAllocationPlanner.distribute"));
+        assertTaskAllocationTranslations(zhCn);
+        assertTaskAllocationTranslations(enUs);
+        assertEquals("轮询可用端点", zhCn.get(
+                "gui.ae2_batchcraft.task_allocation_mode.round_robin.tooltip").getAsString());
+        assertEquals("随机选择可用端点", zhCn.get(
+                "gui.ae2_batchcraft.task_allocation_mode.random.tooltip").getAsString());
+        assertEquals("优先选择排序靠前的端点", zhCn.get(
+                "gui.ae2_batchcraft.task_allocation_mode.priority.tooltip").getAsString());
     }
 
     private static JsonObject assertJson(String path) {
@@ -85,6 +96,14 @@ class PatternBatchConfigScreenResourceTest {
         assertTrue(tooltip.contains("1A + 1B → 1C"));
         assertTrue(tooltip.contains(recommendation));
         assertFalse(language.has("gui.ae2_batchcraft.pattern_batch_count.atomic"));
+    }
+
+    private static void assertTaskAllocationTranslations(JsonObject language) {
+        assertTrue(language.has("gui.ae2_batchcraft.task_allocation_mode"));
+        assertTrue(language.has("gui.ae2_batchcraft.task_allocation_mode.round_robin"));
+        assertTrue(language.has("gui.ae2_batchcraft.task_allocation_mode.random"));
+        assertTrue(language.has("gui.ae2_batchcraft.task_allocation_mode.priority"));
+        assertTrue(language.has("gui.ae2_batchcraft.task_allocation_mode.switch.tooltip"));
     }
 
     private static String onCloseBody(String source) {

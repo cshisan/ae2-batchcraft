@@ -31,7 +31,7 @@ navigation:
 4. Bind all endpoints to one nonzero frequency.
 5. Insert a processing pattern into the Pattern Provider and request a job.
 
-The input checks Outputs and Unit Managers on its frequency in round-robin order. Busy, offline, unloaded, or currently incompatible endpoints are skipped. Full Dispatch assigns the complete push to one endpoint; Batch Distribution follows its separately configured share limits.
+The input assigns tasks to Outputs and Unit Managers on its frequency. Its right-toolbar allocation button selects Round Robin, Random, or Priority behavior. Full Dispatch assigns the complete push to one endpoint; Batch Distribution follows its separately configured share limits.
 
 ## First-Run Checklist
 

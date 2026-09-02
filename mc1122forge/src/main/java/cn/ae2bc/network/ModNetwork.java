@@ -13,6 +13,7 @@ import cn.ae2bc.pattern.PatternEncodingTermMenuState;
 
 import cn.ae2bc.core.extraction.ProductExtractionLimits;
 import cn.ae2bc.core.unit.PatternP2PUnitSettings;
+import cn.ae2bc.core.dispatch.TaskAllocationMode;
 import cn.ae2bc.logic.EnergyDistributionMode;
 import net.minecraft.entity.player.EntityPlayerMP;
 import net.minecraft.client.Minecraft;
@@ -56,6 +57,8 @@ public final class ModNetwork {
                 UnitPortPriorityMessage.class, 7, Side.SERVER);
         CHANNEL.registerMessage(UnitPortStateHandler.class,
                 UnitPortStateMessage.class, 8, Side.CLIENT);
+        CHANNEL.registerMessage(TaskAllocationModeHandler.class,
+                TaskAllocationModeMessage.class, 9, Side.SERVER);
     }
 
     public static void sendComponentPlacerAction(ComponentPlacerMenu menu, int action, int value) {
@@ -205,6 +208,60 @@ public final class ModNetwork {
             PatternP2PUnitSettings settings, boolean syncInputSettings, boolean resetTask) {
         CHANNEL.sendToServer(new SettingsMessage(menu.windowId, menu.getPos(), menu.getSide(), enabled, settings,
                 syncInputSettings, resetTask));
+    }
+
+    public static void sendTaskAllocationMode(PatternP2PTunnelMenu menu, TaskAllocationMode mode) {
+        CHANNEL.sendToServer(new TaskAllocationModeMessage(menu.windowId, menu.getPos(),
+                menu.getSide(), mode));
+    }
+
+    public static final class TaskAllocationModeMessage implements IMessage {
+        private int windowId;
+        private BlockPos pos;
+        private EnumFacing side;
+        private TaskAllocationMode mode;
+
+        public TaskAllocationModeMessage() { }
+
+        private TaskAllocationModeMessage(int windowId, BlockPos pos, EnumFacing side,
+                TaskAllocationMode mode) {
+            this.windowId = windowId;
+            this.pos = pos;
+            this.side = side;
+            this.mode = mode == null ? TaskAllocationMode.ROUND_ROBIN : mode;
+        }
+
+        @Override public void fromBytes(ByteBuf buffer) {
+            windowId = buffer.readInt();
+            pos = BlockPos.fromLong(buffer.readLong());
+            side = EnumFacing.values()[buffer.readUnsignedByte() % EnumFacing.values().length];
+            mode = TaskAllocationMode.fromId(buffer.readUnsignedByte());
+        }
+
+        @Override public void toBytes(ByteBuf buffer) {
+            buffer.writeInt(windowId);
+            buffer.writeLong(pos.toLong());
+            buffer.writeByte(side.ordinal());
+            buffer.writeByte(mode.getId());
+        }
+    }
+
+    public static final class TaskAllocationModeHandler
+            implements IMessageHandler<TaskAllocationModeMessage, IMessage> {
+        @Override public IMessage onMessage(TaskAllocationModeMessage message, MessageContext context) {
+            EntityPlayerMP player = context.getServerHandler().player;
+            player.getServerWorld().addScheduledTask(() -> {
+                if (!(player.openContainer instanceof PatternP2PTunnelMenu)
+                        || player.openContainer.windowId != message.windowId
+                        || !((PatternP2PTunnelMenu) player.openContainer).getPos().equals(message.pos)
+                        || ((PatternP2PTunnelMenu) player.openContainer).getSide() != message.side
+                        || player.getDistanceSq(message.pos.getX() + 0.5, message.pos.getY() + 0.5,
+                        message.pos.getZ() + 0.5) > 64.0) return;
+                PatternP2PTunnelPart part = PatternP2PTunnelMenu.findPart(player, message.pos, message.side);
+                if (part != null && !part.isOutput()) part.setTaskAllocationMode(message.mode);
+            });
+            return null;
+        }
     }
 
     public static void sendMaterialOutputConfig(int windowId, long[] packed) {

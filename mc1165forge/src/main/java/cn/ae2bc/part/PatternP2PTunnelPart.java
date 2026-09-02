@@ -11,6 +11,7 @@ import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.ThreadLocalRandom;
 
 import javax.annotation.Nonnull;
 
@@ -38,6 +39,7 @@ import cn.ae2bc.core.unit.UnitPortType;
 import cn.ae2bc.core.unit.PatternP2PUnitSettings;
 import cn.ae2bc.core.unit.TransferPortOutputMode;
 import cn.ae2bc.core.unit.OutputSlotSharingMode;
+import cn.ae2bc.core.dispatch.TaskAllocationMode;
 import cn.ae2bc.logic.ReturnMode;
 import cn.ae2bc.logic.RedstoneOutputMode;
 import cn.ae2bc.registry.ModContent;
@@ -98,6 +100,7 @@ public final class PatternP2PTunnelPart
     private final ExtractionDeadlineGate returnRecoveryDeadline = new ExtractionDeadlineGate();
     private ItemStack blockedReturnProbe = ItemStack.EMPTY;
     private int roundRobinCursor;
+    private TaskAllocationMode taskAllocationMode = TaskAllocationMode.ROUND_ROBIN;
     private final ReturnBatchTracker<StackKey, StackKey> returnBatch = new ReturnBatchTracker<StackKey, StackKey>();
     private static final net.minecraft.util.ResourceLocation INPUT_MODEL_ID =
             new net.minecraft.util.ResourceLocation("ae2_batchcraft", "part/p2p/pattern_p2p_tunnel_input");
@@ -194,6 +197,7 @@ public final class PatternP2PTunnelPart
                         buffer.writeBoolean(extractionEnabled);
                         writeSettings(buffer, getUnitSettings());
                         buffer.writeBoolean(syncInputSettings);
+                        buffer.writeByte(taskAllocationMode.getId());
                     });
         }
         return true;
@@ -321,6 +325,15 @@ public final class PatternP2PTunnelPart
     }
 
     public long getUnitConfigurationRevision() { return unitConfigurationRevision; }
+
+    public TaskAllocationMode getTaskAllocationMode() { return taskAllocationMode; }
+
+    public void setTaskAllocationMode(TaskAllocationMode mode) {
+        if (output || mode == null || taskAllocationMode == mode) return;
+        taskAllocationMode = mode;
+        getHost().markForSave();
+        getHost().markForUpdate();
+    }
 
     public void setInputSettings(boolean enabled, PatternP2PUnitSettings settings) {
         if (output || settings == null) return;
@@ -511,6 +524,9 @@ public final class PatternP2PTunnelPart
                 ? OutputSlotSharingMode.fromId(data.getInt("Ae2bcOutputSlotSharingMode"))
                 : OutputSlotSharingMode.DISABLED;
         roundRobinCursor = data.getInt("Ae2bcRoundRobinCursor");
+        taskAllocationMode = data.contains("Ae2bcTaskAllocationMode")
+                ? TaskAllocationMode.fromId(data.getInt("Ae2bcTaskAllocationMode"))
+                : TaskAllocationMode.ROUND_ROBIN;
         readOutputReturnBatch(data);
     }
 
@@ -531,6 +547,7 @@ public final class PatternP2PTunnelPart
         data.putInt("Ae2bcTransferPortOutputMode", transferPortOutputMode.getId());
         data.putInt("Ae2bcOutputSlotSharingMode", outputSlotSharingMode.getId());
         data.putInt("Ae2bcRoundRobinCursor", roundRobinCursor);
+        data.putInt("Ae2bcTaskAllocationMode", taskAllocationMode.getId());
         writeOutputReturnBatch(data);
     }
 
@@ -583,23 +600,42 @@ public final class PatternP2PTunnelPart
                 ? null : createManagerDispatch(details, table, packed);
         int inputCount = countInputs(table);
         final int outputCount = outputs.size();
-        int acceptedIndex = cn.ae2bc.core.dispatch.RoundRobinSelector.select(
-                roundRobinCursor, endpointCount, candidateIndex -> {
+        List<Integer> candidates = new ArrayList<Integer>();
+        if (taskAllocationMode == TaskAllocationMode.RANDOM) {
+            for (int index = 0; index < endpointCount; index++) {
+                if (index < outputs.size()) {
+                    PatternP2PTunnelPart candidate = outputs.get(index);
+                    if (candidate.canAcceptTask()
+                            && candidate.canAcceptOutputTask(details)) candidates.add(index);
+                } else if (managerDispatch != null
+                        && managers.get(index - outputs.size()).canAcceptTask()) {
+                    candidates.add(index);
+                }
+            }
+        }
+        final boolean randomMode = taskAllocationMode == TaskAllocationMode.RANDOM;
+        final int candidateCount = randomMode ? candidates.size() : endpointCount;
+        int selectedIndex = cn.ae2bc.core.dispatch.TaskEndpointSelector.select(
+                taskAllocationMode, roundRobinCursor, candidateCount,
+                ThreadLocalRandom.current()::nextInt, selectedCandidate -> {
+            int candidateIndex = randomMode ? candidates.get(selectedCandidate) : selectedCandidate;
             if (candidateIndex < outputCount) {
                 return tryAcceptOutput(outputs.get(candidateIndex), details, table, directions);
             }
             return managerDispatch != null && tryAcceptManager(
                     managers.get(candidateIndex - outputCount), managerDispatch, table);
         });
-        if (acceptedIndex < 0) {
+        if (selectedIndex < 0) {
             return false;
         }
         int moved = inputCount - countInputs(table);
         if (moved <= 0) {
             return false;
         }
-        roundRobinCursor = cn.ae2bc.core.dispatch.RoundRobinPolicy.advance(
-                acceptedIndex, endpointCount);
+        if (taskAllocationMode == TaskAllocationMode.ROUND_ROBIN) {
+            roundRobinCursor = cn.ae2bc.core.dispatch.RoundRobinPolicy.advance(
+                    selectedIndex, endpointCount);
+        }
         getHost().markForSave();
         queueTunnelDrain(PowerUnits.RF, moved);
         return true;
@@ -664,7 +700,7 @@ public final class PatternP2PTunnelPart
 
     private boolean tryAcceptOutput(PatternP2PTunnelPart output, ICraftingPatternDetails details,
             CraftingInventory table, long[] directions) {
-        if (!output.isOutput() || !output.isActive() || !output.canAcceptOutputTask(details)) {
+        if (!output.canAcceptTask() || !output.canAcceptOutputTask(details)) {
             return false;
         }
         // Probe the complete task before committing any slot to this one machine.
@@ -699,6 +735,11 @@ public final class PatternP2PTunnelPart
         OutputReturnMetadata metadata = outputReturnMetadata(details);
         return returnBatch.canAccept(stackKey(details.getPattern()),
                 metadata.outputs, metadata.primaryKey, metadata.primaryAmount);
+    }
+
+    /** Returns whether this output can be considered by an input dispatcher. */
+    public boolean canAcceptTask() {
+        return isOutput() && isActive() && returnBatch.canPotentiallyAccept();
     }
 
     private boolean beginOutputTask(ICraftingPatternDetails details, OutputReturnMetadata metadata) {
