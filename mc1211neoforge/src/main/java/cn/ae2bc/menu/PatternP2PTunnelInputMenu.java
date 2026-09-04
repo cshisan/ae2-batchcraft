@@ -9,6 +9,7 @@ import cn.ae2bc.logic.RedstoneOutputMode;
 import cn.ae2bc.logic.PatternP2PUnitConfiguration;
 import cn.ae2bc.logic.ProductExtractionSettings;
 import cn.ae2bc.logic.PatternDispatchMode;
+import cn.ae2bc.logic.EnergyDistributionMode;
 import cn.ae2bc.core.dispatch.TaskAllocationMode;
 import cn.ae2bc.core.unit.TransferPortOutputMode;
 import cn.ae2bc.core.unit.OutputSlotSharingMode;
@@ -32,6 +33,7 @@ public final class PatternP2PTunnelInputMenu extends AEBaseMenu {
     private static final String SET_TRANSFER_PORT_OUTPUT_MODE = "setTransferPortOutputMode";
     private static final String SET_OUTPUT_SLOT_SHARING_MODE = "setOutputSlotSharingMode";
     private static final String SET_TASK_ALLOCATION_MODE = "setTaskAllocationMode";
+    private static final String SET_ENERGY_DISTRIBUTION_MODE = "setEnergyDistributionMode";
 
     public static final MenuType<PatternP2PTunnelInputMenu> TYPE = MenuTypeBuilder
             .create(PatternP2PTunnelInputMenu::new, PatternP2PTunnelPart.class)
@@ -55,6 +57,7 @@ public final class PatternP2PTunnelInputMenu extends AEBaseMenu {
     @GuiSync(10) public TransferPortOutputMode transferPortOutputMode = TransferPortOutputMode.NORMAL;
     @GuiSync(11) public OutputSlotSharingMode outputSlotSharingMode = OutputSlotSharingMode.DISABLED;
     @GuiSync(12) public TaskAllocationMode taskAllocationMode = TaskAllocationMode.ROUND_ROBIN;
+    @GuiSync(13) public EnergyDistributionMode energyDistributionMode = EnergyDistributionMode.EVEN;
 
     public PatternP2PTunnelInputMenu(int id, Inventory playerInventory, PatternP2PTunnelPart host) {
         super(TYPE, id, playerInventory, host);
@@ -84,6 +87,8 @@ public final class PatternP2PTunnelInputMenu extends AEBaseMenu {
                 value -> updateConfiguration(configuration().withOutputSlotSharingMode(value)));
         registerClientAction(SET_TASK_ALLOCATION_MODE, TaskAllocationMode.class,
                 this::handleSetTaskAllocationMode);
+        registerClientAction(SET_ENERGY_DISTRIBUTION_MODE, EnergyDistributionMode.class,
+                value -> updateConfiguration(configuration().withEnergyDistributionMode(value)));
     }
 
     @Override
@@ -170,6 +175,13 @@ public final class PatternP2PTunnelInputMenu extends AEBaseMenu {
         }
     }
 
+    public void setEnergyDistributionMode(EnergyDistributionMode mode) {
+        if (mode != null) {
+            energyDistributionMode = mode;
+            sendClientAction(SET_ENERGY_DISTRIBUTION_MODE, mode);
+        }
+    }
+
     private void handleSetReturnMode(ReturnMode mode) {
         if (isServerSide() && !host.isOutput() && mode != null) {
             host.getInputLogic().setReturnMode(mode);
@@ -216,7 +228,7 @@ public final class PatternP2PTunnelInputMenu extends AEBaseMenu {
         return new PatternP2PUnitConfiguration(returnMode, breakRecovery, redstoneStrength,
                 redstoneMode, pulseWidth, pulsePeriod,
                 productExtractionInterval, productExtractionAmount, transferPortOutputMode,
-                outputSlotSharingMode);
+                outputSlotSharingMode, energyDistributionMode);
     }
 
     private void updateConfiguration(PatternP2PUnitConfiguration value) {
@@ -234,6 +246,7 @@ public final class PatternP2PTunnelInputMenu extends AEBaseMenu {
         productExtractionAmount = value.productExtractionAmount();
         transferPortOutputMode = value.transferPortOutputMode();
         outputSlotSharingMode = value.outputSlotSharingMode();
+        energyDistributionMode = value.energyDistributionMode();
     }
 
 }

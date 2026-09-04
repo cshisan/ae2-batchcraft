@@ -26,7 +26,8 @@ public final class PatternP2PUnitManagerScreen extends PatternP2PUnitPagedScreen
     private final Map<TransferPortOutputMode, Button> transferModeButtons =
             new EnumMap<>(TransferPortOutputMode.class);
     private final Button energyDistributionMode;
-    private final Button slotSharingMode;
+    private final Map<OutputSlotSharingMode, Button> singleSlotModeButtons =
+            new EnumMap<>(OutputSlotSharingMode.class);
     private final TabButton resetTaskToolbar;
     private ValidatedIntegerField strengthInput;
     private ValidatedIntegerField pulseTimeInput;
@@ -34,7 +35,7 @@ public final class PatternP2PUnitManagerScreen extends PatternP2PUnitPagedScreen
     private ProductExtractionControls extractionControls;
 
     public PatternP2PUnitManagerScreen(PatternP2PUnitManagerMenu menu, Inventory inventory, Component title, ScreenStyle style) {
-        super(menu, inventory, title, style);
+        super(menu, inventory, title, style, false, PageGroup.UNIT);
         syncMain = new VerticallyAlignedCheckbox(style,
                 Component.translatable("gui.ae2_batchcraft.pattern_p2p_unit.sync_main_configuration"));
         widgets.add("syncMain", syncMain);
@@ -54,10 +55,15 @@ public final class PatternP2PUnitManagerScreen extends PatternP2PUnitPagedScreen
                 () -> menu.setEnergyDistributionMode(menu.energyDistributionMode.next()));
         energyDistributionMode.setTooltip(Tooltip.create(Component.translatable(
                 "gui.ae2_batchcraft.energy_distribution_mode.tooltip")));
-        slotSharingMode = widgets.addButton("slotSharingMode", Component.empty(),
-                () -> menu.setOutputSlotSharingMode(menu.outputSlotSharingMode.next()));
-        slotSharingMode.setTooltip(Tooltip.create(Component.translatable(
-                "gui.ae2_batchcraft.pattern_p2p_unit.single_slot.tooltip")));
+        for (OutputSlotSharingMode mode : OutputSlotSharingMode.values()) {
+            var button = widgets.addButton("singleSlot" + camel(mode.getSerializedName()),
+                    Component.translatable("gui.ae2_batchcraft.pattern_p2p_unit.single_slot."
+                            + mode.getSerializedName()),
+                    () -> menu.setOutputSlotSharingMode(mode));
+            button.setTooltip(Tooltip.create(Component.translatable(
+                    "gui.ae2_batchcraft.pattern_p2p_unit.single_slot.tooltip")));
+            singleSlotModeButtons.put(mode, button);
+        }
         breakRecovery = new VerticallyAlignedCheckbox(style,
                 Component.translatable("gui.ae2_batchcraft.pattern_p2p_unit.break_recovery"));
         widgets.add("breakRecovery", breakRecovery);
@@ -112,8 +118,8 @@ public final class PatternP2PUnitManagerScreen extends PatternP2PUnitPagedScreen
     @Override
     protected int getPageHeight(Page page) {
         return switch (page) {
-            case COMMON -> 186;
-            case TRANSFER -> 82;
+            case COMMON -> 146;
+            case OUTPUT_COMMON, UNIT_COMMON, TRANSFER -> 82;
             case BREAK -> 82;
             case REDSTONE -> 166;
             case ENERGY -> 82;
@@ -123,6 +129,7 @@ public final class PatternP2PUnitManagerScreen extends PatternP2PUnitPagedScreen
     @Override
     protected void updatePageVisibility() {
         boolean common = isPage(Page.COMMON);
+        boolean unitCommon = isPage(Page.UNIT_COMMON);
         boolean transfer = isPage(Page.TRANSFER);
         boolean breakPort = isPage(Page.BREAK);
         boolean redstonePort = isPage(Page.REDSTONE);
@@ -132,7 +139,7 @@ public final class PatternP2PUnitManagerScreen extends PatternP2PUnitPagedScreen
             button.visible = common;
         }
         energyDistributionMode.visible = isPage(Page.ENERGY);
-        slotSharingMode.visible = common;
+        for (var button : singleSlotModeButtons.values()) button.visible = unitCommon;
         resetTaskToolbar.visible = true;
         breakRecovery.visible = breakPort;
         for (var button : redstoneModeButtons.values()) {
@@ -168,10 +175,9 @@ public final class PatternP2PUnitManagerScreen extends PatternP2PUnitPagedScreen
         energyDistributionMode.setMessage(Component.translatable(
                 "gui.ae2_batchcraft.energy_distribution_mode." +
                         menu.energyDistributionMode.getSerializedName()));
-        slotSharingMode.setMessage(Component.translatable(
-                "gui.ae2_batchcraft.pattern_p2p_unit.single_slot." +
-                        menu.outputSlotSharingMode.getSerializedName()));
-        slotSharingMode.active = editable;
+        for (var entry : singleSlotModeButtons.entrySet()) {
+            entry.getValue().active = editable && entry.getKey() != menu.outputSlotSharingMode;
+        }
         for (var entry : redstoneModeButtons.entrySet()) {
             entry.getValue().active = editable && entry.getKey() != menu.redstoneMode;
         }
@@ -198,7 +204,8 @@ public final class PatternP2PUnitManagerScreen extends PatternP2PUnitPagedScreen
                     "gui.ae2_batchcraft.return_configuration");
             drawSectionBackground(graphics, offsetX, offsetY, 85, 137,
                     "gui.ae2_batchcraft.product_extraction.title");
-            drawSectionBackground(graphics, offsetX, offsetY, 146, 177,
+        } else if (isPage(Page.UNIT_COMMON)) {
+            drawSectionBackground(graphics, offsetX, offsetY, 43, 74,
                     "gui.ae2_batchcraft.pattern_p2p_unit.section.single_slot");
         } else if (isPage(Page.TRANSFER)) {
             drawSectionBackground(graphics, offsetX, offsetY, 43, 74,
@@ -225,7 +232,8 @@ public final class PatternP2PUnitManagerScreen extends PatternP2PUnitPagedScreen
             drawSectionTitle(graphics, 81,
                     "gui.ae2_batchcraft.product_extraction.title");
             extractionControls.drawUnits(graphics, font, leftPos);
-            drawSectionTitle(graphics, 142,
+        } else if (isPage(Page.UNIT_COMMON)) {
+            drawSectionTitle(graphics, 39,
                     "gui.ae2_batchcraft.pattern_p2p_unit.section.single_slot");
         } else if (isPage(Page.TRANSFER)) {
             drawSectionTitle(graphics, 39,

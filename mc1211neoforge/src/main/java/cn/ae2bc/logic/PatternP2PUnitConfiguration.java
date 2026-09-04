@@ -16,7 +16,8 @@ public record PatternP2PUnitConfiguration(
         int productExtractionInterval,
         int productExtractionAmount,
         TransferPortOutputMode transferPortOutputMode,
-        OutputSlotSharingMode outputSlotSharingMode) {
+        OutputSlotSharingMode outputSlotSharingMode,
+        EnergyDistributionMode energyDistributionMode) {
     public static final int DEFAULT_REDSTONE_STRENGTH = PatternP2PUnitSettings.DEFAULT_REDSTONE_STRENGTH;
     public static final int DEFAULT_PULSE_WIDTH = PatternP2PUnitSettings.DEFAULT_PULSE_WIDTH;
     public static final int DEFAULT_PULSE_PERIOD = PatternP2PUnitSettings.DEFAULT_PULSE_PERIOD;
@@ -25,14 +26,23 @@ public record PatternP2PUnitConfiguration(
             ReturnMode.UNBLOCKED, true, DEFAULT_REDSTONE_STRENGTH,
             RedstoneOutputMode.SINGLE_TRIGGER, DEFAULT_PULSE_WIDTH, DEFAULT_PULSE_PERIOD,
             ProductExtractionSettings.DEFAULT_INTERVAL, ProductExtractionSettings.DEFAULT_AMOUNT,
-            TransferPortOutputMode.NORMAL, OutputSlotSharingMode.DISABLED);
+            TransferPortOutputMode.NORMAL, OutputSlotSharingMode.DISABLED, EnergyDistributionMode.EVEN);
 
     public PatternP2PUnitConfiguration(ReturnMode returnMode, boolean breakRecovery, int redstoneStrength,
             RedstoneOutputMode redstoneMode, int pulseWidthTicks, int pulsePeriodTicks,
             int productExtractionInterval, int productExtractionAmount) {
         this(returnMode, breakRecovery, redstoneStrength, redstoneMode, pulseWidthTicks, pulsePeriodTicks,
                 productExtractionInterval, productExtractionAmount, TransferPortOutputMode.NORMAL,
-                OutputSlotSharingMode.DISABLED);
+                OutputSlotSharingMode.DISABLED, EnergyDistributionMode.EVEN);
+    }
+
+    public PatternP2PUnitConfiguration(ReturnMode returnMode, boolean breakRecovery, int redstoneStrength,
+            RedstoneOutputMode redstoneMode, int pulseWidthTicks, int pulsePeriodTicks,
+            int productExtractionInterval, int productExtractionAmount,
+            TransferPortOutputMode transferPortOutputMode, OutputSlotSharingMode outputSlotSharingMode) {
+        this(returnMode, breakRecovery, redstoneStrength, redstoneMode, pulseWidthTicks, pulsePeriodTicks,
+                productExtractionInterval, productExtractionAmount, transferPortOutputMode,
+                outputSlotSharingMode, EnergyDistributionMode.EVEN);
     }
 
     public PatternP2PUnitConfiguration {
@@ -45,42 +55,55 @@ public record PatternP2PUnitConfiguration(
         productExtractionAmount = ProductExtractionSettings.clampAmount(productExtractionAmount);
         transferPortOutputMode = transferPortOutputMode == null ? TransferPortOutputMode.NORMAL : transferPortOutputMode;
         outputSlotSharingMode = outputSlotSharingMode == null ? OutputSlotSharingMode.DISABLED : outputSlotSharingMode;
+        energyDistributionMode = energyDistributionMode == null ? EnergyDistributionMode.EVEN : energyDistributionMode;
     }
 
     public PatternP2PUnitConfiguration withReturnMode(ReturnMode value) {
         return new PatternP2PUnitConfiguration(value, breakRecovery, redstoneStrength,
                 redstoneMode, pulseWidthTicks, pulsePeriodTicks,
-                productExtractionInterval, productExtractionAmount, transferPortOutputMode, outputSlotSharingMode);
+                productExtractionInterval, productExtractionAmount, transferPortOutputMode, outputSlotSharingMode,
+                energyDistributionMode);
     }
 
     public PatternP2PUnitConfiguration withBreakRecovery(boolean value) {
         return new PatternP2PUnitConfiguration(returnMode, value, redstoneStrength,
                 redstoneMode, pulseWidthTicks, pulsePeriodTicks,
-                productExtractionInterval, productExtractionAmount, transferPortOutputMode, outputSlotSharingMode);
+                productExtractionInterval, productExtractionAmount, transferPortOutputMode, outputSlotSharingMode,
+                energyDistributionMode);
     }
 
     public PatternP2PUnitConfiguration withRedstone(int strength, RedstoneOutputMode mode,
                                           int widthTicks, int periodTicks) {
         return new PatternP2PUnitConfiguration(returnMode, breakRecovery, strength, mode, widthTicks, periodTicks,
-                productExtractionInterval, productExtractionAmount, transferPortOutputMode, outputSlotSharingMode);
+                productExtractionInterval, productExtractionAmount, transferPortOutputMode, outputSlotSharingMode,
+                energyDistributionMode);
     }
 
     public PatternP2PUnitConfiguration withProductExtraction(int interval, int amount) {
         return new PatternP2PUnitConfiguration(returnMode, breakRecovery, redstoneStrength,
                 redstoneMode, pulseWidthTicks, pulsePeriodTicks, interval, amount, transferPortOutputMode,
-                outputSlotSharingMode);
+                outputSlotSharingMode, energyDistributionMode);
     }
 
     public PatternP2PUnitConfiguration withTransferPortOutputMode(TransferPortOutputMode value) {
         return new PatternP2PUnitConfiguration(returnMode, breakRecovery, redstoneStrength,
                 redstoneMode, pulseWidthTicks, pulsePeriodTicks,
-                productExtractionInterval, productExtractionAmount, value, outputSlotSharingMode);
+                productExtractionInterval, productExtractionAmount, value, outputSlotSharingMode,
+                energyDistributionMode);
     }
 
     public PatternP2PUnitConfiguration withOutputSlotSharingMode(OutputSlotSharingMode value) {
         return new PatternP2PUnitConfiguration(returnMode, breakRecovery, redstoneStrength,
                 redstoneMode, pulseWidthTicks, pulsePeriodTicks,
-                productExtractionInterval, productExtractionAmount, transferPortOutputMode, value);
+                productExtractionInterval, productExtractionAmount, transferPortOutputMode, value,
+                energyDistributionMode);
+    }
+
+    public PatternP2PUnitConfiguration withEnergyDistributionMode(EnergyDistributionMode value) {
+        return new PatternP2PUnitConfiguration(returnMode, breakRecovery, redstoneStrength,
+                redstoneMode, pulseWidthTicks, pulsePeriodTicks,
+                productExtractionInterval, productExtractionAmount, transferPortOutputMode,
+                outputSlotSharingMode, value);
     }
 
     public CompoundTag write() {
@@ -95,6 +118,7 @@ public record PatternP2PUnitConfiguration(
         data.putInt("ProductExtractionAmount", productExtractionAmount);
         data.putByte("TransferPortOutputMode", (byte) transferPortOutputMode.getId());
         data.putByte("OutputSlotSharingMode", (byte) outputSlotSharingMode.getId());
+        data.putByte("EnergyDistributionMode", (byte) energyDistributionMode.getId());
         return data;
     }
 
@@ -119,6 +143,9 @@ public record PatternP2PUnitConfiguration(
                         : DEFAULT.transferPortOutputMode,
                 data.contains("OutputSlotSharingMode")
                         ? OutputSlotSharingMode.fromId(data.getByte("OutputSlotSharingMode"))
-                        : DEFAULT.outputSlotSharingMode);
+                        : DEFAULT.outputSlotSharingMode,
+                data.contains("EnergyDistributionMode")
+                        ? EnergyDistributionMode.fromId(data.getByte("EnergyDistributionMode"))
+                        : DEFAULT.energyDistributionMode);
     }
 }

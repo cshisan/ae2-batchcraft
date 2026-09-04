@@ -53,14 +53,9 @@ public final class UnitPortOutputConfigScreen extends AEBaseScreen<UnitPortOutpu
     public void drawBG(GuiGraphics graphics, int offsetX, int offsetY, int mouseX, int mouseY,
                        float partialTicks) {
         super.drawBG(graphics, offsetX, offsetY, mouseX, mouseY, partialTicks);
-        drawSlotBackgrounds(graphics, offsetX, offsetY, UnitPortOutputConfigMenu.MARKER_SLOT);
+        drawSlotBackgrounds(graphics, offsetX, offsetY, SlotSemantics.CONFIG);
         drawSlotBackgrounds(graphics, offsetX, offsetY, SlotSemantics.PLAYER_INVENTORY);
         drawSlotBackgrounds(graphics, offsetX, offsetY, SlotSemantics.PLAYER_HOTBAR);
-    }
-
-    @Override
-    protected void init() {
-        super.init();
     }
 
     @Override

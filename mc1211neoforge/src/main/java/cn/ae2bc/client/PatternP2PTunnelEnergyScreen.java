@@ -27,8 +27,6 @@ public final class PatternP2PTunnelEnergyScreen extends AEBaseScreen<PatternP2PT
                 "gui.ae2_batchcraft.energy.mode.active.tooltip")));
         energyDistributionMode = widgets.addButton("energyDistributionMode", Component.empty(),
                 () -> menu.setEnergyDistributionMode(menu.energyDistributionMode.next()));
-        energyDistributionMode.setTooltip(Tooltip.create(Component.translatable(
-                "gui.ae2_batchcraft.energy_distribution_mode.tooltip")));
     }
 
     @Override

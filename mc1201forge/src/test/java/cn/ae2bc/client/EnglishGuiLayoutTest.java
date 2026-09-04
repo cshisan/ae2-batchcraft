@@ -52,7 +52,6 @@ class EnglishGuiLayoutTest {
         assertFits("gui.ae2_batchcraft.return_mode", 147);
         assertFits("gui.ae2_batchcraft.product_extraction.title", 147);
         assertFits("gui.ae2_batchcraft.pattern_p2p_unit.section.energy_configuration", 147);
-        assertFits("gui.ae2_batchcraft.pattern_p2p_unit.section.task_reset", 147);
         assertFits("gui.ae2_batchcraft.pattern_p2p_unit.redstone_mode", 147);
         assertFits("gui.ae2_batchcraft.pattern_p2p_unit.section.signal_parameters", 147);
         assertFits("gui.ae2_batchcraft.pattern_p2p_unit.section.drop_handling", 147);

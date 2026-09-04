@@ -22,10 +22,10 @@ Actively pulls products from the machine against its front face while its Unit t
 | Input extraction switch | Ignored by this port |
 | Applied settings | Extraction interval and amount |
 
-The input's extraction switch controls only normal outputs. The interval and amount below that switch still apply to synchronized Extraction Ports; an unsynchronized Manager uses its local values.
+The input's extraction switch controls only normal outputs. The interval and amount below that switch apply to synchronized Extraction Ports; an unsynchronized Manager uses its local values. New extraction requires an operational Unit task, including in Unblocked mode.
 
 Extraction may begin before all ingredients have finished dispatching. The Unit keeps pending ingredients separately and cannot complete until they are sent. Empty attempts use a gradual idle backoff capped at `20` ticks. Capability changes, return capacity, and recovery progress can wake extraction early without shortening the configured minimum interval after a successful extraction.
 
-If a pulled resource cannot immediately enter the return path, it is kept in the recovery queue and retried; it is not silently deleted.
+If a pulled resource cannot immediately enter the return path, it is kept in the recovery queue and retried; it is not silently deleted. The queue may continue draining after the task ends, but it never starts a new extraction after completion.
 
 See [Output Extraction](../product-return/endpoint-extraction.md).

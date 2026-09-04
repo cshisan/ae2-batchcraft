@@ -36,6 +36,24 @@ class UnitPortRuntimeStateSourceTest {
         assertTrue(port.contains("setRedstonePower(0);"));
     }
 
+    @Test
+    void managerAndOutputPortUseDirectLocalSlotOverrideSemantics() throws Exception {
+        String managerLogic = Files.readString(Path.of(
+                "src/main/java/cn/ae2bc/logic/PatternP2PUnitManagerLogic.java"));
+        String managerPart = Files.readString(Path.of(
+                "src/main/java/cn/ae2bc/part/PatternP2PUnitManagerPart.java"));
+        String port = Files.readString(Path.of(
+                "src/main/java/cn/ae2bc/part/PatternP2PUnitPortPart.java"));
+
+        assertTrue(managerLogic.contains("ConfigurationSync.State<PatternP2PUnitConfiguration> configurationState"));
+        assertFalse(managerLogic.contains("cachedMainConfiguration"));
+        assertTrue(managerLogic.contains("configurationState.applyBroadcast(configuration, revision)"));
+        assertTrue(managerPart.contains("port.applyManagerSingleSlot(mode);"));
+        assertTrue(port.contains("return singleSlot;"));
+        assertTrue(port.contains("public void applyManagerSingleSlot(OutputSlotSharingMode mode)"));
+        assertTrue(port.contains("mode == OutputSlotSharingMode.FOLLOW_PORT"));
+    }
+
     private static String section(String source, String start, String end) {
         int from = source.indexOf(start);
         int to = source.indexOf(end, from + start.length());

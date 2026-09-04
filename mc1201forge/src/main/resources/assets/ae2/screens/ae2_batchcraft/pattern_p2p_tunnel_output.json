@@ -1,15 +1,20 @@
 {
   "$schema": "../schema.json",
   "includes": ["../common/common.json"],
-  "generatedBackground": {"width": 176, "height": 124},
+  "generatedBackground": {"width": 172, "height": 146},
   "text": {
-    "dialog_title": {"text": {"translate": "item.ae2_batchcraft.pattern_p2p_tunnel_output"}, "position": {"left": 8, "top": 6}}
+    "dialog_title": {"text": {"translate": "item.ae2_batchcraft.pattern_p2p_tunnel_output"}, "position": {"left": 8, "top": 6}},
+    "page_title": {"text": {"translate": "gui.ae2_batchcraft.pattern_p2p_unit.page.common"}, "scale": 1.2, "position": {"left": 8, "top": 23}},
+    "extraction_interval": {"text": {"translate": "gui.ae2_batchcraft.product_extraction.interval"}, "position": {"left": 12, "top": 96}},
+    "extraction_amount": {"text": {"translate": "gui.ae2_batchcraft.product_extraction.amount"}, "position": {"left": 12, "top": 117}}
   },
   "widgets": {
-    "close": {"left": 152, "top": -5, "width": 20, "height": 20},
-    "syncInputSettings": {"left": 8, "top": 22, "width": 80, "height": 14},
-    "returnStrict": {"left": 12, "top": 50, "width": 73, "height": 18},
-    "returnUnblocked": {"left": 91, "top": 50, "width": 73, "height": 18},
-    "resetTask": {"left": 12, "top": 92, "width": 152, "height": 18}
+    "close": {"left": 148, "top": -5, "width": 20, "height": 20},
+    "syncInputSettings": {"left": 124, "top": 21, "width": 40, "height": 14},
+    "returnStrict": {"left": 12, "top": 50, "width": 71, "height": 18},
+    "returnUnblocked": {"left": 89, "top": 50, "width": 71, "height": 18},
+    "productExtractionEnabled": {"left": 12, "top": 50, "width": 71, "height": 18},
+    "productExtractionDisabled": {"left": 89, "top": 50, "width": 71, "height": 18},
+    "resetTaskToolbar": {"left": 172, "top": 17, "width": 22, "height": 22}
   }
 }

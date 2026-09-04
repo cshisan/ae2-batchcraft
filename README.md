@@ -29,6 +29,8 @@ endpoints and machines without copying the same patterns or spending one AE chan
 
 Transfer Ports support **Normal**, **Single Item**, and **Single Type** delivery modes. Separately, the Manager-level **Single-port single-slot** policy controls whether one output port may serve multiple encoded pattern slots: it can enable the restriction for all ports, disable it for all ports, or follow each port's own setting. Output ports can be assigned AE2 priorities and optional material markers; an AE2 Inverter Card reverses the marker filter. The adjacent machine remains the authority for its real inventory or tank capacity.
 
+Input-type Unit Ports can likewise configure return material markers and an optional Inverter Card.
+
 Collect Ports handle dropped items on every supported version. On Minecraft `1.20.1` and `1.21.1`, they can also collect
 source fluids; on `1.16.5` and `1.12.2`, they collect items only.
 
@@ -63,6 +65,12 @@ Output-type Unit Ports (Transfer, Drop, and Place) can be opened empty-handed to
 The input and all endpoints must be on the same AE subnet, powered, and loaded. Frequency `0000` means unconfigured.
 Offline, unloaded, busy, or blocked endpoints are skipped.
 
+Task allocation has three modes:
+
+- **Round Robin** starts at the saved cursor and rotates the cursor after each successful selection.
+- **Random** chooses a random starting endpoint, then continues trying the other endpoints if that attempt fails.
+- **Priority** starts from the first endpoint on every request and tries later endpoints after a failure.
+
 By default, **Full Dispatch** sends one complete request to one endpoint. For example, `100 A + 800 B -> 100 C` must fit
 into one machine before it is accepted.
 
@@ -88,12 +96,16 @@ remain bound to that Manager's identity.
 
 ### Optional Automation
 
-- Configure return mode and product extraction in the Pattern P2P input. Synchronized Unit Managers apply those settings
-  to their bound ports during active tasks, including changes made while the task is running.
+- Configure return mode and product extraction in the Pattern P2P input. Synchronized outputs and Unit Managers receive
+  broadcast changes and overwrite their current local values; unsynchronized endpoints remain local. Changes made while a task is
+  running apply to subsequent extraction and return decisions.
+- The input's extraction interval and amount are shared by normal outputs and Unit Extraction Ports. The output-side extraction
+  Enabled/Disabled buttons control each output when Sync is off, and follow the input when Sync is on.
 - On Minecraft `1.20.1` and `1.21.1`, install a **Product Extraction Card** in a Pattern Provider to configure its own
   adjacent-machine extraction and product filter.
 - Place a **Pattern P2P Tunnel (Energy)** toward an FE source to power the subnet and eligible machines, then choose
-  passive/active input and even/round-robin distribution in its GUI.
+  passive/active input and even/round-robin distribution in its GUI. The Energy Tunnel performs the first-stage allocation
+  between normal-output groups and Unit groups; each Unit Manager then performs the second-stage allocation among its Unit Energy Ports.
 - Use the **AE Component Placer** to select a point, line, or plane, choose a cable and part, optionally load a Memory
   Card frequency, and place the configured endpoints in one action.
 

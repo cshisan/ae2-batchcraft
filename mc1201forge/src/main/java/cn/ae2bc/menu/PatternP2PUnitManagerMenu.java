@@ -5,7 +5,6 @@ import appeng.menu.guisync.GuiSync;
 import appeng.menu.implementations.MenuTypeBuilder;
 import cn.ae2bc.Ae2bcMod;
 import cn.ae2bc.logic.EnergyDistributionMode;
-import cn.ae2bc.logic.PatternP2PEnergyGridService;
 import cn.ae2bc.logic.RedstoneOutputMode;
 import cn.ae2bc.logic.ReturnMode;
 import cn.ae2bc.logic.PatternP2PUnitConfiguration;
@@ -70,7 +69,7 @@ public final class PatternP2PUnitManagerMenu extends AEBaseMenu {
         registerClientAction(SET_PULSE_PERIOD, Integer.class, value -> update(
                 configuration().withRedstone(redstoneStrength, redstoneMode, pulseWidth, value)));
         registerClientAction(SET_ENERGY_DISTRIBUTION_MODE, EnergyDistributionMode.class,
-                this::handleSetEnergyDistributionMode);
+                value -> update(configuration().withEnergyDistributionMode(value)));
         registerClientAction(SET_PRODUCT_EXTRACTION_INTERVAL, Integer.class, value -> update(
                 configuration().withProductExtraction(value, productExtractionAmount)));
         registerClientAction(SET_PRODUCT_EXTRACTION_AMOUNT, Integer.class, value -> update(
@@ -88,9 +87,6 @@ public final class PatternP2PUnitManagerMenu extends AEBaseMenu {
             var logic = host.getLogic();
             syncMain = logic.isSyncMainConfiguration();
             copy(logic.getEffectiveConfiguration());
-            var grid = host.getMainNode().getGrid();
-            energyDistributionMode = grid == null ? logic.getEnergyDistributionMode()
-                    : grid.getService(PatternP2PEnergyGridService.class).getGlobalEnergyDistributionMode();
         }
         super.broadcastChanges();
     }
@@ -141,19 +137,11 @@ public final class PatternP2PUnitManagerMenu extends AEBaseMenu {
         if (isServerSide()) host.resetTaskState();
     }
 
-    private void handleSetEnergyDistributionMode(EnergyDistributionMode mode) {
-        if (isServerSide() && mode != null) {
-            var grid = host.getMainNode().getGrid();
-            if (grid != null) {
-                grid.getService(PatternP2PEnergyGridService.class).setGlobalEnergyDistributionMode(mode);
-            }
-        }
-    }
-
     private PatternP2PUnitConfiguration configuration() {
         return new PatternP2PUnitConfiguration(returnMode, breakRecovery, redstoneStrength,
                 redstoneMode, pulseWidth, pulsePeriod,
-                productExtractionInterval, productExtractionAmount, transferPortOutputMode, outputSlotSharingMode);
+                productExtractionInterval, productExtractionAmount, transferPortOutputMode,
+                outputSlotSharingMode, energyDistributionMode);
     }
 
     private void update(PatternP2PUnitConfiguration value) {
@@ -171,5 +159,6 @@ public final class PatternP2PUnitManagerMenu extends AEBaseMenu {
         productExtractionAmount = value.productExtractionAmount();
         transferPortOutputMode = value.transferPortOutputMode();
         outputSlotSharingMode = value.outputSlotSharingMode();
+        energyDistributionMode = value.energyDistributionMode();
     }
 }

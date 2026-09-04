@@ -6,6 +6,7 @@ import cn.ae2bc.menu.PatternP2PTunnelEnergyMenu;
 import cn.ae2bc.menu.PatternP2PTunnelMenu;
 import cn.ae2bc.menu.PatternP2PUnitManagerMenu;
 import cn.ae2bc.menu.ComponentPlacerMenu;
+import cn.ae2bc.menu.UnitPortInputConfigMenu;
 import cn.ae2bc.menu.UnitPortOutputConfigMenu;
 import cn.ae2bc.placer.ComponentPlacerItem;
 import cn.ae2bc.part.PatternP2PTunnelEnergyPart;
@@ -78,6 +79,8 @@ public final class ModContent {
                     () -> IForgeContainerType.create(ComponentPlacerMenu::new));
     public static final RegistryObject<ContainerType<UnitPortOutputConfigMenu>> UNIT_PORT_OUTPUT_CONFIG =
             CONTAINERS.register("unit_port_output_config", () -> IForgeContainerType.create(UnitPortOutputConfigMenu::new));
+    public static final RegistryObject<ContainerType<UnitPortInputConfigMenu>> UNIT_PORT_INPUT_CONFIG =
+            CONTAINERS.register("unit_port_input_config", () -> IForgeContainerType.create(UnitPortInputConfigMenu::new));
 
     private ModContent() {
     }

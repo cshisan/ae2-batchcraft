@@ -42,6 +42,7 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -57,6 +58,9 @@ public final class PatternP2PTunnelOutputLogic implements ProductExtractionTask 
     private static final String ACTIVE_TASK_COUNT = "ActiveTaskCount";
     private static final String BATCH_SESSION_ID = "BatchSessionId";
     private static final String SYNC_INPUT_SETTINGS = "SyncInputSettings";
+    private static final String PRODUCT_EXTRACTION_ENABLED = "ProductExtractionEnabled";
+    private static final String PRODUCT_EXTRACTION_INTERVAL = "ProductExtractionInterval";
+    private static final String PRODUCT_EXTRACTION_AMOUNT = "ProductExtractionAmount";
     private static final String ENERGY_DISTRIBUTION_MODE = "EnergyDistributionMode";
     private static final String PRODUCT_EXTRACTION_RECOVERY = "ProductExtractionRecovery";
 
@@ -67,12 +71,16 @@ public final class PatternP2PTunnelOutputLogic implements ProductExtractionTask 
     private final ExtractionRecoveryQueue productExtractionRecovery;
     private final ReturnBatchTracker<AEKey, AEItemKey> returnBatch = new ReturnBatchTracker<>();
     private @Nullable TargetCache targetCache;
-    private ReturnMode returnMode = ReturnMode.UNBLOCKED;
-    private boolean syncInputSettings = true;
+    private final ConfigurationSync.State<OutputConfiguration> configurationState =
+            new ConfigurationSync.State<>(
+                    new OutputConfiguration(ReturnMode.UNBLOCKED, EndpointProductExtractionSettings.DEFAULT),
+                    true, -1);
     private EnergyDistributionMode energyDistributionMode = EnergyDistributionMode.EVEN;
     private int pendingRetryFailures;
     private long pendingNextRetryTick;
     private @Nullable UUID batchSessionId;
+    /** Declared output types captured for the duration of one extraction pass. */
+    private @Nullable Set<AEKey> productExtractionReturnFilter;
 
     public PatternP2PTunnelOutputLogic(IManagedGridNode mainNode, PatternP2PTunnelPart output) {
         this.mainNode = mainNode;
@@ -133,45 +141,110 @@ public final class PatternP2PTunnelOutputLogic implements ProductExtractionTask 
     }
 
     public ReturnMode getReturnMode() {
-        return returnMode;
+        return configurationState.value().returnMode();
     }
 
     public void setReturnMode(ReturnMode mode) {
         Objects.requireNonNull(mode, "mode");
-        if (returnMode != mode) {
+        if (configurationState.isSynchronizationEnabled()) {
+            return;
+        }
+        if (configurationState.value().returnMode() != mode) {
             boolean wasAvailable = canAcceptTask();
-            returnMode = mode;
+            configurationState.setLocalValue(new OutputConfiguration(
+                    mode, configurationState.value().productExtractionSettings()));
             persistStateChange(wasAvailable);
         }
     }
 
     public boolean isSyncInputSettings() {
-        return syncInputSettings;
+        return configurationState.isSynchronizationEnabled();
     }
 
     public void setSyncInputSettings(boolean enabled) {
-        if (syncInputSettings == enabled) {
+        if (!configurationState.setSynchronizationEnabled(enabled)) {
             return;
         }
-        syncInputSettings = enabled;
         if (enabled) {
             output.synchronizeFromInput();
         }
+        alertRetry();
         output.getHost().markForSave();
     }
 
-    public void applyInputSettings(ReturnMode mode) {
-        Objects.requireNonNull(mode, "mode");
-        if (!syncInputSettings || returnMode == mode) {
+    public EndpointProductExtractionSettings getProductExtractionSettings() {
+        return configurationState.value().productExtractionSettings();
+    }
+
+    public void setProductExtractionEnabled(boolean enabled) {
+        EndpointProductExtractionSettings settings = configurationState.value().productExtractionSettings();
+        updateProductExtractionSettings(enabled, settings.interval(), settings.amount());
+    }
+
+    public void setProductExtractionInterval(int interval) {
+        EndpointProductExtractionSettings settings = configurationState.value().productExtractionSettings();
+        updateProductExtractionSettings(settings.enabled(), interval, settings.amount());
+    }
+
+    public void setProductExtractionAmount(int amount) {
+        EndpointProductExtractionSettings settings = configurationState.value().productExtractionSettings();
+        updateProductExtractionSettings(settings.enabled(), settings.interval(), amount);
+    }
+
+    private void updateProductExtractionSettings(boolean enabled, int interval, int amount) {
+        EndpointProductExtractionSettings current = configurationState.value().productExtractionSettings();
+        if (configurationState.isSynchronizationEnabled() || current.hasSameValues(enabled, interval, amount)) {
             return;
         }
+        EndpointProductExtractionSettings updated = new EndpointProductExtractionSettings(enabled, interval, amount,
+                current.revision() + 1);
+        configurationState.setLocalValue(new OutputConfiguration(
+                configurationState.value().returnMode(), updated));
+        output.getHost().markForSave();
+        alertRetry();
+    }
+
+    public void applyInputSettings(ReturnMode mode, EndpointProductExtractionSettings extractionSettings) {
+        Objects.requireNonNull(mode, "mode");
+        Objects.requireNonNull(extractionSettings, "extractionSettings");
+        OutputConfiguration current = configurationState.value();
+        OutputConfiguration incoming = new OutputConfiguration(mode, extractionSettings);
         boolean wasAvailable = canAcceptTask();
-        returnMode = mode;
-        persistStateChange(wasAvailable);
+        boolean applied = configurationState.applyBroadcast(incoming, extractionSettings.revision());
+        if (!applied) {
+            return;
+        }
+        boolean returnModeChanged = current.returnMode() != mode;
+        boolean extractionChanged = !current.productExtractionSettings().hasSameValues(
+                extractionSettings.enabled(), extractionSettings.interval(), extractionSettings.amount());
+        if (returnModeChanged) {
+            persistStateChange(wasAvailable);
+        } else {
+            output.getHost().markForSave();
+        }
+        if (extractionChanged) {
+            alertRetry();
+        }
     }
 
     public long filterReturnAmount(AEKey what, long amount) {
-        return returnBatch.filter(what, amount, returnMode);
+        var extractionFilter = productExtractionReturnFilter;
+        if (extractionFilter != null && !isTaskActive()) {
+            return 0;
+        }
+        if (extractionFilter != null && getReturnMode() == ReturnMode.STRICT
+                && !extractionFilter.contains(what)) {
+            return 0;
+        }
+        return returnBatch.filter(what, amount, getReturnMode());
+    }
+
+    public void beginProductExtractionFilter() {
+        productExtractionReturnFilter = Set.copyOf(returnBatch.getDeclaredOutputs().keySet());
+    }
+
+    public void endProductExtractionFilter() {
+        productExtractionReturnFilter = null;
     }
 
     public void onReturnedStack(GenericStack stack) {
@@ -460,9 +533,13 @@ public final class PatternP2PTunnelOutputLogic implements ProductExtractionTask 
                               @Nullable UUID sessionId) {
         GenericStack primary = metadata.primaryOutput();
         if (sessionId != null && returnBatch.isActive()) {
-            return sessionId.equals(batchSessionId)
+            boolean appended = sessionId.equals(batchSessionId)
                     && returnBatch.append(pattern.getDefinition(), metadata.declaredOutputs(),
-                    primary.what(), primary.amount());
+                            primary.what(), primary.amount());
+            if (appended) {
+                alertRetry();
+            }
+            return appended;
         }
         if (sessionId == null && batchSessionId != null) {
             return false;
@@ -471,6 +548,7 @@ public final class PatternP2PTunnelOutputLogic implements ProductExtractionTask 
                 primary.what(), primary.amount());
         if (begun) {
             batchSessionId = sessionId;
+            alertRetry();
         }
         return begun;
     }
@@ -536,11 +614,20 @@ public final class PatternP2PTunnelOutputLogic implements ProductExtractionTask 
         energyDistributionMode = data.contains(ENERGY_DISTRIBUTION_MODE)
                 ? EnergyDistributionMode.fromId(data.getByte(ENERGY_DISTRIBUTION_MODE))
                 : EnergyDistributionMode.EVEN;
-        returnMode = data.contains(RETURN_MODE)
+        ReturnMode restoredReturnMode = data.contains(RETURN_MODE)
                 ? ReturnMode.fromId(data.getByte(RETURN_MODE)) : ReturnMode.UNBLOCKED;
         GenericStack loadedRemainingPrimary = data.contains(REMAINING_PRIMARY_OUTPUT, Tag.TAG_COMPOUND)
                 ? GenericStack.readTag(registries, data.getCompound(REMAINING_PRIMARY_OUTPUT)) : null;
-        syncInputSettings = !data.contains(SYNC_INPUT_SETTINGS) || data.getBoolean(SYNC_INPUT_SETTINGS);
+        boolean synchronizationEnabled = !data.contains(SYNC_INPUT_SETTINGS) || data.getBoolean(SYNC_INPUT_SETTINGS);
+        EndpointProductExtractionSettings restoredExtractionSettings = new EndpointProductExtractionSettings(
+                data.getBoolean(PRODUCT_EXTRACTION_ENABLED),
+                data.contains(PRODUCT_EXTRACTION_INTERVAL)
+                        ? data.getInt(PRODUCT_EXTRACTION_INTERVAL) : ProductExtractionSettings.DEFAULT_INTERVAL,
+                data.contains(PRODUCT_EXTRACTION_AMOUNT)
+                        ? data.getInt(PRODUCT_EXTRACTION_AMOUNT) : ProductExtractionSettings.DEFAULT_AMOUNT,
+                0);
+        configurationState.restore(new OutputConfiguration(restoredReturnMode, restoredExtractionSettings),
+                restoredExtractionSettings.revision(), synchronizationEnabled);
         Map<AEKey, Long> loadedDeclaredOutputs = readCounter(data, DECLARED_OUTPUTS, registries);
         AEItemKey loadedPattern = data.contains(ACTIVE_PATTERN, Tag.TAG_COMPOUND)
                 ? AEItemKey.fromTag(registries, data.getCompound(ACTIVE_PATTERN)) : null;
@@ -566,7 +653,7 @@ public final class PatternP2PTunnelOutputLogic implements ProductExtractionTask 
 
     public void writeToNBT(CompoundTag data, HolderLookup.Provider registries) {
         data.putByte(ENERGY_DISTRIBUTION_MODE, (byte) energyDistributionMode.getId());
-        data.putByte(RETURN_MODE, (byte) returnMode.getId());
+        data.putByte(RETURN_MODE, (byte) getReturnMode().getId());
         data.remove("ActiveReturnMode");
         if (returnBatch.isActive() && returnBatch.getPrimaryKey() != null && returnBatch.getExpectedPrimary() > 0) {
             data.put(REMAINING_PRIMARY_OUTPUT, GenericStack.writeTag(registries,
@@ -584,7 +671,11 @@ public final class PatternP2PTunnelOutputLogic implements ProductExtractionTask 
         } else {
             data.remove(ACTIVE_TASK_COUNT);
         }
-        data.putBoolean(SYNC_INPUT_SETTINGS, syncInputSettings);
+        EndpointProductExtractionSettings extractionSettings = getProductExtractionSettings();
+        data.putBoolean(SYNC_INPUT_SETTINGS, configurationState.isSynchronizationEnabled());
+        data.putBoolean(PRODUCT_EXTRACTION_ENABLED, extractionSettings.enabled());
+        data.putInt(PRODUCT_EXTRACTION_INTERVAL, extractionSettings.interval());
+        data.putInt(PRODUCT_EXTRACTION_AMOUNT, extractionSettings.amount());
         data.put(DECLARED_OUTPUTS, writeCounter(returnBatch.getDeclaredOutputs(), registries));
         data.remove("ExpectedPrimaryOutputs");
         ListTag list = new ListTag();
@@ -678,13 +769,14 @@ public final class PatternP2PTunnelOutputLogic implements ProductExtractionTask 
 
     @Override
     public boolean hasProductExtractionWork() {
-        var settings = output.getProductExtractionSettingsFromInput();
-        return !productExtractionRecovery.isEmpty() || settings != null && settings.enabled();
+        var settings = getEffectiveProductExtractionSettings();
+        return !productExtractionRecovery.isEmpty()
+                || isTaskActive() && settings != null && settings.enabled();
     }
 
     @Override
     public int getProductExtractionInterval() {
-        var settings = output.getProductExtractionSettingsFromInput();
+        var settings = getEffectiveProductExtractionSettings();
         return settings == null ? ProductExtractionSettings.DEFAULT_INTERVAL : settings.interval();
     }
 
@@ -701,8 +793,8 @@ public final class PatternP2PTunnelOutputLogic implements ProductExtractionTask 
             return ProductExtractionTickState.DISABLED;
         }
         boolean recoveryProgress = drainProductExtractionRecovery();
-        var endpointSettings = output.getProductExtractionSettingsFromInput();
-        if (endpointSettings == null || !endpointSettings.enabled()) {
+        var endpointSettings = getEffectiveProductExtractionSettings();
+        if (!isTaskActive() || endpointSettings == null || !endpointSettings.enabled()) {
             if (recoveryProgress) {
                 return ProductExtractionTickState.PROGRESSED;
             }
@@ -719,9 +811,15 @@ public final class PatternP2PTunnelOutputLogic implements ProductExtractionTask 
         var targetPos = output.getBlockEntity().getBlockPos().relative(side);
         Direction targetSide = side.getOpposite();
         var sources = getTargetCache(level, targetPos).get(targetSide).resolveStorages(this::onTargetChanged);
-        ProductExtractor.Result result = ProductExtractor.extract(ExtractionSource.fromTypeMap(sources),
-                output.getReturnInventory(), settings, retryActionSource,
-                productExtractionRecovery::queue, budget);
+        beginProductExtractionFilter();
+        ProductExtractor.Result result;
+        try {
+            result = ProductExtractor.extract(ExtractionSource.fromTypeMap(sources),
+                    output.getReturnInventory(), settings, retryActionSource,
+                    productExtractionRecovery::queue, budget);
+        } finally {
+            endProductExtractionFilter();
+        }
         if (result.budgetExhausted()) {
             return ProductExtractionTickState.BUDGET_EXHAUSTED;
         }
@@ -730,6 +828,14 @@ public final class PatternP2PTunnelOutputLogic implements ProductExtractionTask 
         }
         return result.moved() > 0 || recoveryProgress
                 ? ProductExtractionTickState.PROGRESSED : ProductExtractionTickState.NO_PROGRESS;
+    }
+
+    private @Nullable EndpointProductExtractionSettings getEffectiveProductExtractionSettings() {
+        return getProductExtractionSettings();
+    }
+
+    private record OutputConfiguration(ReturnMode returnMode,
+                                       EndpointProductExtractionSettings productExtractionSettings) {
     }
 
     private boolean drainProductExtractionRecovery() {

@@ -2,7 +2,11 @@ package cn.ae2bc.part;
 
 import cn.ae2bc.core.ProjectLimits;
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 
 import appeng.api.config.AccessRestriction;
 import appeng.api.config.Actionable;
@@ -49,6 +53,7 @@ public final class PatternP2PTunnelEnergyPart extends PartBasicState
     private final IEnergyStorage energyStorage = new DynamicEnergyStorage();
     private boolean transferring;
     private int distributionCursor;
+    private final Map<Object, Integer> groupDistributionCursors = new HashMap<Object, Integer>();
     private long demandCacheTick = Long.MIN_VALUE;
     private int demandCacheFe;
     private long outputCacheTick = Long.MIN_VALUE;
@@ -209,8 +214,8 @@ public final class PatternP2PTunnelEnergyPart extends PartBasicState
         long tick = getTile().getWorld().getTotalWorldTime();
         if (demandCacheTick != tick) {
             int total = 0;
-            for (EnergyEndpoint output : outputs()) {
-                int demand = output.receiveExternalEnergy(Integer.MAX_VALUE, true);
+            for (EnergyGroup group : energyGroups()) {
+                int demand = group.demand();
                 if (Integer.MAX_VALUE - total < demand) {
                     total = Integer.MAX_VALUE;
                     break;
@@ -224,20 +229,110 @@ public final class PatternP2PTunnelEnergyPart extends PartBasicState
     }
 
     private int distribute(int offered, boolean simulate) {
-        final List<EnergyEndpoint> outputs = outputs();
-        if (outputs.isEmpty()) return 0;
-        int start = Math.floorMod(distributionCursor, outputs.size());
-        int accepted;
+        final List<EnergyGroup> groups = energyGroups();
+        if (groups.isEmpty()) return 0;
+        final int[] allocations = new int[groups.size()];
+        int start = Math.floorMod(distributionCursor, groups.size());
         if (distributionMode == EnergyDistributionMode.ROUND_ROBIN) {
-            accepted = PrioritizedEnergyDistributor.distribute(offered, outputs.size(),
-                    index -> outputs.get(index).receiveExternalEnergy(Integer.MAX_VALUE, true),
-                    (index, amount) -> outputs.get(index).receiveExternalEnergy(amount, simulate));
+            PrioritizedEnergyDistributor.distribute(offered, groups.size(),
+                    index -> groups.get(Math.floorMod(start + index, groups.size())).demand(),
+                    (index, amount) -> reserveAllocation(
+                            allocations, Math.floorMod(start + index, groups.size()), amount,
+                            groups.get(Math.floorMod(start + index, groups.size())).demand()));
         } else {
-            accepted = FairEnergyDistributor.distribute(offered, outputs.size(), start,
-                    (index, amount) -> outputs.get(index).receiveExternalEnergy(amount, simulate));
+            FairEnergyDistributor.distribute(offered, groups.size(), start,
+                    (index, amount) -> reserveAllocation(
+                            allocations, index, amount, groups.get(index).demand()));
         }
-        if (!simulate) distributionCursor = (start + 1) % outputs.size();
+        int accepted = 0;
+        for (int index = 0; index < groups.size(); index++) {
+            accepted += groups.get(index).receive(allocations[index], simulate);
+        }
+        if (!simulate) distributionCursor = (start + 1) % groups.size();
         return accepted;
+    }
+
+    private static int reserveAllocation(int[] allocations, int index, int amount, int demand) {
+        int accepted = Math.min(amount, Math.max(0, demand - allocations[index]));
+        allocations[index] += accepted;
+        return accepted;
+    }
+
+    private List<EnergyGroup> energyGroups() {
+        LinkedHashMap<Object, EnergyGroup> grouped = new LinkedHashMap<Object, EnergyGroup>();
+        for (EnergyEndpoint endpoint : outputs()) {
+            Object key = energyGroupKey(endpoint);
+            if (key == null) continue;
+            EnergyGroup group = grouped.get(key);
+            if (group == null) {
+                group = new EnergyGroup(key);
+                grouped.put(key, group);
+            }
+            group.endpoints.add(endpoint);
+        }
+        groupDistributionCursors.keySet().retainAll(grouped.keySet());
+        return new ArrayList<EnergyGroup>(grouped.values());
+    }
+
+    private static Object energyGroupKey(EnergyEndpoint endpoint) {
+        if (endpoint instanceof PatternP2PTunnelPart) {
+            short frequency = ((PatternP2PTunnelPart) endpoint).getFrequency();
+            return frequency == 0 ? null : Short.valueOf(frequency);
+        }
+        if (endpoint instanceof PatternP2PUnitPortPart) {
+            UUID managerId = ((PatternP2PUnitPortPart) endpoint).getBoundManagerId();
+            return managerId;
+        }
+        return endpoint;
+    }
+
+    private final class EnergyGroup {
+        private final Object key;
+        private final List<EnergyEndpoint> endpoints = new ArrayList<EnergyEndpoint>();
+
+        private EnergyGroup(Object key) {
+            this.key = key;
+        }
+
+        private int demand() {
+            int total = 0;
+            for (EnergyEndpoint endpoint : endpoints) {
+                int demand = endpoint.receiveExternalEnergy(Integer.MAX_VALUE, true);
+                if (Integer.MAX_VALUE - total < demand) return Integer.MAX_VALUE;
+                total += demand;
+            }
+            return total;
+        }
+
+        private int receive(int offered, boolean simulate) {
+            if (offered <= 0 || endpoints.isEmpty()) return 0;
+            int cursor = groupDistributionCursors.containsKey(key)
+                    ? groupDistributionCursors.get(key).intValue() : 0;
+            final int start = Math.floorMod(cursor, endpoints.size());
+            EnergyDistributionMode mode = groupMode();
+            int accepted;
+            if (mode == EnergyDistributionMode.ROUND_ROBIN) {
+                accepted = PrioritizedEnergyDistributor.distribute(offered, endpoints.size(),
+                        index -> endpoints.get(Math.floorMod(start + index, endpoints.size()))
+                                .receiveExternalEnergy(Integer.MAX_VALUE, true),
+                        (index, amount) -> endpoints.get(Math.floorMod(start + index, endpoints.size()))
+                                .receiveExternalEnergy(amount, simulate));
+            } else {
+                accepted = FairEnergyDistributor.distribute(offered, endpoints.size(), start,
+                        (index, amount) -> endpoints.get(index).receiveExternalEnergy(amount, simulate));
+            }
+            if (!simulate) groupDistributionCursors.put(key, Integer.valueOf((start + 1) % endpoints.size()));
+            return accepted;
+        }
+
+        private EnergyDistributionMode groupMode() {
+            EnergyEndpoint first = endpoints.get(0);
+            if (first instanceof PatternP2PUnitPortPart) {
+                PatternP2PUnitManagerPart manager = ((PatternP2PUnitPortPart) first).findManager();
+                return manager == null ? EnergyDistributionMode.EVEN : manager.getEnergyDistributionMode();
+            }
+            return distributionMode;
+        }
     }
 
     private List<EnergyEndpoint> outputs() {

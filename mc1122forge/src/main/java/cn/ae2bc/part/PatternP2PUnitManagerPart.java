@@ -31,6 +31,8 @@ import appeng.parts.networking.PartCable;
 import cn.ae2bc.core.frequency.FrequencyLimits;
 import cn.ae2bc.core.unit.PatternP2PUnitSettings;
 import cn.ae2bc.core.unit.OutputSlotSharingMode;
+import cn.ae2bc.core.unit.TransferPortOutputMode;
+import cn.ae2bc.logic.EnergyDistributionMode;
 import cn.ae2bc.logic.PatternP2PUnitDimensions;
 import cn.ae2bc.logic.PatternP2PTopologyGridService;
 import cn.ae2bc.Ae2bcMod;
@@ -88,11 +90,12 @@ public final class PatternP2PUnitManagerPart extends PartCable
     private int pulseWidthTicks = 2;
     private int pulsePeriodTicks = 20;
     private OutputSlotSharingMode outputSlotSharingMode = OutputSlotSharingMode.DISABLED;
+    private TransferPortOutputMode transferPortOutputMode = TransferPortOutputMode.NORMAL;
+    private EnergyDistributionMode energyDistributionMode = EnergyDistributionMode.EVEN;
     private long taskRevision;
     private boolean syncMainConfiguration = true;
     private boolean synchronizingFromInput;
-    private PatternP2PUnitSettings mainConfiguration = PatternP2PUnitSettings.DEFAULT;
-    private long mainConfigurationRevision = -1;
+    private long lastAppliedMainConfigurationRevision = -1;
 
     public PatternP2PUnitManagerPart(ItemStack stack) {
         super(stack);
@@ -131,19 +134,12 @@ public final class PatternP2PUnitManagerPart extends PartCable
     public int getPulseWidthTicks() { return getEffectiveSettings().getPulseWidthTicks(); }
     public int getPulsePeriodTicks() { return getEffectiveSettings().getPulsePeriodTicks(); }
     public OutputSlotSharingMode getOutputSlotSharingMode() {
-        // Keep the effective configuration current when a port GUI reads it directly,
-        // matching the 1.21.1 manager's input-synchronized configuration semantics.
-        if (syncMainConfiguration && !synchronizingFromInput && getTile() != null
-                && getTile().getWorld() != null && !getTile().getWorld().isRemote) {
-            synchronizeFromInput();
-        }
         return getEffectiveSettings().getOutputSlotSharingMode();
     }
     public long getTaskRevision() { return taskRevision; }
     public boolean isSyncMainConfiguration() { return syncMainConfiguration; }
     public void setSyncMainConfiguration(boolean value) {
         if (syncMainConfiguration == value) return;
-        if (!value) applyLocalSettings(getEffectiveSettings());
         syncMainConfiguration = value;
         if (value) {
             invalidateInputCache();
@@ -152,6 +148,7 @@ public final class PatternP2PUnitManagerPart extends PartCable
         saveChanges();
         getHost().markForUpdate();
         wakeBoundPorts();
+        applyOutputSlotSharingModeToPorts();
         cn.ae2bc.network.ModNetwork.refreshUnitPortStates(this);
     }
 
@@ -165,17 +162,18 @@ public final class PatternP2PUnitManagerPart extends PartCable
         saveChanges();
         getHost().markForUpdate();
         wakeBoundPorts();
+        applyOutputSlotSharingModeToPorts();
         cn.ae2bc.network.ModNetwork.refreshUnitPortStates(this);
     }
 
     private PatternP2PUnitSettings getLocalSettings() {
         return new PatternP2PUnitSettings(returnMode, breakRecovery, extractionInterval,
                 extractionAmount, redstoneMode, redstoneStrength, pulseWidthTicks, pulsePeriodTicks,
-                cn.ae2bc.core.unit.TransferPortOutputMode.NORMAL, outputSlotSharingMode);
+                transferPortOutputMode, outputSlotSharingMode, energyDistributionMode);
     }
 
     private PatternP2PUnitSettings getEffectiveSettings() {
-        return syncMainConfiguration ? mainConfiguration : getLocalSettings();
+        return getLocalSettings();
     }
 
     private void applyLocalSettings(PatternP2PUnitSettings settings) {
@@ -187,18 +185,30 @@ public final class PatternP2PUnitManagerPart extends PartCable
         redstoneStrength = settings.getRedstoneStrength();
         pulseWidthTicks = settings.getPulseWidthTicks();
         pulsePeriodTicks = settings.getPulsePeriodTicks();
+        transferPortOutputMode = settings.getTransferPortOutputMode();
         outputSlotSharingMode = settings.getOutputSlotSharingMode();
+        energyDistributionMode = settings.getEnergyDistributionMode();
     }
 
     public void applyMainConfiguration(PatternP2PUnitSettings settings, long revision) {
-        if (settings == null) return;
-        if (mainConfigurationRevision == revision && sameSettings(mainConfiguration, settings)) return;
-        mainConfiguration = settings;
-        mainConfigurationRevision = revision;
+        if (settings == null || !syncMainConfiguration) return;
+        if (lastAppliedMainConfigurationRevision == revision
+                && sameSettings(getLocalSettings(), settings)) return;
+        applyLocalSettings(settings);
+        lastAppliedMainConfigurationRevision = revision;
         saveChanges();
         getHost().markForUpdate();
         wakeBoundPorts();
+        applyOutputSlotSharingModeToPorts();
         cn.ae2bc.network.ModNetwork.refreshUnitPortStates(this);
+    }
+
+    /** Propagates the manager's current single-slot policy to bound output ports. */
+    public void applyOutputSlotSharingModeToPorts() {
+        for (PatternP2PUnitPortPart port
+                : PatternP2PTopologyGridService.findPorts(getGridNode(), unitId)) {
+            port.applyManagerSingleSlot(getOutputSlotSharingMode());
+        }
     }
 
     public void resetTaskState() {
@@ -218,20 +228,16 @@ public final class PatternP2PUnitManagerPart extends PartCable
         invalidateBoundPortRuntimeState();
     }
 
-    public cn.ae2bc.logic.EnergyDistributionMode getEnergyDistributionMode() {
-        for (PatternP2PTunnelEnergyPart energy
-                : PatternP2PTopologyGridService.findEnergyParts(getGridNode())) {
-            return energy.getDistributionMode();
-        }
-        return cn.ae2bc.logic.EnergyDistributionMode.EVEN;
+    public EnergyDistributionMode getEnergyDistributionMode() {
+        return getEffectiveSettings().getEnergyDistributionMode();
     }
 
-    public void setEnergyDistributionMode(cn.ae2bc.logic.EnergyDistributionMode mode) {
-        if (mode == null) return;
-        for (PatternP2PTunnelEnergyPart energy
-                : PatternP2PTopologyGridService.findEnergyParts(getGridNode())) {
-            energy.setSettings(energy.isPullEnabled(), mode);
-        }
+    public void setEnergyDistributionMode(EnergyDistributionMode mode) {
+        if (mode == null || syncMainConfiguration || energyDistributionMode == mode) return;
+        energyDistributionMode = mode;
+        saveChanges();
+        getHost().markForUpdate();
+        wakeBoundPorts();
     }
 
     public boolean canAcceptInput(ItemStack stack, cn.ae2bc.core.unit.UnitPortType targetType) {
@@ -483,6 +489,13 @@ public final class PatternP2PUnitManagerPart extends PartCable
         return remainder;
     }
 
+    /** Retries an already validated extraction remainder after its task may have completed. */
+    public ItemStack returnProductRecovery(ItemStack stack) {
+        if (stack == null || stack.isEmpty()) return ItemStack.EMPTY;
+        PatternP2PTunnelPart input = findInput();
+        return input == null || !input.isActive() ? stack : input.returnToAdjacent(stack, false);
+    }
+
     private PatternP2PTunnelPart findInput() {
         if (getGridNode() == null || getTile().getWorld() == null) return null;
         long tick = getTile().getWorld().getTotalWorldTime();
@@ -542,7 +555,9 @@ public final class PatternP2PUnitManagerPart extends PartCable
                 && left.getRedstoneStrength() == right.getRedstoneStrength()
                 && left.getPulseWidthTicks() == right.getPulseWidthTicks()
                 && left.getPulsePeriodTicks() == right.getPulsePeriodTicks()
-                && left.getOutputSlotSharingMode() == right.getOutputSlotSharingMode();
+                && left.getTransferPortOutputMode() == right.getTransferPortOutputMode()
+                && left.getOutputSlotSharingMode() == right.getOutputSlotSharingMode()
+                && left.getEnergyDistributionMode() == right.getEnergyDistributionMode();
     }
 
     private static boolean containsSameItem(List<ItemStack> stacks, ItemStack candidate) {
@@ -816,6 +831,15 @@ public final class PatternP2PUnitManagerPart extends PartCable
                 ? Math.max(1, data.getInteger("PatternP2PUnitPulsePeriod")) : 20;
         pulseWidthTicks = data.hasKey("PatternP2PUnitPulseWidth")
                 ? Math.max(1, Math.min(pulsePeriodTicks, data.getInteger("PatternP2PUnitPulseWidth"))) : 2;
+        transferPortOutputMode = data.hasKey("PatternP2PUnitTransferPortOutputMode")
+                ? TransferPortOutputMode.fromId(data.getInteger("PatternP2PUnitTransferPortOutputMode"))
+                : TransferPortOutputMode.NORMAL;
+        outputSlotSharingMode = data.hasKey("PatternP2PUnitOutputSlotSharingMode")
+                ? OutputSlotSharingMode.fromId(data.getInteger("PatternP2PUnitOutputSlotSharingMode"))
+                : OutputSlotSharingMode.DISABLED;
+        energyDistributionMode = data.hasKey("PatternP2PUnitEnergyDistributionMode")
+                ? EnergyDistributionMode.fromId(data.getInteger("PatternP2PUnitEnergyDistributionMode"))
+                : EnergyDistributionMode.EVEN;
         taskRevision = data.getLong("PatternP2PUnitTaskRevision");
         persistedSlotPortSides.clear();
         net.minecraft.nbt.NBTTagList bindings = data.getTagList("PatternP2PUnitSlotPortBindings", 10);
@@ -829,10 +853,14 @@ public final class PatternP2PUnitManagerPart extends PartCable
         syncMainConfiguration = !data.hasKey("PatternP2PUnitSyncMain")
                 || data.getBoolean("PatternP2PUnitSyncMain");
         PatternP2PUnitSettings localSettings = getLocalSettings();
-        mainConfiguration = data.hasKey(MAIN_CONFIGURATION, 10)
-                ? readSettings(data.getCompoundTag(MAIN_CONFIGURATION), localSettings)
-                : localSettings;
-        mainConfigurationRevision = data.hasKey(MAIN_CONFIGURATION_REVISION)
+        if (!data.hasKey("PatternP2PUnitReturnMode") && data.hasKey(MAIN_CONFIGURATION, 10)) {
+            applyLocalSettings(readSettings(data.getCompoundTag(MAIN_CONFIGURATION), localSettings));
+        } else if (!data.hasKey("PatternP2PUnitOutputSlotSharingMode")
+                && syncMainConfiguration && data.hasKey(MAIN_CONFIGURATION, 10)) {
+            outputSlotSharingMode = readSettings(data.getCompoundTag(MAIN_CONFIGURATION), localSettings)
+                    .getOutputSlotSharingMode();
+        }
+        lastAppliedMainConfigurationRevision = data.hasKey(MAIN_CONFIGURATION_REVISION)
                 ? data.getLong(MAIN_CONFIGURATION_REVISION) : -1;
     }
 
@@ -867,6 +895,9 @@ public final class PatternP2PUnitManagerPart extends PartCable
         data.setInteger("PatternP2PUnitRedstoneStrength", redstoneStrength);
         data.setInteger("PatternP2PUnitPulseWidth", pulseWidthTicks);
         data.setInteger("PatternP2PUnitPulsePeriod", pulsePeriodTicks);
+        data.setInteger("PatternP2PUnitTransferPortOutputMode", transferPortOutputMode.getId());
+        data.setInteger("PatternP2PUnitOutputSlotSharingMode", outputSlotSharingMode.getId());
+        data.setInteger("PatternP2PUnitEnergyDistributionMode", energyDistributionMode.getId());
         data.setLong("PatternP2PUnitTaskRevision", taskRevision);
         net.minecraft.nbt.NBTTagList bindings = new net.minecraft.nbt.NBTTagList();
         for (java.util.Map.Entry<Integer, EnumFacing> entry : persistedSlotPortSides.entrySet()) {
@@ -877,8 +908,8 @@ public final class PatternP2PUnitManagerPart extends PartCable
         }
         data.setTag("PatternP2PUnitSlotPortBindings", bindings);
         data.setBoolean("PatternP2PUnitSyncMain", syncMainConfiguration);
-        data.setTag(MAIN_CONFIGURATION, writeSettings(mainConfiguration));
-        data.setLong(MAIN_CONFIGURATION_REVISION, mainConfigurationRevision);
+        data.removeTag(MAIN_CONFIGURATION);
+        data.setLong(MAIN_CONFIGURATION_REVISION, lastAppliedMainConfigurationRevision);
     }
 
     @Override public void writeToStream(ByteBuf data) throws java.io.IOException {
@@ -899,6 +930,7 @@ public final class PatternP2PUnitManagerPart extends PartCable
         data.writeInt(settings.getPulsePeriodTicks());
         data.writeByte(settings.getTransferPortOutputMode().getId());
         data.writeByte(settings.getOutputSlotSharingMode().getId());
+        data.writeByte(settings.getEnergyDistributionMode().getId());
         data.writeBoolean(syncMainConfiguration);
     }
 
@@ -917,7 +949,8 @@ public final class PatternP2PUnitManagerPart extends PartCable
                 cn.ae2bc.logic.RedstoneOutputMode.fromId(data.readUnsignedByte()),
                 data.readUnsignedByte(), data.readInt(), data.readInt(),
                 cn.ae2bc.core.unit.TransferPortOutputMode.fromId(data.readUnsignedByte()),
-                OutputSlotSharingMode.fromId(data.readUnsignedByte())));
+                OutputSlotSharingMode.fromId(data.readUnsignedByte()),
+                EnergyDistributionMode.fromId(data.readUnsignedByte())));
         boolean oldSync = syncMainConfiguration;
         syncMainConfiguration = data.readBoolean();
         PatternP2PUnitSettings nextSettings = getSettings();
@@ -932,27 +965,13 @@ public final class PatternP2PUnitManagerPart extends PartCable
                 || oldSettings.getRedstoneStrength() != nextSettings.getRedstoneStrength()
                 || oldSettings.getPulseWidthTicks() != nextSettings.getPulseWidthTicks()
                 || oldSettings.getPulsePeriodTicks() != nextSettings.getPulsePeriodTicks()
-                || oldSettings.getOutputSlotSharingMode() != nextSettings.getOutputSlotSharingMode();
+                || oldSettings.getTransferPortOutputMode() != nextSettings.getTransferPortOutputMode()
+                || oldSettings.getOutputSlotSharingMode() != nextSettings.getOutputSlotSharingMode()
+                || oldSettings.getEnergyDistributionMode() != nextSettings.getEnergyDistributionMode();
     }
 
     private void setSettingsFromStream(PatternP2PUnitSettings settings) {
         applyLocalSettings(settings);
-        mainConfiguration = settings;
-    }
-
-    private static NBTTagCompound writeSettings(PatternP2PUnitSettings settings) {
-        NBTTagCompound data = new NBTTagCompound();
-        data.setInteger("ReturnMode", settings.getReturnMode().getId());
-        data.setBoolean("BreakRecovery", settings.isBreakRecovery());
-        data.setInteger("ExtractionInterval", settings.getExtractionInterval());
-        data.setInteger("ExtractionAmount", settings.getExtractionAmount());
-        data.setInteger("RedstoneMode", settings.getRedstoneMode().getId());
-        data.setInteger("RedstoneStrength", settings.getRedstoneStrength());
-        data.setInteger("PulseWidth", settings.getPulseWidthTicks());
-        data.setInteger("PulsePeriod", settings.getPulsePeriodTicks());
-        data.setInteger("TransferPortOutputMode", settings.getTransferPortOutputMode().getId());
-        data.setInteger("OutputSlotSharingMode", settings.getOutputSlotSharingMode().getId());
-        return data;
     }
 
     private static PatternP2PUnitSettings readSettings(NBTTagCompound data,
@@ -981,7 +1000,10 @@ public final class PatternP2PUnitManagerPart extends PartCable
                         : fallback.getTransferPortOutputMode(),
                 data.hasKey("OutputSlotSharingMode")
                         ? OutputSlotSharingMode.fromId(data.getInteger("OutputSlotSharingMode"))
-                        : fallback.getOutputSlotSharingMode());
+                        : fallback.getOutputSlotSharingMode(),
+                data.hasKey("EnergyDistributionMode")
+                        ? EnergyDistributionMode.fromId(data.getInteger("EnergyDistributionMode"))
+                        : fallback.getEnergyDistributionMode());
     }
 
     @Override public void getDrops(List<ItemStack> drops, boolean wrenched) {

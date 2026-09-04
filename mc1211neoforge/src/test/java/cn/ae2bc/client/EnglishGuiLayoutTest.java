@@ -34,11 +34,11 @@ class EnglishGuiLayoutTest {
         assertFits("gui.ae2_batchcraft.component_placer.execute", 48);
         assertFits("gui.ae2_batchcraft.energy_distribution_mode.round_robin", 172);
         assertFits("gui.ae2_batchcraft.reset_task", 148);
-        assertFits("gui.ae2_batchcraft.pattern_p2p_unit.return_mode.strict", 69);
-        assertFits("gui.ae2_batchcraft.pattern_p2p_unit.return_mode.unblocked", 69);
-        assertFits("gui.ae2_batchcraft.pattern_p2p_unit.redstone_mode.single_trigger", 44);
-        assertFits("gui.ae2_batchcraft.pattern_p2p_unit.redstone_mode.periodic_pulse", 44);
-        assertFits("gui.ae2_batchcraft.pattern_p2p_unit.redstone_mode.continuous", 44);
+        assertFits("gui.ae2_batchcraft.pattern_p2p_unit.return_mode.strict", 67);
+        assertFits("gui.ae2_batchcraft.pattern_p2p_unit.return_mode.unblocked", 67);
+        assertFits("gui.ae2_batchcraft.pattern_p2p_unit.redstone_mode.single_trigger", 42);
+        assertFits("gui.ae2_batchcraft.pattern_p2p_unit.redstone_mode.periodic_pulse", 42);
+        assertFits("gui.ae2_batchcraft.pattern_p2p_unit.redstone_mode.continuous", 42);
         assertFits("gui.ae2_batchcraft.dispatch_mode.full_dispatch", 148);
         assertFits("gui.ae2_batchcraft.dispatch_mode.batch_distribution", 148);
         assertFits("gui.ae2_batchcraft.pattern_batch_count.confirm", 48);
@@ -51,24 +51,28 @@ class EnglishGuiLayoutTest {
         assertFits("item.ae2_batchcraft.pattern_p2p_tunnel_input", 140);
         assertFits("item.ae2_batchcraft.pattern_p2p_unit_manager", 140);
 
-        assertFits("gui.ae2_batchcraft.return_configuration", 147);
-        assertFits("gui.ae2_batchcraft.return_mode", 147);
-        assertFits("gui.ae2_batchcraft.product_extraction.title", 147);
-        assertFits("gui.ae2_batchcraft.pattern_p2p_unit.section.energy_configuration", 147);
-        assertFits("gui.ae2_batchcraft.pattern_p2p_unit.section.task_reset", 147);
-        assertFits("gui.ae2_batchcraft.pattern_p2p_unit.redstone_mode", 147);
-        assertFits("gui.ae2_batchcraft.pattern_p2p_unit.section.signal_parameters", 147);
-        assertFits("gui.ae2_batchcraft.pattern_p2p_unit.section.drop_handling", 147);
+        assertFits("gui.ae2_batchcraft.return_configuration", 143);
+        assertFits("gui.ae2_batchcraft.return_mode", 143);
+        assertFits("gui.ae2_batchcraft.product_extraction.title", 143);
+        assertFits("gui.ae2_batchcraft.product_extraction.parameters", 143);
+        assertFits("gui.ae2_batchcraft.product_extraction.output", 143);
+        assertFits("gui.ae2_batchcraft.pattern_p2p_unit.section.energy_configuration", 143);
+        assertFits("gui.ae2_batchcraft.pattern_p2p_unit.redstone_mode", 143);
+        assertFits("gui.ae2_batchcraft.pattern_p2p_unit.section.signal_parameters", 143);
+        assertFits("gui.ae2_batchcraft.pattern_p2p_unit.section.drop_handling", 143);
 
         int syncInputWidth = width(ENGLISH.get("gui.ae2_batchcraft.sync_input_settings")) + 26;
-        assertTrue(syncInputWidth <= 160);
+        assertTrue(syncInputWidth <= 156);
 
         int generalTitleWidth = (int) Math.ceil(width(
                 ENGLISH.get("gui.ae2_batchcraft.pattern_p2p_unit.page.common")) * 1.2);
-        int availableSyncWidth = 176 - 8 - (8 + generalTitleWidth + 8);
+        int availableSyncWidth = 172 - 8 - (8 + generalTitleWidth + 8);
         int syncMainWidth = width(ENGLISH.get(
                 "gui.ae2_batchcraft.pattern_p2p_unit.sync_main_configuration")) + 26;
         assertTrue(syncMainWidth <= availableSyncWidth);
+
+        assertFits("gui.ae2_batchcraft.pattern_p2p_unit.page.output_common", 143);
+        assertFits("gui.ae2_batchcraft.pattern_p2p_unit.page.unit_common", 143);
 
         int energyHeaderWidth = width(ENGLISH.get("gui.ae2_batchcraft.energy.section.input"));
         int intervalWidth = width(ENGLISH.get("gui.ae2_batchcraft.energy.pull_interval")

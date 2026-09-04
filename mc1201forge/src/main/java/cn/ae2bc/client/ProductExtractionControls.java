@@ -23,7 +23,7 @@ final class ProductExtractionControls {
                                             IntConsumer setInterval, IntConsumer setAmount) {
         Component intervalLabel = Component.translatable("gui.ae2_batchcraft.product_extraction.interval");
         Component amountLabel = Component.translatable("gui.ae2_batchcraft.product_extraction.amount");
-        int inputX = left + 16 + Math.max(font.width(intervalLabel), font.width(amountLabel));
+        int inputX = left + 104;
         var interval = addWidget.apply(new ValidatedIntegerField(font, inputX, top + 92, 36, 16,
                 intervalLabel, () -> ProductExtractionSettings.MIN_INTERVAL,
                 () -> ProductExtractionSettings.MAX_INTERVAL, setInterval));

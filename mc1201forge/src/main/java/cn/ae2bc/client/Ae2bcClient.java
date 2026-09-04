@@ -9,6 +9,7 @@ import cn.ae2bc.menu.ComponentPlacerMenu;
 import cn.ae2bc.menu.ProductExtractionMenu;
 import cn.ae2bc.menu.PatternP2PUnitManagerMenu;
 import cn.ae2bc.menu.UnitPortOutputConfigMenu;
+import cn.ae2bc.menu.UnitPortInputConfigMenu;
 import net.minecraftforge.eventbus.api.IEventBus;
 import net.minecraftforge.fml.event.lifecycle.FMLClientSetupEvent;
 import net.minecraftforge.common.MinecraftForge;
@@ -31,6 +32,7 @@ public final class Ae2bcClient {
     private static final String PRODUCT_EXTRACTION_SCREEN_STYLE = "/screens/ae2_batchcraft/product_extraction.json";
     private static final String PATTERN_P2P_UNIT_MANAGER_SCREEN_STYLE = "/screens/ae2_batchcraft/pattern_p2p_unit_manager.json";
     private static final String UNIT_PORT_OUTPUT_CONFIG_SCREEN_STYLE = "/screens/ae2_batchcraft/unit_port_output_config.json";
+    private static final String UNIT_PORT_INPUT_CONFIG_SCREEN_STYLE = "/screens/ae2_batchcraft/unit_port_input_config.json";
 
     private Ae2bcClient() {
     }
@@ -72,6 +74,10 @@ public final class Ae2bcClient {
                 UnitPortOutputConfigMenu.TYPE, (menu, inventory, title) ->
                         new UnitPortOutputConfigScreen(menu, inventory, title,
                                 StyleManager.loadStyleDoc(UNIT_PORT_OUTPUT_CONFIG_SCREEN_STYLE)));
+        MenuScreens.<UnitPortInputConfigMenu, UnitPortInputConfigScreen>register(
+                UnitPortInputConfigMenu.TYPE, (menu, inventory, title) ->
+                        new UnitPortInputConfigScreen(menu, inventory, title,
+                                StyleManager.loadStyleDoc(UNIT_PORT_INPUT_CONFIG_SCREEN_STYLE)));
         });
     }
 

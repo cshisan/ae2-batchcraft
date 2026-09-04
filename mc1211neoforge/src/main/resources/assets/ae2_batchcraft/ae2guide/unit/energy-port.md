@@ -24,6 +24,6 @@ Continuously receives FE from Pattern P2P Energy Tunnels on the same AE grid and
 
 The port participates whenever it is bound to a valid Manager and the adjacent device can receive FE. The Manager may be idle and may have no active processing task; power delivery continues.
 
-The Manager groups Energy Ports by Unit identity and supplies their distribution mode. **Even** shares available power across demand. **Round robin** rotates receiver priority when supply is limited. This setting is synchronized across the current AE grid.
+The Energy Tunnel first distributes FE among normal-output groups and Unit groups. After a Unit group receives FE, its Manager performs a second-stage distribution among the bound Energy Ports. **Even** shares power across demand; **Round robin** rotates port priority when supply is limited. A Manager uses the input setting while Sync in the General page title is enabled and its local setting otherwise.
 
 The port does not draw FE from AE2's internal energy service. It only forwards FE supplied by a [Pattern P2P Energy Tunnel](../pattern-p2p/energy.md).

@@ -33,9 +33,11 @@ In **Full Dispatch**, one selected endpoint receives the complete processing pus
 
 In **Batch Distribution**, the input requests only the next planned share from the adjacent AE2 Pattern Provider and distributes integer multiples of the configured smallest share. Unsent materials remain in the Pattern Provider until endpoint capacity becomes available. See [Batch Distribution](batch-distribution.md) before enabling this mode.
 
-The task allocation button in the right toolbar controls endpoint selection. **Round Robin** rotates through the stable endpoint order. **Random** independently selects one currently available endpoint for each allocation and may select the same endpoint repeatedly. **Priority** starts from the first endpoint on every allocation and only continues to later endpoints when an earlier one cannot accept the task.
+The task allocation button in the right toolbar controls endpoint selection. **Round Robin** starts at its saved cursor and advances it after a successful selection. **Random** chooses a random starting endpoint, then continues trying the other endpoints when that attempt fails. **Priority** starts from the first endpoint on every allocation and only continues to later endpoints when an earlier one cannot accept the task.
 
 ## General Configuration
+
+The page-group button at the top of the right toolbar cycles the left page set between Output Pages and Unit Pages. General is one shared page in both groups; switching groups neither copies nor resets its data. The four Unit Port pages share one left-side button and cycle in Transfer, Break, Redstone, and Energy order.
 
 The input provides defaults for:
 
@@ -45,10 +47,13 @@ The input provides defaults for:
 - Whether normal outputs may actively extract products.
 - Extraction interval and amount for outputs and Unit Extraction Ports.
 - Unit break recovery and redstone behavior.
+- Single-port single-slot, transfer mode, and second-stage Unit Energy Port distribution.
 
-These settings are synchronized dynamically while a task is active. The Unit Manager and its bound ports apply later changes without requiring a new task.
+The standard-output extraction Enabled/Disabled button is on Output General, while extraction interval and amount remain on the shared General page. Other Unit settings are separated into Unit General and per-port pages.
 
-Normal outputs and Unit Managers follow the relevant settings while synchronization is enabled. Their local settings become effective when synchronization is disabled.
+These settings are broadcast dynamically while a task is active. Outputs and Unit Managers apply later changes without requiring a new task when Sync is enabled; otherwise they keep using local values.
+
+Normal outputs and Unit Managers always keep local values. While synchronization is enabled, input broadcasts overwrite those values; when disabled, broadcasts are ignored. Re-enabling synchronization immediately applies the current input values.
 
 ## Reset Task State
 

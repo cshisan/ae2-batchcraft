@@ -548,6 +548,11 @@ public final class ModNetwork {
                 if (part != null) {
                     if (part.isOutput()) {
                         part.setOutputSettings(packet.settings.getReturnMode(), packet.syncInputSettings);
+                        if (!packet.syncInputSettings) {
+                            part.setExtractionSettings(packet.enabled,
+                                    packet.settings.getExtractionInterval(),
+                                    packet.settings.getExtractionAmount());
+                        }
                     } else {
                         part.setInputSettings(packet.enabled, packet.settings);
                     }
@@ -569,6 +574,7 @@ public final class ModNetwork {
             buffer.writeInt(settings.getPulsePeriodTicks());
             buffer.writeByte(settings.getTransferPortOutputMode().getId());
             buffer.writeByte(settings.getOutputSlotSharingMode().getId());
+            buffer.writeByte(settings.getEnergyDistributionMode().getId());
     }
 
     private static PatternP2PUnitSettings readSettings(PacketBuffer buffer) {
@@ -578,7 +584,8 @@ public final class ModNetwork {
                 cn.ae2bc.logic.RedstoneOutputMode.fromId(buffer.readUnsignedByte()),
                     buffer.readUnsignedByte(), buffer.readInt(), buffer.readInt(),
                     cn.ae2bc.core.unit.TransferPortOutputMode.fromId(buffer.readUnsignedByte()),
-                    cn.ae2bc.core.unit.OutputSlotSharingMode.fromId(buffer.readUnsignedByte()));
+                    cn.ae2bc.core.unit.OutputSlotSharingMode.fromId(buffer.readUnsignedByte()),
+                    cn.ae2bc.logic.EnergyDistributionMode.fromId(buffer.readUnsignedByte()));
     }
 
     private static final class MaterialOutputConfigPacket {

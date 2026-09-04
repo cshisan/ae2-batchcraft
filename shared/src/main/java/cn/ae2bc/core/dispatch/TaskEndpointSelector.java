@@ -28,11 +28,17 @@ public final class TaskEndpointSelector {
                 return -1;
             case RANDOM:
                 Objects.requireNonNull(boundedRandom, "boundedRandom");
-                int index = boundedRandom.applyAsInt(size);
-                if (index < 0 || index >= size) {
-                    throw new IllegalArgumentException("random index outside bound: " + index);
+                int start = boundedRandom.applyAsInt(size);
+                if (start < 0 || start >= size) {
+                    throw new IllegalArgumentException("random index outside bound: " + start);
                 }
-                return attempt.test(index) ? index : -1;
+                for (int offset = 0; offset < size; offset++) {
+                    int index = Math.floorMod(start + offset, size);
+                    if (attempt.test(index)) {
+                        return index;
+                    }
+                }
+                return -1;
             default:
                 throw new IllegalStateException("Unhandled task allocation mode: " + mode);
         }

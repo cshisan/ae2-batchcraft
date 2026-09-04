@@ -9,7 +9,8 @@ class Ae2IconButton extends Ae2Button {
     // AE2's states.png is a 16-column grid. These indices match the 1.16.5 Icon enum.
     static final int PERMISSION_CRAFT = 178;
     static final int PERMISSION_BUILD = 179;
-    static final int FULLNESS_HALF = 81;
+    static final int PERMISSION_BUILD_DISABLED = 195;
+    static final int ARROW_RIGHT = 50;
     static final int ICON_128 = 128;
     static final int INVALID = 129;
     static final int FUZZY_PERCENT_99 = 99;
@@ -20,15 +21,24 @@ class Ae2IconButton extends Ae2Button {
             "appliedenergistics2", "textures/guis/states.png");
     protected int iconIndex;
     private final float iconScale;
+    private final int iconOffsetX;
+    private final int iconOffsetY;
 
     Ae2IconButton(int id, int x, int y, int iconIndex) {
-        this(id, x, y, iconIndex, 1.0F);
+        this(id, x, y, iconIndex, 1.0F, 0, 0);
     }
 
     Ae2IconButton(int id, int x, int y, int iconIndex, float iconScale) {
+        this(id, x, y, iconIndex, iconScale, 0, 0);
+    }
+
+    Ae2IconButton(int id, int x, int y, int iconIndex, float iconScale,
+                  int iconOffsetX, int iconOffsetY) {
         super(id, x, y, 20, 20, "");
         this.iconIndex = iconIndex;
         this.iconScale = iconScale;
+        this.iconOffsetX = iconOffsetX;
+        this.iconOffsetY = iconOffsetY;
     }
 
     void setIconIndex(int iconIndex) {
@@ -52,7 +62,7 @@ class Ae2IconButton extends Ae2Button {
         GlStateManager.color(1.0F, 1.0F, 1.0F, opacity);
         int offset = Math.round((16 - 16 * iconScale) / 2.0F);
         GlStateManager.pushMatrix();
-        GlStateManager.translate(x + 2 + offset, y + 2 + offset, 0);
+        GlStateManager.translate(x + 2 + offset + iconOffsetX, y + 2 + offset + iconOffsetY, 0);
         GlStateManager.scale(iconScale, iconScale, 1.0F);
         drawTexturedModalRect(0, 0, (iconIndex % 16) * 16, (iconIndex / 16) * 16, 16, 16);
         GlStateManager.popMatrix();

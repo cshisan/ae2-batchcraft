@@ -29,7 +29,7 @@ Receives complete processing jobs from the Pattern Provider in front of it and d
 
 ## Task Distribution
 
-The task allocation button in the right toolbar controls endpoint selection. **Round Robin** rotates through the stable endpoint order. **Random** independently selects one currently available endpoint for each allocation and may select the same endpoint repeatedly. **Priority** starts from the first endpoint on every allocation and only continues to later endpoints when an earlier one cannot accept the task.
+The task allocation button in the right toolbar controls endpoint selection. **Round Robin** starts at its saved cursor and advances it after a successful selection. **Random** chooses a random starting endpoint, then continues trying the other endpoints when that attempt fails. **Priority** starts from the first endpoint on every allocation and only continues to later endpoints when an earlier one cannot accept the task.
 
 Offline, unloaded, busy, or incompatible endpoints are unavailable. A selected endpoint receives the full quantities of that processing push.
 
@@ -42,10 +42,11 @@ The input provides defaults for:
 - Whether normal outputs may actively extract products.
 - Extraction interval and amount for outputs and Unit Extraction Ports.
 - Unit break recovery and redstone behavior.
+- Unit single-port single-slot, transfer, and Unit Energy Port distribution settings.
 
 These settings are synchronized dynamically while a task is active. The Unit Manager and its bound ports apply later changes without requiring a new task.
 
-Normal outputs and Unit Managers follow the relevant settings while synchronization is enabled. Their local settings become effective when synchronization is disabled.
+Normal outputs and Unit Managers always keep local values. While synchronization is enabled, input broadcasts overwrite those values; when disabled, broadcasts are ignored and the local values remain in use. Re-enabling synchronization applies the current input values immediately.
 
 ## Reset Task State
 

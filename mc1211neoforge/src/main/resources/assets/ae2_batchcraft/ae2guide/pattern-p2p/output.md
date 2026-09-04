@@ -41,7 +41,9 @@ Machines and pipes can push products into the output's insertion-only return cap
 
 ## Configuration and Energy
 
-The output follows the input's return mode by default. Disable synchronization to choose a local return mode. The input's extraction switch controls normal outputs; its interval and amount set the extraction schedule.
+The output GUI directly shows Output Pages. General contains the product return mode, extraction interval, and extraction amount, with Sync on the right of its title. Output General contains the product extraction switch for this output. Task reset is available from the right toolbar.
+
+While Sync is enabled, input broadcasts overwrite the output's local return mode, extraction switch, interval, and amount, and the corresponding controls cannot be edited. Disabling Sync preserves the last synchronized values and ignores later broadcasts. Re-enabling Sync immediately applies the current input values. New extraction requires an active, runnable task even in Unblocked mode; resources already pulled into the recovery queue may continue draining after the task ends.
 
 A configured, active output also acts as a continuous FE destination for a Pattern P2P Energy Tunnel. It does not need an active crafting task to power the adjacent machine.
 

@@ -12,9 +12,10 @@ public final class UnitPortSingleSlotSyncSourceTest {
     @Test
     public void effectiveStateUsesGlobalModeAndOnlyFollowPortIsEditable() throws Exception {
         String port = read("../part/PatternP2PUnitPortPart.java");
-        assertTrue(port.contains("case ALL: return true;"));
-        assertTrue(port.contains("case DISABLED: return false;"));
-        assertTrue(port.contains("case FOLLOW_PORT: return singleSlot;"));
+        assertTrue(port.contains("return singleSlot;"));
+        assertTrue(port.contains("public void applyManagerSingleSlot(OutputSlotSharingMode mode)"));
+        assertTrue(port.contains("mode == OutputSlotSharingMode.FOLLOW_PORT"));
+        assertTrue(port.contains("mode == OutputSlotSharingMode.ALL"));
         assertTrue(port.contains("manager.getOutputSlotSharingMode() == OutputSlotSharingMode.FOLLOW_PORT"));
         assertTrue(port.contains("public boolean isUsingMainConfiguration()"));
     }
@@ -53,9 +54,10 @@ public final class UnitPortSingleSlotSyncSourceTest {
     @Test
     public void syncedManagersRefreshBeforeExposingEffectiveSlotMode() throws Exception {
         String manager = read("../part/PatternP2PUnitManagerPart.java");
-        assertTrue(manager.contains("if (syncMainConfiguration && !synchronizingFromInput"));
-        assertTrue(manager.contains("synchronizeFromInput();\n        }\n        return getEffectiveSettings()"));
-        assertTrue(manager.contains("if (synchronizingFromInput) return;"));
+        assertTrue(manager.contains("private PatternP2PUnitSettings getEffectiveSettings()"));
+        assertTrue(manager.contains("return getLocalSettings();"));
+        assertTrue(manager.contains("if (settings == null || !syncMainConfiguration) return;"));
+        assertTrue(manager.contains("applyLocalSettings(settings);"));
     }
 
     private static String read(String relative) throws Exception {

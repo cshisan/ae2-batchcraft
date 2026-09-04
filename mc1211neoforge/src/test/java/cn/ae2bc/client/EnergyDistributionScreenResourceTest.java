@@ -8,7 +8,7 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class EnergyDistributionScreenResourceTest {
     @Test
-    void energyTunnelAndUnitManagerExposeGlobalEnergyDistributionMode() throws Exception {
+    void energyTunnelAndUnitPagesExposeTheirDistributionModes() throws Exception {
         String energy = resource("assets/ae2/screens/ae2_batchcraft/pattern_p2p_tunnel_energy.json");
         String output = resource("assets/ae2/screens/ae2_batchcraft/pattern_p2p_tunnel_output.json");
         String unit = resource("assets/ae2/screens/ae2_batchcraft/pattern_p2p_unit_manager.json");
@@ -23,12 +23,14 @@ class EnergyDistributionScreenResourceTest {
     void unitManagerCommonSettingsHaveVisibleVerticalSpacing() throws Exception {
         String unit = resource("assets/ae2/screens/ae2_batchcraft/pattern_p2p_unit_manager.json");
 
-        assertTrue(unit.contains("\"syncMain\": {\"left\": 106, \"top\": 21"));
+        assertTrue(unit.contains("\"syncMain\": {\"left\": 124, \"top\": 21"));
         assertTrue(unit.contains("\"returnStrict\": {\"left\": 12, \"top\": 50"));
         assertTrue(unit.contains("\"extraction_interval\""));
         assertTrue(unit.contains("\"extraction_amount\""));
         assertTrue(unit.contains("\"energyDistributionMode\": {\"left\": 12, \"top\": 50"));
-        assertTrue(unit.contains("\"singleSlotMode\": {\"left\": 12, \"top\": 153"));
+        assertTrue(unit.contains("\"singleSlotAll\": {\"left\": 12, \"top\": 50"));
+        assertTrue(unit.contains("\"singleSlotDisabled\": {\"left\": 63, \"top\": 50"));
+        assertTrue(unit.contains("\"singleSlotFollowPort\": {\"left\": 114, \"top\": 50"));
         assertTrue(unit.contains("\"rightToolbar\": {\"right\": 2, \"top\": 0"));
     }
 
@@ -39,31 +41,42 @@ class EnergyDistributionScreenResourceTest {
         String output = resource("assets/ae2/screens/ae2_batchcraft/pattern_p2p_tunnel_output.json");
 
         assertTrue(input.contains("\"returnStrict\": {\"left\": 12, \"top\": 50"));
-        assertTrue(input.contains("\"productExtraction\": {\"left\": 128, \"top\": 79"));
+        assertTrue(input.contains("\"productExtractionEnabled\": {\"left\": 12, \"top\": 50"));
+        assertTrue(input.contains("\"productExtractionDisabled\": {\"left\": 89, \"top\": 50"));
         assertTrue(input.contains("\"extraction_interval\""));
         assertTrue(input.contains("\"extraction_amount\""));
         assertTrue(input.contains("\"rightToolbar\": {\"right\": 2, \"top\": 0"));
-        assertTrue(input.contains("\"singleSlotMode\": {\"left\": 12, \"top\": 153"));
+        assertTrue(input.contains("\"singleSlotAll\": {\"left\": 12, \"top\": 50"));
+        assertTrue(input.contains("\"singleSlotDisabled\": {\"left\": 63, \"top\": 50"));
+        assertTrue(input.contains("\"singleSlotFollowPort\": {\"left\": 114, \"top\": 50"));
+        assertTrue(input.contains("\"energyDistributionMode\": {\"left\": 12, \"top\": 50"));
         String inputSource = resourceSource("src/main/java/cn/ae2bc/client/PatternP2PTunnelInputScreen.java");
-        assertTrue(inputSource.contains(
-                "DashedSectionRenderer.trailingContentX(imageWidth, productExtractionWidth)"));
+        assertTrue(inputSource.contains("widgets.addButton(\"productExtractionEnabled\""));
+        assertTrue(inputSource.contains("widgets.addButton(\"productExtractionDisabled\""));
         assertTrue(energy.contains("\"left\": 12"));
         assertTrue(energy.contains("\"top\": 77"));
         assertTrue(energy.contains("\"width\": 176"));
         org.junit.jupiter.api.Assertions.assertFalse(energy.contains("\"mode\""));
         org.junit.jupiter.api.Assertions.assertFalse(energy.contains("\"interval\""));
-        assertTrue(output.contains("\"syncInputSettings\": {\"left\": 8, \"top\": 22"));
+        assertTrue(output.contains("\"syncInputSettings\": {\"left\": 124, \"top\": 21"));
         assertTrue(output.contains("\"returnStrict\": {\"left\": 12, \"top\": 50"));
-        assertTrue(output.contains("\"resetTask\": {\"left\": 12, \"top\": 92"));
+        assertTrue(output.contains("\"rightToolbar\": {\"right\": 2, \"top\": 0"));
+        org.junit.jupiter.api.Assertions.assertFalse(output.contains("\"resetTask\":"));
     }
 
     @Test
-    void breakRecoveryCheckboxesUseCompactLabelFirstLayout() throws Exception {
+    void breakRecoveryUsesFullWidthAe2Buttons() throws Exception {
         String input = resource("assets/ae2/screens/ae2_batchcraft/pattern_p2p_tunnel_input.json");
         String unit = resource("assets/ae2/screens/ae2_batchcraft/pattern_p2p_unit_manager.json");
 
-        assertTrue(input.contains("\"breakRecovery\": {\"left\": 12, \"top\": 52"));
-        assertTrue(unit.contains("\"breakRecovery\": {\"left\": 12, \"top\": 52"));
+        assertTrue(input.contains("\"breakRecovery\": {\"left\": 12, \"top\": 50, \"width\": 148, \"height\": 18"));
+        assertTrue(unit.contains("\"breakRecovery\": {\"left\": 12, \"top\": 50, \"width\": 148, \"height\": 18"));
+        String inputSource = resourceSource("src/main/java/cn/ae2bc/client/PatternP2PTunnelInputScreen.java");
+        String managerSource = resourceSource("src/main/java/cn/ae2bc/client/PatternP2PUnitManagerScreen.java");
+        assertTrue(inputSource.contains("widgets.addButton(\"breakRecovery\""));
+        assertTrue(managerSource.contains("widgets.addButton(\"breakRecovery\""));
+        assertTrue(inputSource.contains("pattern_p2p_unit.break_recovery.value"));
+        assertTrue(managerSource.contains("pattern_p2p_unit.break_recovery.value"));
         org.junit.jupiter.api.Assertions.assertFalse(input.contains("\"break_recovery\":"));
         org.junit.jupiter.api.Assertions.assertFalse(unit.contains("\"break_recovery\":"));
     }
@@ -75,8 +88,8 @@ class EnergyDistributionScreenResourceTest {
 
         for (String screen : new String[]{input, unit}) {
             assertTrue(screen.contains("\"redstoneSingle\": {\"left\": 12, \"top\": 50"));
-            assertTrue(screen.contains("\"redstonePeriodic\": {\"left\": 64, \"top\": 50"));
-            assertTrue(screen.contains("\"redstoneContinuous\": {\"left\": 116, \"top\": 50"));
+            assertTrue(screen.contains("\"redstonePeriodic\": {\"left\": 63, \"top\": 50"));
+            assertTrue(screen.contains("\"redstoneContinuous\": {\"left\": 114, \"top\": 50"));
             assertTrue(screen.contains("\"strength\""));
             assertTrue(screen.contains("\"top\": 96"));
             assertTrue(screen.contains("\"left\": 143, \"top\": 117"));
@@ -104,7 +117,6 @@ class EnergyDistributionScreenResourceTest {
         assertTrue(chinese.contains("每 %s tick"));
         assertTrue(chinese.contains("重置可能销毁未下发材料,请确保材料已完整输出"));
         assertTrue(chinese.contains("能量配置"));
-        assertTrue(chinese.contains("任务重置"));
         assertTrue(chinese.contains("严格模式"));
         assertTrue(chinese.contains("pattern_p2p_unit.single_slot.disabled\": \"全部关闭\""));
         assertTrue(english.contains("energy_distribution_mode.even"));

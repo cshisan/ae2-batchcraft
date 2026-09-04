@@ -33,10 +33,11 @@ public final class PatternP2PTunnelSettingsSyncTest {
     }
 
     @Test
-    public void outputExtractionAlwaysResolvesTheCurrentInputSettings() throws Exception {
+    public void outputExtractionUsesLocalSettingsAfterOptionalInputSync() throws Exception {
         ClassNode tunnel = readClass("/cn/ae2bc/part/PatternP2PTunnelPart.class");
-        assertTrue(hasCallNamed(method(tunnel, "tickingRequest"),
-                "getProductExtractionSettingsFromInput"));
+        assertTrue(hasCallNamed(method(tunnel, "tickingRequest"), "isActive"));
+        assertTrue(hasCallNamed(method(tunnel, "tickingRequest"), "isActive"));
+        assertTrue(hasCallNamed(method(tunnel, "setOutputSettings"), "synchronizeFromInputSettings"));
         assertTrue(hasCallNamed(method(tunnel, "onTunnelNetworkChange"),
                 "refreshExtractionEndpoints"));
     }
@@ -58,7 +59,7 @@ public final class PatternP2PTunnelSettingsSyncTest {
         assertTrue(hasCallNamed(method(manager, "acceptInputs"), "synchronizeFromInput"));
         assertTrue(hasCallNamed(method(manager, "onPowerStatusChanged"), "synchronizeFromInput"));
         assertTrue(hasCallNamed(method(manager, "onChannelsChanged"), "synchronizeFromInput"));
-        assertTrue(hasCallNamed(method(manager, "writeToNBT"), "writeSettings"));
+        assertFalse(hasCallNamed(method(manager, "writeToNBT"), "writeSettings"));
     }
 
     @Test
@@ -70,11 +71,9 @@ public final class PatternP2PTunnelSettingsSyncTest {
 
     @Test
     public void closingOtherSettingsScreensDoesNotWriteClientSnapshotsBack() throws Exception {
-        MethodNode energyClose = method(readClass("/cn/ae2bc/client/PatternP2PTunnelEnergyScreen.class"),
-                "onGuiClosed");
         MethodNode managerClose = method(readClass("/cn/ae2bc/client/PatternP2PUnitManagerScreen.class"),
                 "onGuiClosed");
-        assertFalse(hasCallNamed(energyClose, "sendCurrentSettings"));
+        assertFalse(hasMethod(readClass("/cn/ae2bc/client/PatternP2PTunnelEnergyScreen.class"), "onGuiClosed"));
         assertFalse(hasCallNamed(managerClose, "sendCurrentSettings"));
     }
 
@@ -114,6 +113,13 @@ public final class PatternP2PTunnelSettingsSyncTest {
             if (name.equals(method.name)) return method;
         }
         throw new AssertionError("Missing method " + name);
+    }
+
+    private static boolean hasMethod(ClassNode node, String name) {
+        for (MethodNode method : node.methods) {
+            if (name.equals(method.name)) return true;
+        }
+        return false;
     }
 
     private static boolean hasCall(MethodNode method, String owner, String name) {

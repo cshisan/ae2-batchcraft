@@ -16,8 +16,9 @@ public final class GuiRenderingSourceTest {
         String manager = readClient("PatternP2PUnitManagerScreen.java");
         String confirmation = readClient("TaskResetConfirmation.java");
 
-        assertTrue(tunnel.contains("new Ae2IconButton(6, guiLeft + xSize + 2"));
-        assertTrue(tunnel.contains("new Ae2Button(43, guiLeft + 12, guiTop + 92"));
+        assertTrue(tunnel.contains("new Ae2IconButton(60, guiLeft + xSize + 2, guiTop + 39"));
+        assertTrue(tunnel.contains("new Ae2IconButton(60, guiLeft + xSize + 2, guiTop + 17"));
+        assertFalse(tunnel.contains("new Ae2Button(43, guiLeft + 12, guiTop + 92"));
         assertTrue(manager.contains("new Ae2IconButton(14, guiLeft + xSize + 2"));
         assertTrue(confirmation.contains("new GuiYesNo"));
         assertTrue(confirmation.contains("if (confirmed)"));
@@ -76,18 +77,24 @@ public final class GuiRenderingSourceTest {
         String manager = readClient("PatternP2PUnitManagerScreen.java");
         String outputConfig = readClient("UnitPortOutputConfigScreen.java");
         assertTrue(icons.contains("PERMISSION_BUILD = 179"));
-        assertTrue(icons.contains("FULLNESS_HALF = 81"));
+        assertTrue(icons.contains("PERMISSION_BUILD_DISABLED = 195"));
+        assertTrue(icons.contains("ARROW_RIGHT = 50"));
+        assertTrue(icons.contains("x + 2 + offset + iconOffsetX"));
+        assertTrue(icons.contains("y + 2 + offset + iconOffsetY"));
         assertTrue(icons.contains("PERMISSION_CRAFT = 178"));
         assertTrue(icons.contains("ICON_128 = 128"));
         assertTrue(icons.contains("INVALID = 129"));
         assertTrue(icons.contains("BLOCK_NO = 20"));
         assertTrue(icons.contains("BLOCK_YES = 21"));
         assertTrue(tunnel.contains("pageIconButton(2, Page.COMMON, 20, Ae2IconButton.PERMISSION_BUILD)"));
-        assertTrue(tunnel.contains("pageIconButton(3, Page.TRANSFER, 42, Ae2IconButton.FULLNESS_HALF)"));
-        assertTrue(tunnel.contains("pageIconButton(4, Page.BREAK, 64, Ae2IconButton.PERMISSION_CRAFT)"));
+        assertTrue(tunnel.contains("Page.UNIT_COMMON : Page.OUTPUT_COMMON"));
+        assertTrue(tunnel.contains("Ae2IconButton.PERMISSION_BUILD_DISABLED"));
+        assertTrue(tunnel.contains("Ae2IconButton.ARROW_RIGHT, 1.0F, -1, -1"));
+        assertTrue(tunnel.contains("4, nextUnitPortPage(), 64, Ae2IconButton.ARROW_RIGHT, -1, -1"));
         assertTrue(manager.contains("pageIconButton(2, Page.COMMON, 20, Ae2IconButton.PERMISSION_BUILD)"));
-        assertTrue(manager.contains("pageIconButton(3, Page.TRANSFER, 42, Ae2IconButton.FULLNESS_HALF)"));
-        assertTrue(manager.contains("pageIconButton(4, Page.BREAK, 64, Ae2IconButton.PERMISSION_CRAFT)"));
+        assertTrue(manager.contains("pageIconButton(3, Page.UNIT_COMMON, 42,"));
+        assertTrue(manager.contains("Ae2IconButton.PERMISSION_BUILD_DISABLED"));
+        assertTrue(manager.contains("pageIconButton(4, nextPortPage(), 64, Ae2IconButton.ARROW_RIGHT, -1, -1)"));
         assertTrue(tunnel.contains("Ae2IconButton.ICON_128"));
         assertTrue(manager.contains("Ae2IconButton.ICON_128"));
         assertTrue(outputConfig.contains("new Ae2IconButton(4, guiLeft - 24, guiTop + 19"));
@@ -109,16 +116,18 @@ public final class GuiRenderingSourceTest {
     }
 
     @Test
-    public void unitManagerPageIdsMapExplicitly() throws Exception {
+    public void unitManagerPageIdsMapSharedAndCycledPagesExplicitly() throws Exception {
         String manager = readClient("PatternP2PUnitManagerScreen.java");
-        assertTrue(manager.contains("case 5: return Page.REDSTONE;"));
-        assertTrue(manager.contains("case 6: return Page.ENERGY;"));
-        assertTrue(manager.contains("Page target = pageForButtonId(button.id);"));
+        assertTrue(manager.contains("Page target = button.id == 4 ? nextPortPage() : pageForButtonId(button.id);"));
+        assertTrue(manager.contains("case 2: return Page.COMMON;"));
+        assertTrue(manager.contains("case 3: return Page.UNIT_COMMON;"));
+        assertTrue(manager.contains("private Page nextPortPage()"));
+        assertTrue(manager.contains("page == Page.REDSTONE ? Page.ENERGY"));
         assertTrue(manager.contains("ySize = resolveHeight(page);"));
         assertTrue(manager.contains("guiTop = relayoutTop;"));
         assertTrue(readClient("PatternP2PTunnelScreen.java").contains("guiTop = relayoutTop;"));
-        assertFalse(manager.contains("button == redstonePageButton"));
-        assertFalse(manager.contains("button == energyPageButton"));
+        assertFalse(manager.contains("case 5: return Page.REDSTONE;"));
+        assertFalse(manager.contains("case 6: return Page.ENERGY;"));
     }
 
     @Test

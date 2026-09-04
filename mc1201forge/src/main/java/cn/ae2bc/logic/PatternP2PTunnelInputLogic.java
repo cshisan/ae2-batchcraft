@@ -126,7 +126,9 @@ public final class PatternP2PTunnelInputLogic {
         if (!unitConfiguration.equals(patternP2PUnitConfiguration)) {
             setPatternP2PUnitConfiguration(unitConfiguration);
         } else {
-            alertProductExtractionEndpoints();
+            // The enabled flag is not part of PatternP2PUnitConfiguration. A
+            // switch-only edit must still broadcast the complete settings snapshot.
+            synchronizeSettings();
             input.getHost().markForSave();
         }
     }
@@ -145,7 +147,7 @@ public final class PatternP2PTunnelInputLogic {
 
     public void synchronizeSettings() {
         for (var output : getOutputSnapshot()) {
-            output.getOutputLogic().applyInputSettings(returnMode);
+            output.getOutputLogic().applyInputSettings(returnMode, productExtractionSettings);
         }
         for (var manager : getPatternP2PUnitManagers()) {
             manager.getLogic().applyMainConfiguration(patternP2PUnitConfiguration,

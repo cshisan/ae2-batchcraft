@@ -1,6 +1,7 @@
 package cn.ae2bc.client;
 
 import appeng.client.gui.Icon;
+import appeng.client.gui.style.Blitter;
 import appeng.client.gui.widgets.IconButton;
 import net.minecraft.client.gui.GuiGraphics;
 
@@ -9,7 +10,7 @@ import net.minecraft.client.gui.GuiGraphics;
  * The button background and hitbox retain the original IconButton dimensions.
  */
 class ScaledIconButton extends IconButton {
-    private final Icon icon;
+    private final Icon ae2Icon;
     private final float iconScale;
     private final int iconOffsetX;
     private final int iconOffsetY;
@@ -21,7 +22,7 @@ class ScaledIconButton extends IconButton {
 
     ScaledIconButton(Icon icon, float iconScale, int iconOffsetX, int iconOffsetY, OnPress onPress) {
         super(onPress);
-        this.icon = icon;
+        this.ae2Icon = icon;
         this.iconScale = iconScale;
         this.iconOffsetX = iconOffsetX;
         this.iconOffsetY = iconOffsetY;
@@ -33,7 +34,7 @@ class ScaledIconButton extends IconButton {
 
     @Override
     protected Icon getIcon() {
-        return icon;
+        return ae2Icon;
     }
 
     @Override
@@ -71,15 +72,14 @@ class ScaledIconButton extends IconButton {
             return;
         }
 
-        Icon icon = getIcon();
-        if (icon == null) {
-            return;
-        }
-
         int size = Math.max(1, Math.round(iconBoxSize * iconScale));
+        // Keep full-size icons on an even pixel grid so integer centering leaves equal margins.
+        if (!halfSize && (size & 1) != 0) {
+            size++;
+        }
         int x = getX() + (iconBoxSize - size) / 2 + iconOffsetX;
         int y = getY() + (halfSize ? 0 : 1 + yOffset) + (iconBoxSize - size) / 2 + iconOffsetY;
-        var blitter = icon.getBlitter();
+        Blitter blitter = ae2Icon.getBlitter();
         if (!active && dimWhenInactive) {
             blitter.opacity(0.5f);
         }

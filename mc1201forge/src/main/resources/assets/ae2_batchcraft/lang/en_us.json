@@ -30,7 +30,6 @@
   "gui.ae2_batchcraft.energy_distribution_mode.round_robin": "Round robin",
   "gui.ae2_batchcraft.return_mode": "Output return mode",
   "gui.ae2_batchcraft.return_configuration": "Output Return Configuration",
-  "gui.ae2_batchcraft.product_extraction.enabled": "Product extraction",
   "gui.ae2_batchcraft.product_extraction.enabled.tooltip": "The switch only controls whether outputs can extract; the settings below affect outputs and Unit Extraction Ports",
   "gui.ae2_batchcraft.product_extraction.unit": "units",
   "gui.ae2_batchcraft.return_mode.strict": "Strict",
@@ -142,7 +141,6 @@
   "gui.ae2_batchcraft.pattern_p2p_unit.transfer_mode.same_type.tooltip": "Each transfer port accepts only one item type for the current task.",
   "gui.ae2_batchcraft.pattern_p2p_unit.page.switch": "Switch to %s",
   "gui.ae2_batchcraft.pattern_p2p_unit.section.energy_configuration": "Energy Configuration",
-  "gui.ae2_batchcraft.pattern_p2p_unit.section.task_reset": "Task Reset",
   "gui.ae2_batchcraft.pattern_p2p_unit.return_mode.strict": "Strict Mode",
   "gui.ae2_batchcraft.pattern_p2p_unit.return_mode.unblocked": "Unblocked",
   "gui.ae2_batchcraft.configuration.close": "Close",
@@ -189,8 +187,6 @@
   ,"gui.ae2_batchcraft.disabled":"Disabled"
   ,"gui.ae2_batchcraft.unit_port_output_config.title":"Unit Port Output Configuration"
   ,"gui.ae2_batchcraft.unit_port_output_config.markers":"Material Markers"
-  ,"gui.ae2_batchcraft.unit_port_output_config.inverter":"AE2 Inverter Card"
-  ,"gui.ae2_batchcraft.confirm":"Confirm"
   ,"gui.ae2_batchcraft.unit_port_output_config.single_slot.tooltip":"Single-port single-slot\nCurrent: %s\nWhen enabled, this port may output materials from only one pattern slot"
   ,"gui.ae2_batchcraft.pattern_p2p_unit.page.energy":"Unit Port (Energy)"
   ,"gui.ae2_batchcraft.pattern_p2p_unit.section.single_slot":"Single-port single-slot"
@@ -198,4 +194,12 @@
   ,"gui.ae2_batchcraft.pattern_p2p_unit.single_slot.all":"All Enabled"
   ,"gui.ae2_batchcraft.pattern_p2p_unit.single_slot.disabled":"All Disabled"
   ,"gui.ae2_batchcraft.pattern_p2p_unit.single_slot.follow_port":"Follow Port Configuration"
+  ,"gui.ae2_batchcraft.product_extraction.parameters":"Product Extraction"
+  ,"gui.ae2_batchcraft.pattern_p2p_unit.page.output_common":"Output General"
+  ,"gui.ae2_batchcraft.pattern_p2p_unit.page.unit_common":"Unit General"
+  ,"gui.ae2_batchcraft.pattern_p2p_unit.page_group.output":"Output Pages"
+  ,"gui.ae2_batchcraft.pattern_p2p_unit.page_group.unit":"Unit Pages"
+  ,"gui.ae2_batchcraft.unit_port_input_config.title":"Unit Port Input Configuration"
+  ,"gui.ae2_batchcraft.unit_port_input_config.markers":"Material Markers",
+  "gui.ae2_batchcraft.pattern_p2p_unit.page_group.switch":"Switch to %s"
 }

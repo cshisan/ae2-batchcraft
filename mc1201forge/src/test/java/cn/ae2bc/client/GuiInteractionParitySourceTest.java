@@ -21,11 +21,14 @@ class GuiInteractionParitySourceTest {
                 "menu.setReturnMode(ReturnMode.UNBLOCKED)",
                 "menu.setBreakRecovery(breakRecovery.isSelected())",
                 "menu.setRedstoneMode(mode)",
-                "menu.setProductExtractionEnabled(productExtraction.isSelected())",
+                "menu.setProductExtractionEnabled(true)",
+                "menu.setProductExtractionEnabled(false)",
                 "menu::resetTaskState");
         assertContainsAll(output,
                 "menu.setReturnMode(mode)",
                 "menu.setSyncInputSettings(syncInputSettings.isSelected())",
+                "menu.setProductExtractionEnabled(true)",
+                "menu.setProductExtractionEnabled(false)",
                 "menu::resetTaskState");
         assertContainsAll(energy,
                 "menu.setPullEnabled(false)",

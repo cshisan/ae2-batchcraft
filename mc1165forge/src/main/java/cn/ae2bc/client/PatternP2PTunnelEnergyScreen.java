@@ -56,11 +56,6 @@ public final class PatternP2PTunnelEnergyScreen extends ContainerScreen<PatternP
         return tr("gui.ae2_batchcraft.energy_distribution_mode." + mode.getSerializedName());
     }
 
-    @Override
-    public void onClose() {
-        super.onClose();
-    }
-
     private void sendCurrentSettings() {
         ModNetwork.sendEnergySettings(menu, pullEnabled, mode);
     }

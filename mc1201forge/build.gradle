@@ -45,6 +45,13 @@ minecraft {
 
 repositories {
     maven {
+        name = 'JaredsMaven'
+        url = 'https://maven.blamejared.com/'
+        content {
+            includeGroup 'mezz.jei'
+        }
+    }
+    maven {
         url = 'https://api.modrinth.com/maven'
     }
 }
@@ -52,6 +59,8 @@ repositories {
 dependencies {
     implementation project(':shared')
     minecraft "net.minecraftforge:forge:${minecraft_version}-${forge_version}"
+    compileOnly fg.deobf("mezz.jei:jei-${minecraft_version}-common-api:${jei_version}")
+    compileOnly fg.deobf("mezz.jei:jei-${minecraft_version}-forge-api:${jei_version}")
     implementation fg.deobf("maven.modrinth:ae2:${ae2_version}")
     implementation fg.deobf("maven.modrinth:guideme:${guideme_version}")
     annotationProcessor 'org.spongepowered:mixin:0.8.5:processor'

@@ -14,6 +14,8 @@ class PatternP2PUnitConfigurationTest {
                 PatternP2PUnitConfiguration.DEFAULT.productExtractionInterval());
         assertEquals(ProductExtractionSettings.DEFAULT_AMOUNT,
                 PatternP2PUnitConfiguration.DEFAULT.productExtractionAmount());
+        assertEquals(EnergyDistributionMode.EVEN,
+                PatternP2PUnitConfiguration.DEFAULT.energyDistributionMode());
     }
 
     @Test
@@ -51,7 +53,8 @@ class PatternP2PUnitConfigurationTest {
         var value = PatternP2PUnitConfiguration.DEFAULT.withReturnMode(ReturnMode.STRICT)
                 .withBreakRecovery(false)
                 .withRedstone(7, RedstoneOutputMode.CONTINUOUS, 4, 30)
-                .withProductExtraction(40, 16);
+                .withProductExtraction(40, 16)
+                .withEnergyDistributionMode(EnergyDistributionMode.ROUND_ROBIN);
 
         assertEquals(ReturnMode.STRICT, value.returnMode());
         assertFalse(value.breakRecovery());
@@ -60,6 +63,7 @@ class PatternP2PUnitConfigurationTest {
         assertEquals(30, value.pulsePeriodTicks());
         assertEquals(40, value.productExtractionInterval());
         assertEquals(16, value.productExtractionAmount());
+        assertEquals(EnergyDistributionMode.ROUND_ROBIN, value.energyDistributionMode());
     }
 
     @Test

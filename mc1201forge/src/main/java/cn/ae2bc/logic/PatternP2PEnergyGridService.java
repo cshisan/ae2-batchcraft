@@ -24,6 +24,7 @@ import java.util.concurrent.atomic.AtomicLong;
 /** Grid-wide receiver registry and one-tick demand snapshot for Pattern P2P energy. */
 public final class PatternP2PEnergyGridService implements IGridService, IGridServiceProvider {
     private static final String JOIN_ORDER_TAG = "ae2bcEnergyJoinOrder";
+    private static final String GLOBAL_DISTRIBUTION_MODE_TAG = "ae2bcGlobalEnergyDistributionMode";
     private static final AtomicLong NEXT_JOIN_ORDER = new AtomicLong();
 
     private final IGrid grid;
@@ -56,14 +57,16 @@ public final class PatternP2PEnergyGridService implements IGridService, IGridSer
         Object owner = node.getOwner();
         if (owner instanceof PatternP2PTunnelEnergyPart) {
             energyTunnels.put(node, Boolean.TRUE);
+            if (!globalEnergyDistributionModeInitialized && savedData != null
+                    && savedData.contains(GLOBAL_DISTRIBUTION_MODE_TAG)) {
+                globalEnergyDistributionMode = EnergyDistributionMode.fromId(
+                        savedData.getByte(GLOBAL_DISTRIBUTION_MODE_TAG));
+                globalEnergyDistributionModeInitialized = true;
+            }
         }
         if (owner instanceof PatternP2PUnitManagerPart manager) {
             managers.put(manager.getPatternP2PUnitId(), manager);
-            boolean modeChanged = initializeOrApplyGlobalMode(manager);
             invalidateSnapshot();
-            if (modeChanged) {
-                demandChanged();
-            }
         }
 
         if (!(owner instanceof PatternP2PTunnelPart output && output.isStandardOutput())
@@ -81,8 +84,8 @@ public final class PatternP2PEnergyGridService implements IGridService, IGridSer
         topologyDirty = true;
         invalidateSnapshot();
 
-        if (owner instanceof PatternP2PTunnelPart output) {
-            initializeOrApplyGlobalMode(output);
+        if (!globalEnergyDistributionModeInitialized && owner instanceof PatternP2PTunnelPart output) {
+            globalEnergyDistributionMode = output.getOutputLogic().getEnergyDistributionMode();
         }
     }
 
@@ -108,6 +111,10 @@ public final class PatternP2PEnergyGridService implements IGridService, IGridSer
         if (order != null) {
             savedData.putLong(JOIN_ORDER_TAG, order);
         }
+        if (node.getOwner() instanceof PatternP2PTunnelEnergyPart) {
+            savedData.putByte(GLOBAL_DISTRIBUTION_MODE_TAG,
+                    (byte) globalEnergyDistributionMode.getId());
+        }
     }
 
     public int getDemand(int limit) {
@@ -131,27 +138,7 @@ public final class PatternP2PEnergyGridService implements IGridService, IGridSer
         for (var group : groups) {
             group.allocation = 0;
         }
-        for (var sink : sinks) {
-            sink.allocation = 0;
-        }
-
-        int sinkCount = sinks.size();
-        int startIndex = sinkCount == 0 ? 0 : Math.floorMod(distributionCursor, sinkCount);
-        FairEnergyDistributor.distribute(allocatable, sinkCount, startIndex, (index, amount) -> {
-            SinkEntry sink = sinks.get(index);
-            int accepted = Math.min(amount, sink.remainingDemand());
-            sink.allocation += accepted;
-            return accepted;
-        });
-        if (sinkCount > 0) {
-            distributionCursor = (startIndex + 1) % sinkCount;
-        }
-
-        for (var sink : sinks) {
-            if (sink.group != null) {
-                sink.group.allocation += sink.allocation;
-            }
-        }
+        allocateToGroups(allocatable);
 
         int accepted = 0;
         for (var group : groups) {
@@ -190,34 +177,12 @@ public final class PatternP2PEnergyGridService implements IGridService, IGridSer
         }
         globalEnergyDistributionMode = mode;
         globalEnergyDistributionModeInitialized = true;
-        for (var sink : sinks) {
-            if (sink.owner instanceof PatternP2PTunnelPart output) {
-                output.getOutputLogic().applyEnergyDistributionMode(mode);
+        for (var node : energyTunnels.keySet()) {
+            if (node.getOwner() instanceof PatternP2PTunnelEnergyPart energyTunnel) {
+                energyTunnel.getHost().markForSave();
             }
         }
-        for (var manager : managers.values()) {
-            manager.getLogic().applyEnergyDistributionMode(mode);
-        }
         demandChanged();
-    }
-
-    private void initializeOrApplyGlobalMode(PatternP2PTunnelPart output) {
-        if (!globalEnergyDistributionModeInitialized) {
-            globalEnergyDistributionMode = output.getOutputLogic().getEnergyDistributionMode();
-            globalEnergyDistributionModeInitialized = true;
-        } else {
-            output.getOutputLogic().applyEnergyDistributionMode(globalEnergyDistributionMode);
-        }
-    }
-
-    private boolean initializeOrApplyGlobalMode(PatternP2PUnitManagerPart manager) {
-        if (!globalEnergyDistributionModeInitialized) {
-            globalEnergyDistributionMode = manager.getLogic().getEnergyDistributionMode();
-            globalEnergyDistributionModeInitialized = true;
-            return false;
-        } else {
-            return manager.getLogic().applyEnergyDistributionMode(globalEnergyDistributionMode);
-        }
     }
 
     public void synchronizeOutputGroupMode(PatternP2PTunnelPart origin, EnergyDistributionMode requestedMode) {
@@ -260,19 +225,45 @@ public final class PatternP2PEnergyGridService implements IGridService, IGridSer
             return;
         }
         rebuildGroupsIfNeeded();
-        totalDemand = 0;
         for (var group : groups) {
             group.demand = 0;
         }
         for (var sink : sinks) {
             sink.demand = sink.receive(Integer.MAX_VALUE, true);
-            sink.allocation = 0;
             if (sink.group != null) {
                 sink.group.demand += sink.demand;
             }
-            totalDemand = saturatingAdd(totalDemand, sink.demand);
+        }
+        totalDemand = 0;
+        for (var group : groups) {
+            totalDemand = saturatingAdd(totalDemand, group.demand);
         }
         snapshotEpoch = tickEpoch;
+    }
+
+    private void allocateToGroups(int allocatable) {
+        int groupCount = groups.size();
+        if (groupCount == 0) {
+            return;
+        }
+        int startIndex = Math.floorMod(distributionCursor, groupCount);
+        if (globalEnergyDistributionMode == EnergyDistributionMode.ROUND_ROBIN) {
+            PrioritizedEnergyDistributor.distribute(allocatable, groupCount,
+                    index -> (int) Math.min(Integer.MAX_VALUE,
+                            groups.get(Math.floorMod(startIndex + index, groupCount)).demand),
+                    (index, amount) -> reserveGroupAllocation(
+                            groups.get(Math.floorMod(startIndex + index, groupCount)), amount));
+        } else {
+            FairEnergyDistributor.distribute(allocatable, groupCount, startIndex,
+                    (index, amount) -> reserveGroupAllocation(groups.get(index), amount));
+        }
+        distributionCursor = (startIndex + 1) % groupCount;
+    }
+
+    private static int reserveGroupAllocation(ReceiverGroup group, int amount) {
+        int accepted = (int) Math.min(amount, Math.max(0, group.demand - group.allocation));
+        group.allocation += accepted;
+        return accepted;
     }
 
     private void rebuildGroupsIfNeeded() {
@@ -310,31 +301,35 @@ public final class PatternP2PEnergyGridService implements IGridService, IGridSer
         private final List<SinkEntry> sinks = new ArrayList<>();
         private long demand;
         private int allocation;
+        private int distributionCursor;
 
         private int distribute() {
             if (allocation <= 0) {
                 return 0;
             }
             EnergyDistributionMode mode = sinks.get(0).mode();
-            int accepted = 0;
+            int sinkCount = sinks.size();
+            int startIndex = Math.floorMod(distributionCursor, sinkCount);
+            int accepted;
             if (mode == EnergyDistributionMode.ROUND_ROBIN) {
-                accepted = PrioritizedEnergyDistributor.distribute(allocation, sinks.size(),
-                        index -> sinks.get(index).demand, (index, amount) -> {
-                            var sink = sinks.get(index);
+                accepted = PrioritizedEnergyDistributor.distribute(allocation, sinkCount,
+                        index -> sinks.get(Math.floorMod(startIndex + index, sinkCount)).demand,
+                        (index, amount) -> {
+                            var sink = sinks.get(Math.floorMod(startIndex + index, sinkCount));
                             int received = sink.receive(amount, false);
                             sink.demand = Math.max(0, sink.demand - received);
                             return received;
                         });
             } else {
-                for (var sink : sinks) {
-                    if (sink.allocation <= 0) {
-                        continue;
-                    }
-                    int received = sink.receive(sink.allocation, false);
+                accepted = FairEnergyDistributor.distribute(allocation, sinkCount, startIndex,
+                        (index, amount) -> {
+                    var sink = sinks.get(index);
+                    int received = sink.receive(Math.min(amount, sink.demand), false);
                     sink.demand = Math.max(0, sink.demand - received);
-                    accepted += received;
-                }
+                    return received;
+                });
             }
+            distributionCursor = (startIndex + 1) % sinkCount;
             demand = Math.max(0, demand - accepted);
             return accepted;
         }
@@ -346,7 +341,6 @@ public final class PatternP2PEnergyGridService implements IGridService, IGridSer
         private final long joinOrder;
         private ReceiverGroup group;
         private int demand;
-        private int allocation;
 
         private SinkEntry(IGridNode node, Object owner, long joinOrder) {
             this.node = node;
@@ -356,10 +350,6 @@ public final class PatternP2PEnergyGridService implements IGridService, IGridSer
 
         private long joinOrder() {
             return joinOrder;
-        }
-
-        private int remainingDemand() {
-            return Math.max(0, demand - allocation);
         }
 
         private int receive(int amount, boolean simulate) {
@@ -388,7 +378,7 @@ public final class PatternP2PEnergyGridService implements IGridService, IGridSer
 
         private EnergyDistributionMode mode() {
             if (owner instanceof PatternP2PTunnelPart output) {
-                return output.getOutputLogic().getEnergyDistributionMode();
+                return globalEnergyDistributionMode;
             }
             if (owner instanceof PatternP2PUnitPortPart port) {
                 PatternP2PUnitManagerPart manager = findManager(port.getBoundPatternP2PUnitId());

@@ -63,7 +63,7 @@ public final class AnnihilationPlaneBreakStrategy
         try {
             if (!canHandleBlock(level, target)) return TickRateModulation.IDLE;
             List<ItemStack> expectedDrops = Arrays.asList(Platform.getBlockDrops(level, target));
-            if (!canReturnDrops(manager, expectedDrops)) return TickRateModulation.IDLE;
+            if (!canReturnDrops(port, manager, expectedDrops)) return TickRateModulation.IDLE;
 
             float energyUsage = calculateEnergyUsage(level, target, expectedDrops);
             IEnergyGrid energy = port.getProxy().getEnergy();
@@ -78,7 +78,7 @@ public final class AnnihilationPlaneBreakStrategy
             }
 
             energy.extractAEPower(energyUsage, Actionable.MODULATE, PowerMultiplier.CONFIG);
-            if (!breakBlockAndHandleDrops(level, target, manager)) {
+            if (!breakBlockAndHandleDrops(port, level, target, manager)) {
                 return TickRateModulation.IDLE;
             }
             AppEng.proxy.sendToAllNearExcept(null, target.getX(), target.getY(), target.getZ(),
@@ -103,10 +103,12 @@ public final class AnnihilationPlaneBreakStrategy
                 && level.canMineBlockBody(Platform.getPlayer(level), target);
     }
 
-    private static boolean canReturnDrops(PatternP2PUnitManagerPart manager,
+    private static boolean canReturnDrops(PatternP2PUnitPortPart port,
+                                          PatternP2PUnitManagerPart manager,
                                           List<ItemStack> drops) {
         for (ItemStack drop : drops) {
-            if (!drop.isEmpty() && !manager.returnProduct(drop, true).isEmpty()) return false;
+            if (!drop.isEmpty() && (!port.allowsInputFilter(drop)
+                    || !manager.returnProduct(drop, true).isEmpty())) return false;
         }
         return true;
     }
@@ -118,14 +120,15 @@ public final class AnnihilationPlaneBreakStrategy
         return energyUsage;
     }
 
-    private static boolean breakBlockAndHandleDrops(WorldServer level, BlockPos target,
+    private static boolean breakBlockAndHandleDrops(PatternP2PUnitPortPart port,
+                                                    WorldServer level, BlockPos target,
                                                     PatternP2PUnitManagerPart manager) {
         if (!level.destroyBlock(target, true)) return false;
         if (!manager.isBreakRecovery()) return true;
         AxisAlignedBB area = new AxisAlignedBB(target).grow(0.2);
         for (EntityItem entity : level.getEntitiesWithinAABB(EntityItem.class, area)) {
             ItemStack offered = entity.getItem().copy();
-            if (offered.isEmpty()) continue;
+            if (offered.isEmpty() || !port.allowsInputFilter(offered)) continue;
             ItemStack remainder = manager.returnProduct(offered, false);
             if (remainder.isEmpty()) entity.setDead(); else entity.setItem(remainder);
         }

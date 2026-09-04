@@ -457,7 +457,7 @@ public final class PatternP2PTunnelPart extends P2PTunnelPart<PatternP2PTunnelPa
         if (input != null && !input.isOutput() && input.hasConfiguredFrequency()) {
             var settings = input.getInputLogic();
             if (outputLogic != null && outputLogic.isSyncInputSettings()) {
-                outputLogic.applyInputSettings(settings.getReturnMode());
+                outputLogic.applyInputSettings(settings.getReturnMode(), settings.getProductExtractionSettings());
             }
         }
     }

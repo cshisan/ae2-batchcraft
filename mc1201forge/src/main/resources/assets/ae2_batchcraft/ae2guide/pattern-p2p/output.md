@@ -35,11 +35,11 @@ If the target accepts only part of a resource, the remainder stays pending and i
 
 ## Product Return
 
-Machines and pipes can push products into the output's insertion-only return capability. Active extraction can also pull from the adjacent machine when enabled on the input. Both paths apply the task's return configuration.
+Machines and pipes can push products into the output's insertion-only return capability. Active extraction can also pull from the adjacent machine when enabled for this output. Both paths apply the task's return configuration.
 
 ## Configuration and Energy
 
-The output follows the input's return mode by default. Disable synchronization to choose a local return mode. The input's extraction switch controls normal outputs; its interval and amount set the extraction schedule.
+The output always has local return, extraction, interval, and amount values. With Sync enabled, input broadcasts overwrite those values; with Sync disabled, the output ignores broadcasts and uses its local values. The output-side extraction Enabled/Disabled buttons therefore control this output when Sync is off, while their state follows the input when Sync is on. New extraction is attempted only while this output has an active, runnable task; Unblocked mode does not bypass that task requirement. Resources already pulled but waiting for return remain in the recovery queue and may drain after the task ends.
 
 A configured, active output also acts as a continuous FE destination for a Pattern P2P Energy Tunnel. It does not need an active crafting task to power the adjacent machine.
 

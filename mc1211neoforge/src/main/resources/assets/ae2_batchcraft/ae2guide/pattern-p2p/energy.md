@@ -40,7 +40,7 @@ A normal output must have a nonzero frequency and an active AE node. A Unit Ener
 | Even | Shares available FE across current receiver demand as evenly as possible |
 | Round robin | Prioritizes receivers in a rotating order, useful when supply cannot satisfy all demand |
 
-Changing the distribution mode synchronizes it across Pattern P2P outputs and Unit Managers on the current AE grid. Receivers are grouped by output frequency or Unit identity, then their configured mode is applied within the group.
+The Energy Tunnel mode controls first-stage distribution. Receivers are grouped by output frequency or Unit identity, then the Energy Tunnel distributes FE among those groups. Normal output groups continue to use this mode internally. After a Unit group receives FE, the input or its Unit Manager's Unit Port (Energy) setting performs a second-stage distribution among that Unit's Energy Ports.
 
 The energy tunnel never forwards FE into another energy tunnel placed as its target.
 

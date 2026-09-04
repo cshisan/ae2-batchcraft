@@ -4,22 +4,16 @@ import appeng.api.inventories.InternalInventory;
 import appeng.api.storage.ISubMenuHost;
 import appeng.menu.AEBaseMenu;
 import appeng.menu.ISubMenu;
-import appeng.menu.SlotSemantic;
 import appeng.menu.SlotSemantics;
 import appeng.menu.guisync.GuiSync;
 import appeng.menu.implementations.MenuTypeBuilder;
-import appeng.menu.slot.AppEngSlot;
 import appeng.menu.slot.FakeSlot;
 import appeng.menu.slot.RestrictedInputSlot;
-import cn.ae2bc.Ae2bcMod;
 import cn.ae2bc.part.PatternP2PUnitPortPart;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.MenuType;
-import net.minecraft.world.item.ItemStack;
 
 public final class UnitPortOutputConfigMenu extends AEBaseMenu implements ISubMenu {
-    public static final SlotSemantic MARKER_SLOT = SlotSemantics.register("AE2_BATCHCRAFT_UNIT_PORT_MARKER", false);
     private static final String SET_PRIORITY = "setPriority";
     private static final String SET_SINGLE_SLOT = "setSingleSlot";
     public static final MenuType<UnitPortOutputConfigMenu> TYPE = MenuTypeBuilder
@@ -37,8 +31,10 @@ public final class UnitPortOutputConfigMenu extends AEBaseMenu implements ISubMe
         if (!host.getType().acceptsTaskInput()) {
             throw new IllegalStateException("Output configuration menu opened for non-output unit port: " + host.getType());
         }
-        InternalInventory markers = host.getOutputFilterMarkers();
-        for (int i = 0; i < markers.size(); i++) addSlot(new MarkerSlot(markers, i), MARKER_SLOT);
+        InternalInventory markers = host.getOutputFilterMarkers().createMenuWrapper();
+        for (int i = 0; i < markers.size(); i++) {
+            addSlot(new FakeSlot(markers, i), SlotSemantics.CONFIG);
+        }
         addSlot(new InverterSlot(host.getOutputFilterInverter(), 0), SlotSemantics.UPGRADE);
         createPlayerInventorySlots(playerInventory);
         priority = host.getPriority();
@@ -74,10 +70,6 @@ public final class UnitPortOutputConfigMenu extends AEBaseMenu implements ISubMe
     }
     @Override public ISubMenuHost getHost() { return host; }
 
-    private static final class MarkerSlot extends FakeSlot {
-        private MarkerSlot(InternalInventory inventory, int slot) { super(inventory, slot); }
-        @Override public void set(ItemStack stack) { super.set(stack.isEmpty() ? ItemStack.EMPTY : stack.copyWithCount(1)); }
-    }
     private static final class InverterSlot extends RestrictedInputSlot {
         private InverterSlot(InternalInventory inventory, int slot) {
             super(PlacableItemType.UPGRADES, inventory, slot);

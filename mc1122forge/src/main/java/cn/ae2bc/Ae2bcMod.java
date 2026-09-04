@@ -43,6 +43,7 @@ public final class Ae2bcMod {
     public static final int GUI_COMPONENT_PLACER_CRAFT_AMOUNT = 4401;
     public static final int GUI_COMPONENT_PLACER_CRAFT_CONFIRM = 4402;
     public static final int GUI_UNIT_PORT_OUTPUT_BASE = 4500;
+    public static final int GUI_UNIT_PORT_INPUT_BASE = 4600;
     @Mod.Instance(MOD_ID)
     public static Ae2bcMod INSTANCE;
     private static final Class<?> AE2_NODE_API = IGridNode.class;
@@ -97,6 +98,10 @@ public final class Ae2bcMod {
                     return new cn.ae2bc.menu.UnitPortOutputConfigMenu(player, new BlockPos(x, y, z),
                             EnumFacing.values()[id - GUI_UNIT_PORT_OUTPUT_BASE]);
                 }
+                if (id >= GUI_UNIT_PORT_INPUT_BASE && id < GUI_UNIT_PORT_INPUT_BASE + 6) {
+                    return new cn.ae2bc.menu.UnitPortInputConfigMenu(player, new BlockPos(x, y, z),
+                            EnumFacing.values()[id - GUI_UNIT_PORT_INPUT_BASE]);
+                }
                 if (id >= GUI_ENERGY_BASE && id < GUI_ENERGY_BASE + 6) {
                     return new cn.ae2bc.menu.PatternP2PTunnelEnergyMenu(player, new BlockPos(x, y, z),
                             EnumFacing.values()[id - GUI_ENERGY_BASE]);
@@ -137,6 +142,12 @@ public final class Ae2bcMod {
                             new cn.ae2bc.menu.UnitPortOutputConfigMenu(player, new BlockPos(x, y, z),
                                     EnumFacing.values()[id - GUI_UNIT_PORT_OUTPUT_BASE]);
                     return new cn.ae2bc.client.UnitPortOutputConfigScreen(container, player.inventory);
+                }
+                if (id >= GUI_UNIT_PORT_INPUT_BASE && id < GUI_UNIT_PORT_INPUT_BASE + 6) {
+                    cn.ae2bc.menu.UnitPortInputConfigMenu container =
+                            new cn.ae2bc.menu.UnitPortInputConfigMenu(player, new BlockPos(x, y, z),
+                                    EnumFacing.values()[id - GUI_UNIT_PORT_INPUT_BASE]);
+                    return new cn.ae2bc.client.UnitPortInputConfigScreen(container, player.inventory);
                 }
                 if (id >= GUI_ENERGY_BASE && id < GUI_ENERGY_BASE + 6) {
                     cn.ae2bc.menu.PatternP2PTunnelEnergyMenu container =

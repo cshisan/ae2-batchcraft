@@ -13,7 +13,7 @@ class ProviderOwnedBatchDispatchSourceTest {
     void fullDispatchRemainsSingleEndpointFastPath() throws Exception {
         String input = source("logic/PatternP2PTunnelInputLogic.java");
         assertTrue(input.contains("pushPatternComplete(pattern, metadata, inputs, outputs, size)"));
-        assertTrue(input.contains("output.tryAcceptPattern(pattern, metadata, inputs, actionSource)"));
+        assertTrue(input.contains("endpoint.tryAcceptPattern(pattern, metadata, inputs, actionSource)"));
         assertFalse(input.contains("totalCapacity < totalUnits"));
     }
 

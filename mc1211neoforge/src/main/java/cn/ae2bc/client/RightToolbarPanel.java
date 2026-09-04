@@ -34,6 +34,10 @@ final class RightToolbarPanel implements ICompositeWidget {
         buttons.add(button);
     }
 
+    int getRequiredHeight() {
+        return position.getY() + getPanelHeight();
+    }
+
     @Override
     public void setPosition(Point position) {
         this.position = position;

@@ -241,6 +241,24 @@ final class BatchDispatchContext {
         return Map.copyOf(roundAllocations);
     }
 
+    boolean reassignRoundAllocation(String fromEndpointId, String toEndpointId, long units) {
+        if (fromEndpointId == null || toEndpointId == null || fromEndpointId.equals(toEndpointId)
+                || units <= 0) {
+            return false;
+        }
+        long assigned = roundAllocations.getOrDefault(fromEndpointId, 0L);
+        if (assigned < units || roundAllocations.containsKey(toEndpointId)) {
+            return false;
+        }
+        if (assigned == units) {
+            roundAllocations.remove(fromEndpointId);
+        } else {
+            roundAllocations.put(fromEndpointId, assigned - units);
+        }
+        roundAllocations.put(toEndpointId, units);
+        return true;
+    }
+
     long insert(AEKey what, long amount, Actionable mode, IActionSource source) {
         if (amount <= 0 || roundUnits <= 0 || isRoundReady()) {
             return 0;

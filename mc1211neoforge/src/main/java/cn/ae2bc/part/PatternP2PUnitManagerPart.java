@@ -32,6 +32,7 @@ import cn.ae2bc.logic.PatternP2PUnitIdentityColors;
 import cn.ae2bc.logic.PatternP2PUnitDimensions;
 import cn.ae2bc.logic.PatternP2PUnitManagerLogic;
 import cn.ae2bc.core.unit.UnitPortType;
+import cn.ae2bc.core.unit.OutputSlotSharingMode;
 import cn.ae2bc.logic.PatternP2PTopologyGridService;
 import cn.ae2bc.client.model.PatternP2PUnitModelData;
 import cn.ae2bc.menu.PatternP2PUnitManagerMenu;
@@ -210,6 +211,19 @@ public final class PatternP2PUnitManagerPart extends CablePart implements Patter
             var inputLogic = input.getInputLogic();
             logic.applyMainConfiguration(inputLogic.getPatternP2PUnitConfiguration(),
                     inputLogic.getPatternP2PUnitConfigurationRevision());
+        }
+    }
+
+    /** Applies the current manager slot-sharing policy to all bound output ports. */
+    public void applyOutputSlotSharingModeToPorts() {
+        var grid = getMainNode().getGrid();
+        if (grid == null) {
+            return;
+        }
+        OutputSlotSharingMode mode = logic.getEffectiveConfiguration().outputSlotSharingMode();
+        for (PatternP2PUnitPortPart port : grid.getService(PatternP2PTopologyGridService.class)
+                .getPorts(patternP2PUnitId)) {
+            port.applyManagerSingleSlot(mode);
         }
     }
 
@@ -426,5 +440,6 @@ public final class PatternP2PUnitManagerPart extends CablePart implements Patter
                 .getPorts(patternP2PUnitId)) {
             port.getHost().markForUpdate();
         }
+        applyOutputSlotSharingModeToPorts();
     }
 }

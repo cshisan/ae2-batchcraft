@@ -15,10 +15,11 @@ class EnergyDistributionBatchingSourceTest {
         String source = Files.readString(Path.of(
                 "src/main/java/cn/ae2bc/logic/PatternP2PEnergyGridService.java"));
         String method = methodBody(source, "public void setGlobalEnergyDistributionMode",
-                "private void initializeOrApplyGlobalMode(PatternP2PTunnelPart");
+                "public void synchronizeOutputGroupMode");
 
-        assertTrue(method.contains("manager.getLogic().applyEnergyDistributionMode(mode)"));
+        assertFalse(method.contains("manager.getLogic().applyEnergyDistributionMode(mode)"));
         assertFalse(method.contains("manager.getLogic().setEnergyDistributionMode(mode)"));
+        assertTrue(method.contains("energyTunnel.getHost().markForSave()"));
         assertFalse(method.contains("topologyChanged()"));
         assertEquals(1, occurrences(method, "demandChanged()"));
     }
@@ -28,10 +29,23 @@ class EnergyDistributionBatchingSourceTest {
         String source = Files.readString(Path.of(
                 "src/main/java/cn/ae2bc/logic/PatternP2PUnitManagerLogic.java"));
         String method = methodBody(source, "public void setEnergyDistributionMode",
-                "boolean applyEnergyDistributionMode");
+                "public void setSyncMainConfiguration");
 
-        assertTrue(method.contains("demandChanged()"));
+        assertTrue(method.contains("setLocalConfiguration"));
         assertFalse(method.contains("topologyChanged()"));
+    }
+
+    @Test
+    void energyIsAllocatedToLogicalGroupsBeforeTheirEndpoints() throws Exception {
+        String source = Files.readString(Path.of(
+                "src/main/java/cn/ae2bc/logic/PatternP2PEnergyGridService.java"));
+
+        assertTrue(source.contains("allocateToGroups(allocatable);"));
+        assertTrue(source.contains("totalDemand = saturatingAdd(totalDemand, group.demand);"));
+        assertTrue(source.contains("globalEnergyDistributionMode == EnergyDistributionMode.ROUND_ROBIN"));
+        assertTrue(source.contains("EnergyDistributionMode mode = sinks.get(0).mode();"));
+        assertTrue(source.contains("return manager == null ? EnergyDistributionMode.EVEN"));
+        assertTrue(source.contains(": manager.getLogic().getEnergyDistributionMode();"));
     }
 
     private static String methodBody(String source, String startMarker, String endMarker) {

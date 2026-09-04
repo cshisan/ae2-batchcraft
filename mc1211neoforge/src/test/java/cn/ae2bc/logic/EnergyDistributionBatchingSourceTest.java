@@ -11,27 +11,40 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class EnergyDistributionBatchingSourceTest {
     @Test
-    void globalModeAppliesSilentlyAndInvalidatesDemandOnce() throws Exception {
+    void energyTunnelModeControlsFirstStageWithoutOverwritingEndpointModes() throws Exception {
         String source = Files.readString(Path.of(
                 "src/main/java/cn/ae2bc/logic/PatternP2PEnergyGridService.java"));
         String method = methodBody(source, "public void setGlobalEnergyDistributionMode",
-                "private void initializeOrApplyGlobalMode(PatternP2PTunnelPart");
+                "public void synchronizeOutputGroupMode");
 
-        assertTrue(method.contains("manager.getLogic().applyEnergyDistributionMode(mode)"));
-        assertFalse(method.contains("manager.getLogic().setEnergyDistributionMode(mode)"));
-        assertFalse(method.contains("topologyChanged()"));
+        assertTrue(method.contains("globalEnergyDistributionMode = mode"));
+        assertFalse(method.contains("manager.getLogic()"));
+        assertFalse(method.contains("output.getOutputLogic()"));
         assertEquals(1, occurrences(method, "demandChanged()"));
     }
 
     @Test
-    void individualManagerModeChangeOnlyInvalidatesDemand() throws Exception {
+    void managerModeComesFromItsEffectiveUnitConfiguration() throws Exception {
         String source = Files.readString(Path.of(
                 "src/main/java/cn/ae2bc/logic/PatternP2PUnitManagerLogic.java"));
-        String method = methodBody(source, "public void setEnergyDistributionMode",
-                "boolean applyEnergyDistributionMode");
+        String method = methodBody(source, "public EnergyDistributionMode getEnergyDistributionMode",
+                "public void setEnergyDistributionMode");
 
-        assertTrue(method.contains("demandChanged()"));
-        assertFalse(method.contains("topologyChanged()"));
+        assertTrue(method.contains("getEffectiveConfiguration().energyDistributionMode()"));
+        assertFalse(method.contains("globalEnergyDistributionMode"));
+    }
+
+    @Test
+    void unitEnergyModePersistsInConfigurationWithLegacyManagerMigration() throws Exception {
+        String configuration = Files.readString(Path.of(
+                "src/main/java/cn/ae2bc/logic/PatternP2PUnitConfiguration.java"));
+        String manager = Files.readString(Path.of(
+                "src/main/java/cn/ae2bc/logic/PatternP2PUnitManagerLogic.java"));
+
+        assertTrue(configuration.contains("data.putByte(\"EnergyDistributionMode\""));
+        assertTrue(configuration.contains("data.contains(\"EnergyDistributionMode\")"));
+        assertTrue(manager.contains("legacyEnergyDistributionMode"));
+        assertTrue(manager.contains("withEnergyDistributionMode(legacyEnergyDistributionMode)"));
     }
 
     private static String methodBody(String source, String startMarker, String endMarker) {

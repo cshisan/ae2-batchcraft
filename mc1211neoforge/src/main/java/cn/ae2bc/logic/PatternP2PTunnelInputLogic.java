@@ -168,7 +168,9 @@ public final class PatternP2PTunnelInputLogic {
         if (!unitConfiguration.equals(patternP2PUnitConfiguration)) {
             setPatternP2PUnitConfiguration(unitConfiguration);
         } else {
-            alertProductExtractionEndpoints();
+            // The enabled flag is not part of PatternP2PUnitConfiguration, so a
+            // switch-only edit must still broadcast the complete extraction settings.
+            synchronizeSettings();
             input.getHost().markForSave();
         }
     }
@@ -187,7 +189,7 @@ public final class PatternP2PTunnelInputLogic {
 
     public void synchronizeSettings() {
         for (var output : getOutputSnapshot()) {
-            output.getOutputLogic().applyInputSettings(returnMode);
+            output.getOutputLogic().applyInputSettings(returnMode, productExtractionSettings);
         }
         for (var manager : getPatternP2PUnitManagers()) {
             manager.getLogic().applyMainConfiguration(patternP2PUnitConfiguration,
@@ -309,14 +311,11 @@ public final class PatternP2PTunnelInputLogic {
                                         KeyCounter[] inputs, List<PatternTaskEndpoint> outputs, int size) {
         List<PatternTaskEndpoint> candidates = taskAllocationMode == TaskAllocationMode.RANDOM
                 ? getAvailableTaskEndpoints() : outputs;
-        int acceptedIndex = TaskEndpointSelector.select(taskAllocationMode, roundRobinCursor,
-                candidates.size(), random::nextInt, index -> {
-                    var output = candidates.get(index);
-                    if (!output.isOperationalTaskEndpoint() || !output.canAcceptTask()) {
-                        return false;
-                    }
-                    return output.tryAcceptPattern(pattern, metadata, inputs, actionSource);
-                });
+        int acceptedIndex = taskAllocationMode == TaskAllocationMode.RANDOM
+                ? selectRandomEndpoint(candidates, pattern, metadata, inputs)
+                : TaskEndpointSelector.select(taskAllocationMode, roundRobinCursor,
+                        candidates.size(), random::nextInt,
+                        index -> tryAcceptTaskEndpoint(candidates.get(index), pattern, metadata, inputs));
         if (acceptedIndex >= 0) {
             outputAvailabilityDirty = true;
             if (taskAllocationMode == TaskAllocationMode.ROUND_ROBIN) {
@@ -326,6 +325,28 @@ public final class PatternP2PTunnelInputLogic {
             return true;
         }
         return false;
+    }
+
+    private int selectRandomEndpoint(List<PatternTaskEndpoint> candidates, IPatternDetails pattern,
+                                     PatternDispatchMetadata metadata, KeyCounter[] inputs) {
+        if (candidates.isEmpty()) {
+            return -1;
+        }
+        int start = random.nextInt(candidates.size());
+        for (int offset = 0; offset < candidates.size(); offset++) {
+            int index = Math.floorMod(start + offset, candidates.size());
+            if (tryAcceptTaskEndpoint(candidates.get(index), pattern, metadata, inputs)) {
+                return index;
+            }
+        }
+        return -1;
+    }
+
+    private boolean tryAcceptTaskEndpoint(PatternTaskEndpoint endpoint, IPatternDetails pattern,
+                                          PatternDispatchMetadata metadata, KeyCounter[] inputs) {
+        return endpoint.isOperationalTaskEndpoint()
+                && endpoint.canAcceptTask()
+                && endpoint.tryAcceptPattern(pattern, metadata, inputs, actionSource);
     }
 
     private boolean planNextRound() {
@@ -389,17 +410,33 @@ public final class PatternP2PTunnelInputLogic {
         for (var allocation : context.roundAllocations().entrySet()) {
             PatternTaskEndpoint endpoint = endpointsById.get(allocation.getKey());
             long units = allocation.getValue();
-            if (endpoint == null || !endpoint.isOperationalTaskEndpoint()) {
+            if (tryAcceptAtomicUnits(endpoint, pattern, atomicMetadata, context, units)) {
+                context.dispatched(allocation.getKey(), units);
+                lastAccepted = endpoints.indexOf(endpoint);
                 continue;
             }
-            long accepted = endpoint.getMaximumAcceptedAtomicUnits(
-                    pattern, atomicMetadata, context.atomicInputs(), units, context.sessionId(), actionSource);
-            if (accepted < units || !endpoint.tryAcceptPatternAtomicUnits(
-                    pattern, atomicMetadata, context.atomicInputs(), units, context.sessionId(), actionSource)) {
-                continue;
+
+            if (taskAllocationMode == TaskAllocationMode.RANDOM) {
+                int firstCandidateIndex = endpoint == null
+                        ? 0 : Math.floorMod(endpoints.indexOf(endpoint) + 1, size);
+                for (int attempt = 0; attempt < size; attempt++) {
+                    int candidateIndex = Math.floorMod(firstCandidateIndex + attempt, size);
+                    PatternTaskEndpoint candidate = endpoints.get(candidateIndex);
+                    String candidateId = candidate.getDispatchId();
+                    if (candidate == endpoint || context.roundAllocations().containsKey(candidateId)) {
+                        continue;
+                    }
+                    if (!context.reassignRoundAllocation(allocation.getKey(), candidateId, units)) {
+                        continue;
+                    }
+                    if (tryAcceptAtomicUnits(candidate, pattern, atomicMetadata, context, units)) {
+                        context.dispatched(candidateId, units);
+                        lastAccepted = candidateIndex;
+                        break;
+                    }
+                    context.reassignRoundAllocation(candidateId, allocation.getKey(), units);
+                }
             }
-            context.dispatched(allocation.getKey(), units);
-            lastAccepted = endpoints.indexOf(endpoint);
         }
         if (lastAccepted < 0) {
             return false;
@@ -417,6 +454,18 @@ public final class PatternP2PTunnelInputLogic {
         }
         input.getHost().markForSave();
         return true;
+    }
+
+    private boolean tryAcceptAtomicUnits(PatternTaskEndpoint endpoint, IPatternDetails pattern,
+                                         PatternDispatchMetadata atomicMetadata,
+                                         BatchDispatchContext context, long units) {
+        if (endpoint == null || !endpoint.isOperationalTaskEndpoint()) {
+            return false;
+        }
+        long accepted = endpoint.getMaximumAcceptedAtomicUnits(
+                pattern, atomicMetadata, context.atomicInputs(), units, context.sessionId(), actionSource);
+        return accepted >= units && endpoint.tryAcceptPatternAtomicUnits(
+                pattern, atomicMetadata, context.atomicInputs(), units, context.sessionId(), actionSource);
     }
 
     public void addDrops(List<ItemStack> drops) {

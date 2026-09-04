@@ -16,7 +16,7 @@ Endpoint extraction lets BatchCraft pull products from the inventory or resource
 | Extraction interval | Applied | Applied through the Manager |
 | Extraction amount | Applied | Applied through the Manager |
 
-The switch therefore controls only whether normal Outputs have extraction capability. The interval and amount affect both endpoint types. A Unit Extraction Port still requires its Manager's task to be operational.
+The switch therefore controls only whether normal Outputs have extraction capability. The interval and amount affect both endpoint types. New extraction also requires an active, runnable task for both normal Outputs and Unit Extraction Ports; Unblocked mode does not bypass this requirement.
 
 The configured amount is the maximum resource-operation budget for one scheduled pass. It is not a promise that the whole amount moves in one tick. A small inventory may provide less, while a large amount may require later ticks.
 
@@ -27,5 +27,7 @@ After a successful round enters the AE network, the return inventory can be reus
 Empty attempts add a gradual backoff of at most `20` ticks. Inventory changes and recovered return capacity can wake a waiting extractor early, while a successful extraction still respects the configured minimum interval.
 
 Extraction may start before every input material has been dispatched. This is intentional: the task remains active until the pending-material queue is empty. If a resource was pulled but cannot immediately enter the return path, it is held in a recovery queue and retried rather than silently discarded.
+
+The recovery queue may continue draining after the task has ended. It contains only resources already pulled for return and never permits a new extraction after completion.
 
 Use direct return when the adjacent inventory already sends products reliably. Enable endpoint extraction when products must be pulled or when a configured pull rate is useful.

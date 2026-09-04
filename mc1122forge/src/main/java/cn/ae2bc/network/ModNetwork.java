@@ -589,9 +589,14 @@ public final class ModNetwork {
                         message.pos.getZ() + 0.5) > 64.0) return;
                 PatternP2PTunnelPart part = PatternP2PTunnelMenu.findPart(player, message.pos, message.side);
                 if (part != null) {
-                    if (part.isOutput()) part.setOutputSettings(
-                            message.settings.getReturnMode(), message.syncInputSettings);
-                    else part.setInputSettings(message.enabled, message.settings);
+                    if (part.isOutput()) {
+                        part.setOutputSettings(message.settings.getReturnMode(), message.syncInputSettings);
+                        if (!message.syncInputSettings) {
+                            part.setExtractionSettings(message.enabled,
+                                    message.settings.getExtractionInterval(),
+                                    message.settings.getExtractionAmount());
+                        }
+                    } else part.setInputSettings(message.enabled, message.settings);
                     if (message.resetTask) part.resetTaskState();
                 }
             });
@@ -610,6 +615,7 @@ public final class ModNetwork {
         buffer.writeInt(settings.getPulsePeriodTicks());
         buffer.writeByte(settings.getTransferPortOutputMode().getId());
         buffer.writeByte(settings.getOutputSlotSharingMode().getId());
+        buffer.writeByte(settings.getEnergyDistributionMode().getId());
     }
 
     private static PatternP2PUnitSettings readSettings(ByteBuf buffer) {
@@ -619,7 +625,8 @@ public final class ModNetwork {
                 cn.ae2bc.logic.RedstoneOutputMode.fromId(buffer.readUnsignedByte()),
                 buffer.readUnsignedByte(), buffer.readInt(), buffer.readInt(),
                 cn.ae2bc.core.unit.TransferPortOutputMode.fromId(buffer.readUnsignedByte()),
-                cn.ae2bc.core.unit.OutputSlotSharingMode.fromId(buffer.readUnsignedByte()));
+                cn.ae2bc.core.unit.OutputSlotSharingMode.fromId(buffer.readUnsignedByte()),
+                cn.ae2bc.logic.EnergyDistributionMode.fromId(buffer.readUnsignedByte()));
     }
 
     public static final class MaterialOutputConfigMessage implements IMessage {

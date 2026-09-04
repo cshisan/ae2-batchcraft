@@ -20,14 +20,15 @@ class TaskAllocationModeSourceTest {
     }
 
     @Test
-    void randomSelectionIsWithReplacementAndAttemptsOneEndpoint() throws Exception {
-        String selector = Files.readString(Path.of(
-                "../shared/src/main/java/cn/ae2bc/core/dispatch/TaskEndpointSelector.java"));
+    void randomSelectionUsesARandomStartAndRetriesOtherEndpoints() throws Exception {
         String input = Files.readString(Path.of(
                 "src/main/java/cn/ae2bc/logic/PatternP2PTunnelInputLogic.java"));
 
-        assertTrue(selector.contains("int index = boundedRandom.applyAsInt(size)"));
-        assertTrue(selector.contains("return attempt.test(index) ? index : -1"));
         assertTrue(input.contains("getAvailableTaskEndpoints() : outputs"));
+        assertTrue(input.contains("selectRandomEndpoint(candidates, pattern, metadata, inputs)"));
+        assertTrue(input.contains("random.nextInt(candidates.size())"));
+        assertTrue(input.contains("for (int offset = 0; offset < candidates.size(); offset++)"));
+        assertTrue(input.contains("context.reassignRoundAllocation"));
+        assertTrue(input.contains("for (int attempt = 0; attempt < size; attempt++)"));
     }
 }

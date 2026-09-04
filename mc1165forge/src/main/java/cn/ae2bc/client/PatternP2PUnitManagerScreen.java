@@ -28,7 +28,7 @@ public final class PatternP2PUnitManagerScreen extends ContainerScreen<PatternP2
     private static final int PAGE_BUTTON_TOP = 20;
     private static final int PAGE_BUTTON_HEIGHT = 20;
     private static final int PAGE_BUTTON_SPACING = 2;
-    private enum Page { COMMON, TRANSFER, BREAK, REDSTONE, ENERGY }
+    private enum Page { COMMON, UNIT_COMMON, TRANSFER, BREAK, REDSTONE, ENERGY }
 
     private Page page = Page.COMMON;
     private ReturnMode returnMode;
@@ -44,7 +44,9 @@ public final class PatternP2PUnitManagerScreen extends ContainerScreen<PatternP2
     private int pulseWidth;
     private int pulsePeriod;
     private Button resetTaskButton;
-    private Button singleSlotButton;
+    private Button commonPageButton;
+    private Button unitCommonPageButton;
+    private Button pagePortButton;
     private TextFieldWidget intervalField;
     private TextFieldWidget amountField;
     private TextFieldWidget strengthField;
@@ -53,7 +55,7 @@ public final class PatternP2PUnitManagerScreen extends ContainerScreen<PatternP2
 
     public PatternP2PUnitManagerScreen(PatternP2PUnitManagerMenu menu, PlayerInventory inventory, ITextComponent title) {
         super(menu, inventory, title);
-        imageWidth = 176;
+        imageWidth = 172;
         PatternP2PUnitSettings settings = menu.getSettings();
         syncMain = menu.isSyncMainConfiguration();
         slotSharingMode = menu.getOutputSlotSharingMode();
@@ -74,19 +76,25 @@ public final class PatternP2PUnitManagerScreen extends ContainerScreen<PatternP2
     protected void init() {
         imageHeight = resolveHeight(page);
         super.init();
-        addButton(new Ae2Button(leftPos + 152, topPos - 5, 20, 20,
+        addButton(new Ae2Button(leftPos + 148, topPos - 5, 20, 20,
                 new StringTextComponent("X"), button -> onClose()));
-        addPageIconButton(2, Page.COMMON, 20, Icon.PERMISSION_BUILD.ordinal());
-        addPageIconButton(3, Page.TRANSFER, 42, Icon.FULLNESS_HALF.ordinal());
-        addPageIconButton(4, Page.BREAK, 64, Icon.PERMISSION_CRAFT.ordinal());
-        addPageIconButton(5, Page.REDSTONE, 86, 1);
-        addPageIconButton(6, Page.ENERGY, 108, 164);
+        commonPageButton = addPageIconButton(2, Page.COMMON, 20, Icon.PERMISSION_BUILD.ordinal());
+        unitCommonPageButton = addPageIconButton(3, Page.UNIT_COMMON, 42,
+                Icon.PERMISSION_BUILD_DISABLED.ordinal());
+        pagePortButton = addButton(new Ae2IconButton(leftPos - 24, topPos + 64,
+                Icon.ARROW_RIGHT.ordinal(), 1.0F, -1, -1, pressed -> {
+                    page = nextPortPage();
+                    init(minecraft, width, height);
+                }));
+        pagePortButton.setMessage(new TranslationTextComponent(
+                "gui.ae2_batchcraft.pattern_p2p_unit.page.switch", pageName(nextPortPage())));
         resetTaskButton = addButton(new Ae2IconButton(leftPos + imageWidth + 2, topPos + 17,
                 Icon.INVALID.ordinal(), ignored -> TaskResetConfirmation.open(this,
                         tr("gui.ae2_batchcraft.reset_task.confirm.unit"),
                         () -> sendCurrentSettings(true))));
         resetTaskButton.setMessage(tr("gui.ae2_batchcraft.reset_task.tooltip.unit"));
         if (page == Page.COMMON) initCommon();
+        else if (page == Page.UNIT_COMMON) initUnitCommon();
         else if (page == Page.TRANSFER) initTransfer();
         else if (page == Page.BREAK) initBreak();
         else if (page == Page.REDSTONE) initRedstone();
@@ -127,10 +135,22 @@ public final class PatternP2PUnitManagerScreen extends ContainerScreen<PatternP2
         amountField = field(104, 113, extractionAmount,
                 ProductExtractionLimits.MIN_AMOUNT, () -> ProductExtractionLimits.MAX_AMOUNT,
                 value -> extractionAmount = value);
-        singleSlotButton = addButton(new Ae2Button(leftPos + 12, topPos + 153, 152, 20,
-                tr("gui.ae2_batchcraft.pattern_p2p_unit.single_slot." + slotSharingMode.getSerializedName()),
-                button -> { slotSharingMode = slotSharingMode.next(); sendCurrentSettings(false); init(minecraft, width, height); }));
         setCommonEditable(!syncMain);
+    }
+
+    private void initUnitCommon() {
+        Button all = addButton(new ScrollingAe2Button(leftPos + 12, topPos + 50, 46, 20,
+                tr("gui.ae2_batchcraft.pattern_p2p_unit.single_slot.all"),
+                button -> { slotSharingMode = OutputSlotSharingMode.ALL; sendCurrentSettings(false); init(minecraft, width, height); }));
+        Button disabled = addButton(new ScrollingAe2Button(leftPos + 63, topPos + 50, 46, 20,
+                tr("gui.ae2_batchcraft.pattern_p2p_unit.single_slot.disabled"),
+                button -> { slotSharingMode = OutputSlotSharingMode.DISABLED; sendCurrentSettings(false); init(minecraft, width, height); }));
+        Button follow = addButton(new ScrollingAe2Button(leftPos + 114, topPos + 50, 46, 20,
+                tr("gui.ae2_batchcraft.pattern_p2p_unit.single_slot.follow_port"),
+                button -> { slotSharingMode = OutputSlotSharingMode.FOLLOW_PORT; sendCurrentSettings(false); init(minecraft, width, height); }));
+        all.active = !syncMain && slotSharingMode != OutputSlotSharingMode.ALL;
+        disabled.active = !syncMain && slotSharingMode != OutputSlotSharingMode.DISABLED;
+        follow.active = !syncMain && slotSharingMode != OutputSlotSharingMode.FOLLOW_PORT;
     }
 
     private void initBreak() {
@@ -160,9 +180,10 @@ public final class PatternP2PUnitManagerScreen extends ContainerScreen<PatternP2
     }
 
     private void initEnergy() {
-        addButton(new Ae2Button(leftPos + 12, topPos + 50, 152, 20,
+        Button modeButton = addButton(new Ae2Button(leftPos + 12, topPos + 50, 152, 20,
                 tr("gui.ae2_batchcraft.energy_distribution_mode." + energyMode.getSerializedName()),
-                button -> { energyMode = energyMode.next(); sendCurrentSettings(false); init(minecraft, width, height); }));
+                pressed -> { energyMode = energyMode.next(); sendCurrentSettings(false); init(minecraft, width, height); }));
+        modeButton.active = !syncMain;
     }
 
     private Button modeButton(int x, int y, int width, ReturnMode mode) {
@@ -231,19 +252,36 @@ public final class PatternP2PUnitManagerScreen extends ContainerScreen<PatternP2
         addButton(button);
     }
 
-    private void addPageIconButton(int id, Page target, int y, int iconIndex) {
-        Button button = new Ae2IconButton(leftPos - 24, topPos + y, iconIndex, pressed -> {
+    private Button addPageIconButton(int id, Page target, int y, int iconIndex) {
+        return addPageIconButton(id, target, y, iconIndex, 1.0F);
+    }
+
+    private Button addPageIconButton(int id, Page target, int y, int iconIndex,
+                                     int iconOffsetX, int iconOffsetY) {
+        return addPageIconButton(id, target, y, iconIndex, 1.0F, iconOffsetX, iconOffsetY);
+    }
+
+    private Button addPageIconButton(int id, Page target, int y, int iconIndex, float iconScale) {
+        return addPageIconButton(id, target, y, iconIndex, iconScale, 0, 0);
+    }
+
+    private Button addPageIconButton(int id, Page target, int y, int iconIndex, float iconScale,
+                                     int iconOffsetX, int iconOffsetY) {
+        Button button = new Ae2IconButton(leftPos - 24, topPos + y, iconIndex, iconScale,
+                iconOffsetX, iconOffsetY, pressed -> {
             captureFields();
             page = target;
             init(minecraft, width, height);
         });
         button.active = page != target;
+        button.setMessage(pageName(target));
         addButton(button);
+        return button;
     }
 
     private void switchPage() {
         captureFields();
-        page = page == Page.COMMON ? Page.TRANSFER : page == Page.TRANSFER ? Page.BREAK
+        page = page == Page.COMMON ? Page.UNIT_COMMON : page == Page.UNIT_COMMON ? Page.TRANSFER : page == Page.TRANSFER ? Page.BREAK
                 : page == Page.BREAK ? Page.REDSTONE : page == Page.REDSTONE ? Page.ENERGY : Page.COMMON;
         init(minecraft, width, height);
     }
@@ -265,11 +303,6 @@ public final class PatternP2PUnitManagerScreen extends ContainerScreen<PatternP2
         if (periodField != null) pulsePeriod = parse(periodField.getValue(), pulsePeriod);
     }
 
-    @Override
-    public void onClose() {
-        super.onClose();
-    }
-
     private void sendCurrentSettings(boolean resetTask) {
         captureFields();
         int period = Math.max(1, pulsePeriod);
@@ -282,7 +315,7 @@ public final class PatternP2PUnitManagerScreen extends ContainerScreen<PatternP2
         settings = new PatternP2PUnitSettings(settings.getReturnMode(), settings.isBreakRecovery(),
                 settings.getExtractionInterval(), settings.getExtractionAmount(), settings.getRedstoneMode(),
                 settings.getRedstoneStrength(), settings.getPulseWidthTicks(), settings.getPulsePeriodTicks(),
-                transferPortOutputMode, slotSharingMode);
+                transferPortOutputMode, slotSharingMode, energyMode);
         ModNetwork.sendUnitManagerSettings(menu, menu.getFrequency(), settings, syncMain, energyMode, resetTask);
     }
 
@@ -291,8 +324,9 @@ public final class PatternP2PUnitManagerScreen extends ContainerScreen<PatternP2
         Ae2GuiSkin.draw(matrices, leftPos, topPos, imageWidth, imageHeight);
         if (page == Page.COMMON) {
             section(matrices, "gui.ae2_batchcraft.return_configuration", 43, 74);
-            section(matrices, "gui.ae2_batchcraft.product_extraction.title", 85, 137);
-            section(matrices, "gui.ae2_batchcraft.pattern_p2p_unit.section.single_slot", 146, 178);
+            section(matrices, "gui.ae2_batchcraft.product_extraction.parameters", 85, 137);
+        } else if (page == Page.UNIT_COMMON) {
+            section(matrices, "gui.ae2_batchcraft.pattern_p2p_unit.section.single_slot", 43, 74);
         } else if (page == Page.TRANSFER) {
             section(matrices, "gui.ae2_batchcraft.pattern_p2p_unit.section.transfer_mode", 43, 74);
         } else if (page == Page.BREAK) {
@@ -312,10 +346,11 @@ public final class PatternP2PUnitManagerScreen extends ContainerScreen<PatternP2
                 + page.name().toLowerCase()).getString(), 8, 23, 0x404040);
         if (page == Page.COMMON) {
             labels(matrices, "gui.ae2_batchcraft.return_configuration", 39);
-            labels(matrices, "gui.ae2_batchcraft.product_extraction.title", 81);
+            labels(matrices, "gui.ae2_batchcraft.product_extraction.parameters", 81);
             drawValueLabel(matrices, "gui.ae2_batchcraft.product_extraction.interval", 96, "gui.ae2_batchcraft.time.ticks");
             drawValueLabel(matrices, "gui.ae2_batchcraft.product_extraction.amount", 117, "gui.ae2_batchcraft.product_extraction.unit");
-            labels(matrices, "gui.ae2_batchcraft.pattern_p2p_unit.section.single_slot", 142);
+        } else if (page == Page.UNIT_COMMON) {
+            labels(matrices, "gui.ae2_batchcraft.pattern_p2p_unit.section.single_slot", 39);
         } else if (page == Page.TRANSFER) {
             labels(matrices, "gui.ae2_batchcraft.pattern_p2p_unit.section.transfer_mode", 39);
         } else if (page == Page.BREAK) {
@@ -347,14 +382,6 @@ public final class PatternP2PUnitManagerScreen extends ContainerScreen<PatternP2
 
     @Override
     public void render(MatrixStack matrices, int mouseX, int mouseY, float partialTick) {
-        OutputSlotSharingMode synced = menu.getOutputSlotSharingMode();
-        if (synced != slotSharingMode) {
-            slotSharingMode = synced;
-            if (singleSlotButton != null) {
-                singleSlotButton.setMessage(tr("gui.ae2_batchcraft.pattern_p2p_unit.single_slot."
-                        + slotSharingMode.getSerializedName()));
-            }
-        }
         renderBackground(matrices);
         super.render(matrices, mouseX, mouseY, partialTick);
         if (page == Page.COMMON) {
@@ -369,15 +396,28 @@ public final class PatternP2PUnitManagerScreen extends ContainerScreen<PatternP2
         if (resetTaskButton != null && resetTaskButton.isHovered()) {
             renderTooltip(matrices, tr("gui.ae2_batchcraft.reset_task.tooltip.unit"), mouseX, mouseY);
         }
+        renderIconTooltip(matrices, commonPageButton, mouseX, mouseY);
+        renderIconTooltip(matrices, unitCommonPageButton, mouseX, mouseY);
+        renderIconTooltip(matrices, pagePortButton, mouseX, mouseY);
+    }
+
+    private void renderIconTooltip(MatrixStack matrices, Button button, int mouseX, int mouseY) {
+        if (button != null && button.visible && button.isHovered()) {
+            renderTooltip(matrices, button.getMessage(), mouseX, mouseY);
+        }
+    }
+
+    private static ITextComponent pageName(Page page) {
+        return tr("gui.ae2_batchcraft.pattern_p2p_unit.page."
+                + page.name().toLowerCase(java.util.Locale.ROOT));
     }
 
     private static int heightFor(Page page) {
-        return page == Page.COMMON ? 186 : page == Page.TRANSFER ? 82 : page == Page.BREAK ? 82
-                : page == Page.REDSTONE ? 166 : 82;
+        return page == Page.COMMON ? 146 : page == Page.REDSTONE ? 166 : 82;
     }
 
     private static int resolveHeight(Page page) {
-        int pageCount = Page.values().length;
+        int pageCount = 3;
         int toolbarHeight = PAGE_BUTTON_TOP + pageCount * PAGE_BUTTON_HEIGHT
                 + Math.max(0, pageCount - 1) * PAGE_BUTTON_SPACING;
         return Math.max(heightFor(page), toolbarHeight);
@@ -386,6 +426,12 @@ public final class PatternP2PUnitManagerScreen extends ContainerScreen<PatternP2
     private static int parse(String value, int fallback) {
         try { return Integer.parseInt(value); }
         catch (NumberFormatException ignored) { return fallback; }
+    }
+
+    private Page nextPortPage() {
+        return page == Page.TRANSFER ? Page.BREAK
+                : page == Page.BREAK ? Page.REDSTONE
+                : page == Page.REDSTONE ? Page.ENERGY : Page.TRANSFER;
     }
 
     private static ITextComponent tr(String key) { return new TranslationTextComponent(key); }

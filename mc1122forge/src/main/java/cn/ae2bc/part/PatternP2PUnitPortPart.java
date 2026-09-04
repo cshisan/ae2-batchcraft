@@ -1,6 +1,7 @@
 package cn.ae2bc.part;
 
 import cn.ae2bc.logic.PatternP2PTopologyGridService;
+import cn.ae2bc.logic.ItemStackExtractionRecoveryQueue;
 import cn.ae2bc.platform.AnnihilationPlaneBreakStrategy;
 
 import java.util.Objects;
@@ -84,6 +85,7 @@ public final class PatternP2PUnitPortPart extends AEBasePart
     private boolean modelOnline;
     private PatternP2PUnitManagerPart cachedManager;
     private final ExtractionDeadlineGate extractionDeadline = new ExtractionDeadlineGate();
+    private final ItemStackExtractionRecoveryQueue extractionRecovery;
     private int redstonePower;
     private boolean redstoneWorldStateDirty = true;
     private long taskStartTick = Long.MIN_VALUE;
@@ -92,6 +94,8 @@ public final class PatternP2PUnitPortPart extends AEBasePart
     private long observedTaskRevision = Long.MIN_VALUE;
     private final ItemStackHandler outputFilterMarkers;
     private final ItemStackHandler outputFilterInverter;
+    private final ItemStackHandler inputFilterMarkers;
+    private final ItemStackHandler inputFilterInverter;
     private final AnnihilationPlaneBreakStrategy breakStrategy;
 
     public PatternP2PUnitPortPart(ItemStack stack, UnitPortType type) {
@@ -109,6 +113,19 @@ public final class PatternP2PUnitPortPart extends AEBasePart
                 return AEApi.instance().definitions().materials().cardInverter().isSameAs(stack);
             }
         };
+        this.inputFilterMarkers = new ItemStackHandler(18) {
+            @Override protected void onContentsChanged(int slot) { getHost().markForSave(); getHost().markForUpdate(); }
+            @Override public int getSlotLimit(int slot) { return 1; }
+            @Override public boolean isItemValid(int slot, ItemStack stack) { return false; }
+        };
+        this.inputFilterInverter = new ItemStackHandler(1) {
+            @Override protected void onContentsChanged(int slot) { getHost().markForSave(); getHost().markForUpdate(); }
+            @Override public int getSlotLimit(int slot) { return 1; }
+            @Override public boolean isItemValid(int slot, ItemStack stack) {
+                return AEApi.instance().definitions().materials().cardInverter().isSameAs(stack);
+            }
+        };
+        this.extractionRecovery = new ItemStackExtractionRecoveryQueue(() -> getHost().markForSave());
         this.breakStrategy = new AnnihilationPlaneBreakStrategy(this);
         ResourceLocation front = modelId(type);
         this.modelOff = createModel(STATUS_OFF_MODEL_ID, front);
@@ -152,6 +169,8 @@ public final class PatternP2PUnitPortPart extends AEBasePart
     public UnitPortType getPortType() { return type; }
     public ItemStackHandler getOutputFilterMarkers() { return outputFilterMarkers; }
     public ItemStackHandler getOutputFilterInverter() { return outputFilterInverter; }
+    public ItemStackHandler getInputFilterMarkers() { return inputFilterMarkers; }
+    public ItemStackHandler getInputFilterInverter() { return inputFilterInverter; }
     private boolean allowsOutputFilter(ItemStack stack) {
         if (!type.acceptsTaskInput()) return true;
         boolean hasMarkers = false;
@@ -164,6 +183,20 @@ public final class PatternP2PUnitPortPart extends AEBasePart
             }
         }
         boolean inverted = !outputFilterInverter.getStackInSlot(0).isEmpty();
+        return !hasMarkers || (inverted ? !marked : marked);
+    }
+    public boolean allowsInputFilter(ItemStack stack) {
+        if (!type.returnsTaskOutput()) return true;
+        boolean hasMarkers = false;
+        boolean marked = false;
+        for (int i = 0; i < inputFilterMarkers.getSlots(); i++) {
+            ItemStack marker = inputFilterMarkers.getStackInSlot(i);
+            if (!marker.isEmpty()) {
+                hasMarkers = true;
+                if (ItemHandlerHelper.canItemStacksStack(marker, stack)) marked = true;
+            }
+        }
+        boolean inverted = !inputFilterInverter.getStackInSlot(0).isEmpty();
         return !hasMarkers || (inverted ? !marked : marked);
     }
     public int getTransferPriority() { return transferPriority; }
@@ -179,14 +212,15 @@ public final class PatternP2PUnitPortPart extends AEBasePart
         return manager != null && manager.isSyncMainConfiguration();
     }
     public boolean getEffectiveSingleSlot() {
-        PatternP2PUnitManagerPart manager = findManager();
-        if (manager == null) return singleSlot;
-        switch (manager.getOutputSlotSharingMode()) {
-            case ALL: return true;
-            case DISABLED: return false;
-            case FOLLOW_PORT: return singleSlot;
-            default: return singleSlot;
-        }
+        return singleSlot;
+    }
+    public void applyManagerSingleSlot(OutputSlotSharingMode mode) {
+        if (mode == null || mode == OutputSlotSharingMode.FOLLOW_PORT) return;
+        boolean value = mode == OutputSlotSharingMode.ALL;
+        if (singleSlot == value) return;
+        singleSlot = value;
+        saveChanges();
+        getHost().markForUpdate();
     }
     public void setSingleSlot(boolean value) {
         if (!isSingleSlotEditable()) return;
@@ -362,7 +396,7 @@ public final class PatternP2PUnitPortPart extends AEBasePart
         for (int slot = 0; slot < source.getSlots() && moved < amount && manager.isTaskActive()
                 && transferredSlots < ProductExtractionLimits.MAX_TRANSFER_ENTRIES_PER_RUN; slot++) {
             ItemStack candidate = source.extractItem(slot, amount - moved, true);
-            if (candidate.isEmpty()) continue;
+            if (candidate.isEmpty() || !allowsInputFilter(candidate)) continue;
             ItemStack simulatedRemainder = manager.returnProduct(candidate, true);
             int accepted = candidate.getCount() - simulatedRemainder.getCount();
             if (accepted <= 0) continue;
@@ -371,9 +405,15 @@ public final class PatternP2PUnitPortPart extends AEBasePart
             int transferred = extracted.getCount() - unexpected.getCount();
             moved = (int) Math.min((long) amount, (long) moved + transferred);
             if (transferred > 0) transferredSlots++;
-            if (!unexpected.isEmpty()) ItemHandlerHelper.insertItem(source, unexpected, false);
+            if (!unexpected.isEmpty()) {
+                extractionRecovery.queue(ItemHandlerHelper.insertItem(source, unexpected, false));
+            }
         }
         return moved;
+    }
+
+    private boolean drainExtractionRecovery(PatternP2PUnitManagerPart manager) {
+        return extractionRecovery.drain(manager::returnProductRecovery);
     }
 
     @Override public TickingRequest getTickingRequest(IGridNode node) {
@@ -403,8 +443,25 @@ public final class PatternP2PUnitPortPart extends AEBasePart
 
     @Override public TickRateModulation tickingRequest(IGridNode node, int ticksSinceLastCall) {
         PatternP2PUnitManagerPart manager = findManager();
-        if (manager == null || !manager.isOperational() || !manager.isTaskActive()
-                || getTile().getWorld() == null) {
+        if (manager == null || !manager.isOperational() || getTile().getWorld() == null) {
+            breakStrategy.reset();
+            taskStartTick = Long.MIN_VALUE;
+            setRedstonePower(0);
+            return TickRateModulation.SLEEP;
+        }
+        if (type == UnitPortType.EXTRACT) {
+            boolean recoveryProgress = drainExtractionRecovery(manager);
+            if (!manager.isTaskActive()) {
+                return recoveryProgress ? TickRateModulation.URGENT
+                        : extractionRecovery.isEmpty() ? TickRateModulation.SLEEP : TickRateModulation.SLOWER;
+            }
+            if (!extractionDeadline.isDue(getTile().getWorld().getTotalWorldTime(), manager.getExtractionInterval())) {
+                return recoveryProgress ? TickRateModulation.URGENT : TickRateModulation.SAME;
+            }
+            return extractFromAdjacent(manager, manager.getExtractionAmount()) > 0 || recoveryProgress
+                    ? TickRateModulation.URGENT : TickRateModulation.SLOWER;
+        }
+        if (!manager.isTaskActive()) {
             breakStrategy.reset();
             taskStartTick = Long.MIN_VALUE;
             setRedstonePower(0);
@@ -414,12 +471,7 @@ public final class PatternP2PUnitPortPart extends AEBasePart
         if (type == UnitPortType.COLLECT) return collect(manager)
                 ? TickRateModulation.URGENT : TickRateModulation.SLOWER;
         if (type == UnitPortType.BREAK) return breakStrategy.tick(manager);
-        if (type != UnitPortType.EXTRACT) return TickRateModulation.SLEEP;
-        if (!extractionDeadline.isDue(getTile().getWorld().getTotalWorldTime(), manager.getExtractionInterval())) {
-            return TickRateModulation.SAME;
-        }
-        return extractFromAdjacent(manager, manager.getExtractionAmount()) > 0
-                ? TickRateModulation.URGENT : TickRateModulation.SLOWER;
+        return TickRateModulation.SLEEP;
     }
 
     private TickRateModulation tickRedstone(PatternP2PUnitManagerPart manager) {
@@ -474,7 +526,7 @@ public final class PatternP2PUnitPortPart extends AEBasePart
         boolean moved = false;
         for (EntityItem entity : level.getEntitiesWithinAABB(EntityItem.class, new AxisAlignedBB(target))) {
             ItemStack offered = entity.getItem().copy();
-            if (offered.isEmpty()) continue;
+            if (offered.isEmpty() || !allowsInputFilter(offered)) continue;
             ItemStack simulated = manager.returnProduct(offered, true);
             int accepted = offered.getCount() - simulated.getCount();
             if (accepted <= 0) continue;
@@ -512,10 +564,13 @@ public final class PatternP2PUnitPortPart extends AEBasePart
 
     @Override public boolean onPartActivate(EntityPlayer player, EnumHand hand, Vec3d hit) {
         if (bindFromMemoryCard(player, hand)) return true;
-        if (hand == EnumHand.MAIN_HAND && type.acceptsTaskInput()) {
+        if (hand == EnumHand.MAIN_HAND && (type.acceptsTaskInput() || type.returnsTaskOutput())) {
             if (!player.world.isRemote) {
                 player.openGui(cn.ae2bc.Ae2bcMod.INSTANCE,
-                        cn.ae2bc.Ae2bcMod.GUI_UNIT_PORT_OUTPUT_BASE + getSide().getFacing().ordinal(),
+                        (type.acceptsTaskInput()
+                                ? cn.ae2bc.Ae2bcMod.GUI_UNIT_PORT_OUTPUT_BASE
+                                : cn.ae2bc.Ae2bcMod.GUI_UNIT_PORT_INPUT_BASE)
+                                + getSide().getFacing().ordinal(),
                         player.world, getTile().getPos().getX(), getTile().getPos().getY(),
                         getTile().getPos().getZ());
             }
@@ -599,10 +654,13 @@ public final class PatternP2PUnitPortPart extends AEBasePart
                 : data.hasKey("AllowMultiplePatternSlots") && !data.getBoolean("AllowMultiplePatternSlots");
         if (data.hasKey("OutputFilterMarkers")) outputFilterMarkers.deserializeNBT(data.getCompoundTag("OutputFilterMarkers"));
         if (data.hasKey("OutputFilterInverter")) outputFilterInverter.deserializeNBT(data.getCompoundTag("OutputFilterInverter"));
+        if (data.hasKey("InputFilterMarkers")) inputFilterMarkers.deserializeNBT(data.getCompoundTag("InputFilterMarkers"));
+        if (data.hasKey("InputFilterInverter")) inputFilterInverter.deserializeNBT(data.getCompoundTag("InputFilterInverter"));
         cachedManager = null;
         redstoneWorldStateDirty = true;
         taskStartTick = Long.MIN_VALUE;
         observedTaskRevision = Long.MIN_VALUE;
+        extractionRecovery.read(data, "ProductExtractionRecovery");
     }
     @Override public void writeToNBT(NBTTagCompound data) {
         super.writeToNBT(data);
@@ -613,6 +671,9 @@ public final class PatternP2PUnitPortPart extends AEBasePart
         data.setBoolean("SingleSlot", singleSlot);
         data.setTag("OutputFilterMarkers", outputFilterMarkers.serializeNBT());
         data.setTag("OutputFilterInverter", outputFilterInverter.serializeNBT());
+        data.setTag("InputFilterMarkers", inputFilterMarkers.serializeNBT());
+        data.setTag("InputFilterInverter", inputFilterInverter.serializeNBT());
+        extractionRecovery.write(data, "ProductExtractionRecovery");
     }
     @Override public void writeToStream(ByteBuf data) throws java.io.IOException {
         super.writeToStream(data);
@@ -649,6 +710,12 @@ public final class PatternP2PUnitPortPart extends AEBasePart
                 || oldPowered != modelPowered || oldOnline != modelOnline;
     }
     @Override public void getBoxes(IPartCollisionHelper helper) { helper.addBox(3, 3, 13, 13, 13, 16); }
+    @Override public void getDrops(List<ItemStack> drops, boolean wrenched) {
+        super.getDrops(drops, wrenched);
+        ItemStack inputInverter = inputFilterInverter.getStackInSlot(0);
+        if (!inputInverter.isEmpty()) drops.add(inputInverter.copy());
+        extractionRecovery.addDrops(drops);
+    }
     @Override public float getCableConnectionLength(AECableType cable) { return 1; }
     @Override public IPartModel getStaticModels() {
         return modelPowered && modelOnline ? modelActive : modelPowered ? modelOn : modelOff;
@@ -669,10 +736,11 @@ public final class PatternP2PUnitPortPart extends AEBasePart
         @Override public ItemStack getStackInSlot(int slot) { return ItemStack.EMPTY; }
         @Override public ItemStack insertItem(int slot, ItemStack stack, boolean simulate) {
             PatternP2PUnitManagerPart manager = findManager();
-            return manager == null ? stack : manager.returnProduct(stack, simulate);
+            return manager == null || !allowsInputFilter(stack)
+                    ? stack : manager.returnProduct(stack, simulate);
         }
         @Override public ItemStack extractItem(int slot, int amount, boolean simulate) { return ItemStack.EMPTY; }
         @Override public int getSlotLimit(int slot) { return 64; }
-        @Override public boolean isItemValid(int slot, ItemStack stack) { return true; }
+        @Override public boolean isItemValid(int slot, ItemStack stack) { return allowsInputFilter(stack); }
     };
 }

@@ -88,6 +88,7 @@ public final class PatternP2PTunnelMenu extends Container {
                 cn.ae2bc.logic.RedstoneOutputMode.fromId(buffer.readUnsignedByte()),
                 buffer.readUnsignedByte(), buffer.readInt(), buffer.readInt(),
                 cn.ae2bc.core.unit.TransferPortOutputMode.fromId(buffer.readUnsignedByte()),
-                cn.ae2bc.core.unit.OutputSlotSharingMode.fromId(buffer.readUnsignedByte()));
+                cn.ae2bc.core.unit.OutputSlotSharingMode.fromId(buffer.readUnsignedByte()),
+                cn.ae2bc.logic.EnergyDistributionMode.fromId(buffer.readUnsignedByte()));
     }
 }

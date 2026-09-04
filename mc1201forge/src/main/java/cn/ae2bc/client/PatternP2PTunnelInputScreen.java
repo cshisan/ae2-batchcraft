@@ -4,6 +4,7 @@ import appeng.client.gui.style.ScreenStyle;
 import net.minecraft.client.gui.components.Button;
 import appeng.client.gui.widgets.TabButton;
 import cn.ae2bc.logic.PatternP2PUnitConfiguration;
+import cn.ae2bc.logic.EnergyDistributionMode;
 import cn.ae2bc.logic.RedstoneOutputMode;
 import cn.ae2bc.logic.ReturnMode;
 import cn.ae2bc.core.unit.TransferPortOutputMode;
@@ -28,8 +29,11 @@ public final class PatternP2PTunnelInputScreen extends PatternP2PUnitPagedScreen
             new EnumMap<>(TransferPortOutputMode.class);
     private final TabButton resetTaskToolbar;
     private final TabButton taskAllocationModeToolbar;
-    private final Button slotSharingMode;
-    private final VerticallyAlignedCheckbox productExtraction;
+    private final Map<OutputSlotSharingMode, Button> singleSlotModeButtons =
+            new EnumMap<>(OutputSlotSharingMode.class);
+    private final Button productExtractionEnabled;
+    private final Button productExtractionDisabled;
+    private final Button energyDistributionMode;
     private ValidatedIntegerField strengthInput;
     private ValidatedIntegerField pulseTimeInput;
     private ValidatedIntegerField pulsePeriodInput;
@@ -37,7 +41,7 @@ public final class PatternP2PTunnelInputScreen extends PatternP2PUnitPagedScreen
 
     public PatternP2PTunnelInputScreen(PatternP2PTunnelInputMenu menu, Inventory playerInventory,
                                          Component title, ScreenStyle style) {
-        super(menu, playerInventory, title, style);
+        super(menu, playerInventory, title, style, true, PageGroup.OUTPUT);
         strictButton = widgets.addButton("returnStrict",
                 Component.translatable("gui.ae2_batchcraft.pattern_p2p_unit.return_mode.strict"),
                 () -> menu.setReturnMode(ReturnMode.STRICT));
@@ -48,13 +52,16 @@ public final class PatternP2PTunnelInputScreen extends PatternP2PUnitPagedScreen
                 () -> menu.setReturnMode(ReturnMode.UNBLOCKED));
         unblockedButton.setTooltip(Tooltip.create(Component.translatable(
                 "gui.ae2_batchcraft.return_mode.unblocked.tooltip")));
-        productExtraction = new VerticallyAlignedCheckbox(style,
-                Component.translatable("gui.ae2_batchcraft.product_extraction.enabled"), false);
-        widgets.add("productExtraction", productExtraction);
-        productExtraction.setTooltip(Tooltip.create(Component.translatable(
+        productExtractionEnabled = widgets.addButton("productExtractionEnabled",
+                Component.translatable("gui.ae2_batchcraft.enabled"),
+                () -> menu.setProductExtractionEnabled(true));
+        productExtractionEnabled.setTooltip(Tooltip.create(Component.translatable(
                 "gui.ae2_batchcraft.product_extraction.enabled.tooltip")));
-        productExtraction.setChangeListener(() ->
-                menu.setProductExtractionEnabled(productExtraction.isSelected()));
+        productExtractionDisabled = widgets.addButton("productExtractionDisabled",
+                Component.translatable("gui.ae2_batchcraft.disabled"),
+                () -> menu.setProductExtractionEnabled(false));
+        productExtractionDisabled.setTooltip(Tooltip.create(Component.translatable(
+                "gui.ae2_batchcraft.product_extraction.enabled.tooltip")));
         breakRecovery = new VerticallyAlignedCheckbox(style,
                 Component.translatable("gui.ae2_batchcraft.pattern_p2p_unit.break_recovery"));
         widgets.add("breakRecovery", breakRecovery);
@@ -80,10 +87,17 @@ public final class PatternP2PTunnelInputScreen extends PatternP2PUnitPagedScreen
                 1.0f, Component.translatable("gui.ae2_batchcraft.task_allocation_mode"),
                 ignored -> menu.setTaskAllocationMode(menu.taskAllocationMode.next()));
         addToRightToolbar("taskAllocationModeToolbar", taskAllocationModeToolbar);
-        slotSharingMode = widgets.addButton("slotSharingMode", Component.empty(),
-                () -> menu.setOutputSlotSharingMode(menu.outputSlotSharingMode.next()));
-        slotSharingMode.setTooltip(Tooltip.create(Component.translatable(
-                "gui.ae2_batchcraft.pattern_p2p_unit.single_slot.tooltip")));
+        for (OutputSlotSharingMode mode : OutputSlotSharingMode.values()) {
+            var button = widgets.addButton("singleSlot" + camel(mode.getSerializedName()),
+                    Component.translatable("gui.ae2_batchcraft.pattern_p2p_unit.single_slot."
+                            + mode.getSerializedName()),
+                    () -> menu.setOutputSlotSharingMode(mode));
+            button.setTooltip(Tooltip.create(Component.translatable(
+                    "gui.ae2_batchcraft.pattern_p2p_unit.single_slot.tooltip")));
+            singleSlotModeButtons.put(mode, button);
+        }
+        energyDistributionMode = widgets.addButton("energyDistributionMode", Component.empty(),
+                () -> menu.setEnergyDistributionMode(menu.energyDistributionMode.next()));
     }
 
     @Override
@@ -92,10 +106,6 @@ public final class PatternP2PTunnelInputScreen extends PatternP2PUnitPagedScreen
         breakRecovery.fitToMessage();
         breakRecovery.setX(leftPos + 12);
         breakRecovery.setY(topPos + 52);
-        int productExtractionWidth = productExtraction.fitToMessage();
-        productExtraction.setX(leftPos
-                + DashedSectionRenderer.trailingContentX(imageWidth, productExtractionWidth));
-        productExtraction.setY(topPos + 79);
         extractionControls = ProductExtractionControls.create(font, leftPos, topPos,
                 this::addRenderableWidget, menu::setProductExtractionInterval, menu::setProductExtractionAmount);
         strengthInput = addRenderableWidget(new ValidatedIntegerField(font,
@@ -118,8 +128,8 @@ public final class PatternP2PTunnelInputScreen extends PatternP2PUnitPagedScreen
     @Override
     protected int getPageHeight(Page page) {
         return switch (page) {
-            case COMMON -> 186;
-            case TRANSFER -> 82;
+            case COMMON -> 146;
+            case OUTPUT_COMMON, UNIT_COMMON, TRANSFER -> 82;
             case BREAK -> 82;
             case REDSTONE -> 166;
             case ENERGY -> 82;
@@ -127,13 +137,10 @@ public final class PatternP2PTunnelInputScreen extends PatternP2PUnitPagedScreen
     }
 
     @Override
-    protected boolean supportsEnergyPage() {
-        return false;
-    }
-
-    @Override
     protected void updatePageVisibility() {
         boolean common = isPage(Page.COMMON);
+        boolean outputCommon = isPage(Page.OUTPUT_COMMON);
+        boolean unitCommon = isPage(Page.UNIT_COMMON);
         boolean transfer = isPage(Page.TRANSFER);
         boolean breakPort = isPage(Page.BREAK);
         boolean redstonePort = isPage(Page.REDSTONE);
@@ -142,8 +149,10 @@ public final class PatternP2PTunnelInputScreen extends PatternP2PUnitPagedScreen
         unblockedButton.visible = common;
         resetTaskToolbar.visible = true;
         taskAllocationModeToolbar.visible = true;
-        slotSharingMode.visible = common;
-        productExtraction.visible = common;
+        for (var button : singleSlotModeButtons.values()) button.visible = unitCommon;
+        productExtractionEnabled.visible = outputCommon;
+        productExtractionDisabled.visible = outputCommon;
+        energyDistributionMode.visible = isPage(Page.ENERGY);
         breakRecovery.visible = breakPort;
         for (var button : redstoneModeButtons.values()) {
             button.visible = redstonePort;
@@ -174,7 +183,8 @@ public final class PatternP2PTunnelInputScreen extends PatternP2PUnitPagedScreen
         strictButton.active = menu.returnMode != ReturnMode.STRICT;
         unblockedButton.active = menu.returnMode != ReturnMode.UNBLOCKED;
         breakRecovery.setSelected(menu.breakRecovery);
-        productExtraction.setSelected(menu.productExtractionEnabled);
+        productExtractionEnabled.active = !menu.productExtractionEnabled;
+        productExtractionDisabled.active = menu.productExtractionEnabled;
         extractionControls.sync(menu.productExtractionInterval, menu.productExtractionAmount);
         for (var entry : redstoneModeButtons.entrySet()) {
             entry.getValue().active = entry.getKey() != menu.redstoneMode;
@@ -182,9 +192,13 @@ public final class PatternP2PTunnelInputScreen extends PatternP2PUnitPagedScreen
         for (var entry : transferModeButtons.entrySet()) {
             entry.getValue().active = entry.getKey() != menu.transferPortOutputMode;
         }
-        slotSharingMode.setMessage(Component.translatable(
-                "gui.ae2_batchcraft.pattern_p2p_unit.single_slot." +
-                        menu.outputSlotSharingMode.getSerializedName()));
+        for (var entry : singleSlotModeButtons.entrySet()) {
+            entry.getValue().active = entry.getKey() != menu.outputSlotSharingMode;
+        }
+        energyDistributionMode.setMessage(Component.translatable(
+                "gui.ae2_batchcraft.energy_distribution_mode."
+                        + menu.energyDistributionMode.getSerializedName()));
+        energyDistributionMode.active = true;
         TaskAllocationMode nextMode = menu.taskAllocationMode.next();
         taskAllocationModeToolbar.setMessage(Component.translatable(
                 "gui.ae2_batchcraft.task_allocation_mode.switch.tooltip",
@@ -206,12 +220,16 @@ public final class PatternP2PTunnelInputScreen extends PatternP2PUnitPagedScreen
                     Component.translatable("gui.ae2_batchcraft.return_configuration"),
                     offsetX, offsetY, imageWidth, 43, 74);
             DashedSectionRenderer.drawBackground(graphics, font,
-                    Component.translatable("gui.ae2_batchcraft.product_extraction.title"),
-                    productExtraction.getWidth(),
+                    Component.translatable("gui.ae2_batchcraft.product_extraction.parameters"),
                     offsetX, offsetY, imageWidth, 85, 137);
+        } else if (isPage(Page.OUTPUT_COMMON)) {
+            DashedSectionRenderer.drawBackground(graphics, font,
+                    Component.translatable("gui.ae2_batchcraft.product_extraction.title"),
+                    offsetX, offsetY, imageWidth, 43, 74);
+        } else if (isPage(Page.UNIT_COMMON)) {
             DashedSectionRenderer.drawBackground(graphics, font,
                     Component.translatable("gui.ae2_batchcraft.pattern_p2p_unit.section.single_slot"),
-                    offsetX, offsetY, imageWidth, 146, 177);
+                    offsetX, offsetY, imageWidth, 43, 74);
         } else if (isPage(Page.TRANSFER)) {
             DashedSectionRenderer.drawBackground(graphics, font,
                     Component.translatable("gui.ae2_batchcraft.pattern_p2p_unit.section.transfer_mode"),
@@ -220,13 +238,17 @@ public final class PatternP2PTunnelInputScreen extends PatternP2PUnitPagedScreen
             DashedSectionRenderer.drawBackground(graphics, font,
                     Component.translatable("gui.ae2_batchcraft.pattern_p2p_unit.section.drop_handling"),
                     offsetX, offsetY, imageWidth, 43, 74);
-        } else {
+        } else if (isPage(Page.REDSTONE)) {
             DashedSectionRenderer.drawBackground(graphics, font,
                     Component.translatable("gui.ae2_batchcraft.pattern_p2p_unit.redstone_mode"),
                     offsetX, offsetY, imageWidth, 43, 74);
             DashedSectionRenderer.drawBackground(graphics, font,
                     Component.translatable("gui.ae2_batchcraft.pattern_p2p_unit.section.signal_parameters"),
                     offsetX, offsetY, imageWidth, 85, 158);
+        } else {
+            DashedSectionRenderer.drawBackground(graphics, font,
+                    Component.translatable("gui.ae2_batchcraft.pattern_p2p_unit.section.energy_configuration"),
+                    offsetX, offsetY, imageWidth, 43, 74);
         }
     }
 
@@ -237,21 +259,28 @@ public final class PatternP2PTunnelInputScreen extends PatternP2PUnitPagedScreen
             DashedSectionRenderer.drawTitle(graphics, font,
                     Component.translatable("gui.ae2_batchcraft.return_configuration"), 39);
             DashedSectionRenderer.drawTitle(graphics, font,
-                    Component.translatable("gui.ae2_batchcraft.product_extraction.title"), 81);
+                    Component.translatable("gui.ae2_batchcraft.product_extraction.parameters"), 81);
             extractionControls.drawUnits(graphics, font, leftPos);
+        } else if (isPage(Page.OUTPUT_COMMON)) {
             DashedSectionRenderer.drawTitle(graphics, font,
-                    Component.translatable("gui.ae2_batchcraft.pattern_p2p_unit.section.single_slot"), 142);
+                    Component.translatable("gui.ae2_batchcraft.product_extraction.title"), 39);
+        } else if (isPage(Page.UNIT_COMMON)) {
+            DashedSectionRenderer.drawTitle(graphics, font,
+                    Component.translatable("gui.ae2_batchcraft.pattern_p2p_unit.section.single_slot"), 39);
         } else if (isPage(Page.TRANSFER)) {
             DashedSectionRenderer.drawTitle(graphics, font,
                     Component.translatable("gui.ae2_batchcraft.pattern_p2p_unit.section.transfer_mode"), 39);
         } else if (isPage(Page.BREAK)) {
             DashedSectionRenderer.drawTitle(graphics, font,
                     Component.translatable("gui.ae2_batchcraft.pattern_p2p_unit.section.drop_handling"), 39);
-        } else {
+        } else if (isPage(Page.REDSTONE)) {
             DashedSectionRenderer.drawTitle(graphics, font,
                     Component.translatable("gui.ae2_batchcraft.pattern_p2p_unit.redstone_mode"), 39);
             DashedSectionRenderer.drawTitle(graphics, font,
                     Component.translatable("gui.ae2_batchcraft.pattern_p2p_unit.section.signal_parameters"), 81);
+        } else {
+            DashedSectionRenderer.drawTitle(graphics, font,
+                    Component.translatable("gui.ae2_batchcraft.pattern_p2p_unit.section.energy_configuration"), 39);
         }
     }
 

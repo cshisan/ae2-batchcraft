@@ -1,6 +1,7 @@
 package cn.ae2bc.part;
 
 import cn.ae2bc.logic.InterfaceReturnFlusher;
+import cn.ae2bc.logic.ItemStackExtractionRecoveryQueue;
 import cn.ae2bc.logic.PatternP2PTopologyGridService;
 import cn.ae2bc.logic.ReturnBatchTracker;
 import cn.ae2bc.menu.PatternP2PTunnelMenu;
@@ -42,6 +43,7 @@ import cn.ae2bc.core.unit.OutputSlotSharingMode;
 import cn.ae2bc.core.dispatch.TaskAllocationMode;
 import cn.ae2bc.logic.ReturnMode;
 import cn.ae2bc.logic.RedstoneOutputMode;
+import cn.ae2bc.logic.EnergyDistributionMode;
 import cn.ae2bc.registry.ModContent;
 import appeng.me.GridAccessException;
 import appeng.parts.p2p.CapabilityP2PTunnelPart;
@@ -76,6 +78,7 @@ public final class PatternP2PTunnelPart
     private static final String EXTRACTION_ENABLED = "Ae2bcExtractionEnabled";
     private static final String EXTRACTION_INTERVAL = "Ae2bcExtractionInterval";
     private static final String EXTRACTION_AMOUNT = "Ae2bcExtractionAmount";
+    private static final String EXTRACTION_RECOVERY = "Ae2bcExtractionRecovery";
     private static final String RETURN_BATCH_MODE = "Ae2bcReturnBatchMode";
     private static final String RETURN_BATCH_PATTERN = "Ae2bcReturnBatchPattern";
     private static final String RETURN_BATCH_TASK_COUNT = "Ae2bcReturnBatchTaskCount";
@@ -96,7 +99,9 @@ public final class PatternP2PTunnelPart
     private boolean syncInputSettings = true;
     private TransferPortOutputMode transferPortOutputMode = TransferPortOutputMode.NORMAL;
     private OutputSlotSharingMode outputSlotSharingMode = OutputSlotSharingMode.DISABLED;
+    private EnergyDistributionMode energyDistributionMode = EnergyDistributionMode.EVEN;
     private final ExtractionDeadlineGate extractionDeadline = new ExtractionDeadlineGate();
+    private final ItemStackExtractionRecoveryQueue extractionRecovery;
     private final ExtractionDeadlineGate returnRecoveryDeadline = new ExtractionDeadlineGate();
     private ItemStack blockedReturnProbe = ItemStack.EMPTY;
     private int roundRobinCursor;
@@ -152,6 +157,7 @@ public final class PatternP2PTunnelPart
         this.inputHandler = new EndpointHandler();
         this.outputHandler = new EndpointHandler();
         this.emptyHandler = new EmptyHandler();
+        this.extractionRecovery = new ItemStackExtractionRecoveryQueue(() -> getHost().markForSave());
     }
 
     @Override
@@ -311,6 +317,7 @@ public final class PatternP2PTunnelPart
                 || getTile().getLevel().isClientSide) return;
         extractionDeadline.wake();
         if (output) {
+            synchronizeFromInputSettings();
             wakeSelf();
         } else {
             synchronizeUnitManagers();
@@ -321,7 +328,7 @@ public final class PatternP2PTunnelPart
     public PatternP2PUnitSettings getUnitSettings() {
         return new PatternP2PUnitSettings(returnMode, breakRecovery, extractionInterval,
                 extractionAmount, redstoneMode, redstoneStrength, pulseWidthTicks, pulsePeriodTicks,
-                transferPortOutputMode, outputSlotSharingMode);
+                transferPortOutputMode, outputSlotSharingMode, energyDistributionMode);
     }
 
     public long getUnitConfigurationRevision() { return unitConfigurationRevision; }
@@ -370,16 +377,37 @@ public final class PatternP2PTunnelPart
 
     public void setOutputSettings(ReturnMode mode, boolean sync) {
         if (!output) return;
-        returnMode = mode == null ? ReturnMode.UNBLOCKED : mode;
+        if (!sync) {
+            returnMode = mode == null ? ReturnMode.UNBLOCKED : mode;
+        }
         syncInputSettings = sync;
+        if (sync) synchronizeFromInputSettings();
         getHost().markForSave();
         getHost().markForUpdate();
     }
 
     public boolean isSyncInputSettings() { return syncInputSettings; }
     public ReturnMode getReturnMode() {
-        PatternP2PTunnelPart input = output && syncInputSettings ? getInput() : null;
-        return input == null ? returnMode : input.returnMode;
+        return returnMode;
+    }
+
+    private void synchronizeFromInputSettings() {
+        if (!output || !syncInputSettings) return;
+        PatternP2PTunnelPart input = getInput();
+        if (input == null) return;
+        boolean changed = returnMode != input.returnMode
+                || extractionEnabled != input.extractionEnabled
+                || extractionInterval != input.extractionInterval
+                || extractionAmount != input.extractionAmount;
+        returnMode = input.returnMode;
+        extractionEnabled = input.extractionEnabled;
+        extractionInterval = input.extractionInterval;
+        extractionAmount = input.extractionAmount;
+        if (changed) {
+            extractionDeadline.wake();
+            getHost().markForSave();
+            getHost().markForUpdate();
+        }
     }
 
     public void resetTaskState() {
@@ -414,6 +442,7 @@ public final class PatternP2PTunnelPart
         pulsePeriodTicks = settings.getPulsePeriodTicks();
         transferPortOutputMode = settings.getTransferPortOutputMode();
         outputSlotSharingMode = settings.getOutputSlotSharingMode();
+        energyDistributionMode = settings.getEnergyDistributionMode();
     }
 
     private static void writeSettings(net.minecraft.network.PacketBuffer buffer,
@@ -428,6 +457,7 @@ public final class PatternP2PTunnelPart
         buffer.writeInt(settings.getPulsePeriodTicks());
         buffer.writeByte(settings.getTransferPortOutputMode().getId());
         buffer.writeByte(settings.getOutputSlotSharingMode().getId());
+        buffer.writeByte(settings.getEnergyDistributionMode().getId());
     }
 
     public void setExtractionSettings(boolean enabled, int interval, int amount) {
@@ -460,7 +490,8 @@ public final class PatternP2PTunnelPart
                 && left.getPulseWidthTicks() == right.getPulseWidthTicks()
                 && left.getPulsePeriodTicks() == right.getPulsePeriodTicks()
                 && left.getTransferPortOutputMode() == right.getTransferPortOutputMode()
-                && left.getOutputSlotSharingMode() == right.getOutputSlotSharingMode();
+                && left.getOutputSlotSharingMode() == right.getOutputSlotSharingMode()
+                && left.getEnergyDistributionMode() == right.getEnergyDistributionMode();
     }
 
     public boolean isExtractionEnabled() {
@@ -523,11 +554,15 @@ public final class PatternP2PTunnelPart
         outputSlotSharingMode = data.contains("Ae2bcOutputSlotSharingMode")
                 ? OutputSlotSharingMode.fromId(data.getInt("Ae2bcOutputSlotSharingMode"))
                 : OutputSlotSharingMode.DISABLED;
+        energyDistributionMode = data.contains("Ae2bcUnitEnergyDistributionMode")
+                ? EnergyDistributionMode.fromId(data.getInt("Ae2bcUnitEnergyDistributionMode"))
+                : EnergyDistributionMode.EVEN;
         roundRobinCursor = data.getInt("Ae2bcRoundRobinCursor");
         taskAllocationMode = data.contains("Ae2bcTaskAllocationMode")
                 ? TaskAllocationMode.fromId(data.getInt("Ae2bcTaskAllocationMode"))
                 : TaskAllocationMode.ROUND_ROBIN;
         readOutputReturnBatch(data);
+        extractionRecovery.read(data, EXTRACTION_RECOVERY);
     }
 
     @Override
@@ -546,9 +581,11 @@ public final class PatternP2PTunnelPart
         data.putBoolean("Ae2bcSyncInputSettings", syncInputSettings);
         data.putInt("Ae2bcTransferPortOutputMode", transferPortOutputMode.getId());
         data.putInt("Ae2bcOutputSlotSharingMode", outputSlotSharingMode.getId());
+        data.putInt("Ae2bcUnitEnergyDistributionMode", energyDistributionMode.getId());
         data.putInt("Ae2bcRoundRobinCursor", roundRobinCursor);
         data.putInt("Ae2bcTaskAllocationMode", taskAllocationMode.getId());
         writeOutputReturnBatch(data);
+        extractionRecovery.write(data, EXTRACTION_RECOVERY);
     }
 
     @Nonnull
@@ -566,15 +603,15 @@ public final class PatternP2PTunnelPart
         if (!isOutput()) {
             return probeBlockedReturn() ? TickRateModulation.URGENT : TickRateModulation.SLOWER;
         }
-        PatternP2PTunnelPart input = getInput();
-        if (input == null || !input.extractionEnabled) {
-            return TickRateModulation.SLOWER;
+        boolean recoveryProgress = drainExtractionRecovery();
+        if (!extractionEnabled || !returnBatch.isActive()) {
+            return recoveryProgress ? TickRateModulation.URGENT : TickRateModulation.SLOWER;
         }
         long now = getTile().getLevel().getGameTime();
-        if (!extractionDeadline.isDue(now, input.extractionInterval)) {
+        if (!extractionDeadline.isDue(now, extractionInterval)) {
             return TickRateModulation.SAME;
         }
-        return extractFromAdjacent(input.extractionAmount) > 0
+        return extractFromAdjacent(extractionAmount) > 0 || recoveryProgress
                 ? TickRateModulation.URGENT : TickRateModulation.SLOWER;
     }
 
@@ -1047,6 +1084,7 @@ public final class PatternP2PTunnelPart
 
     private void wakeOutputs() {
         for (PatternP2PTunnelPart output : outputs()) {
+            output.synchronizeFromInputSettings();
             output.extractionDeadline.wake();
             try {
                 getProxy().getTick().alertDevice(output.getGridNode());
@@ -1090,10 +1128,21 @@ public final class PatternP2PTunnelPart
                 transferredSlots++;
             }
             if (!unexpectedRemainder.isEmpty()) {
-                ItemHandlerHelper.insertItem(source, unexpectedRemainder, false);
+                extractionRecovery.queue(ItemHandlerHelper.insertItem(source, unexpectedRemainder, false));
             }
         }
         return moved;
+    }
+
+    private boolean drainExtractionRecovery() {
+        PatternP2PTunnelPart input = getInput();
+        return input != null && extractionRecovery.drain(stack -> input.returnToAdjacent(stack, false));
+    }
+
+    @Override
+    public void getDrops(List<ItemStack> drops, boolean wrenched) {
+        super.getDrops(drops, wrenched);
+        extractionRecovery.addDrops(drops);
     }
 
     private static final class EmptyHandler implements IItemHandler {

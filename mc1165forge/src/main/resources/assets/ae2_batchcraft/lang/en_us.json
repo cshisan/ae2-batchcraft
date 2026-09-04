@@ -14,6 +14,7 @@
   "item.ae2_batchcraft.pattern_p2p_unit_port_redstone": "Pattern P2P Unit Port (Redstone)",
   "item.ae2_batchcraft.pattern_p2p_unit_port_energy": "Pattern P2P Unit Port (Energy)",
   "gui.ae2_batchcraft.product_extraction": "Product Extraction",
+  "gui.ae2_batchcraft.product_extraction.enabled.tooltip": "The switch only controls whether outputs can extract; the settings below affect outputs and Unit Extraction Ports",
   "gui.ae2_batchcraft.enabled": "Enabled",
   "gui.ae2_batchcraft.disabled": "Disabled",
   "gui.ae2_batchcraft.return_mode.strict": "Strict",
@@ -21,18 +22,6 @@
   "gui.ae2_batchcraft.redstone_mode.single_trigger": "Single Trigger",
   "gui.ae2_batchcraft.redstone_mode.periodic_pulse": "Periodic Pulse",
   "gui.ae2_batchcraft.redstone_mode.continuous": "Continuous",
-  "gui.ae2_batchcraft.unit_manager.unit": "Unit",
-  "gui.ae2_batchcraft.unit_manager.frequency": "Frequency",
-  "gui.ae2_batchcraft.unit_manager.return_mode": "Return mode",
-  "gui.ae2_batchcraft.unit_manager.break_recovery": "Break recovery",
-  "gui.ae2_batchcraft.unit_manager.extraction_interval": "Extraction interval",
-  "gui.ae2_batchcraft.unit_manager.extraction_amount": "Extraction amount",
-  "gui.ae2_batchcraft.unit_manager.redstone_mode": "Redstone mode",
-  "gui.ae2_batchcraft.unit_manager.redstone_strength": "Signal strength",
-  "gui.ae2_batchcraft.unit_manager.pulse_width": "Pulse width",
-  "gui.ae2_batchcraft.unit_manager.pulse_period": "Pulse period",
-  "gui.ae2_batchcraft.unit_manager.ticks": "ticks",
-  "gui.ae2_batchcraft.unit_manager.units": "units",
   "tooltip.ae2_batchcraft.pattern_p2p.input": "Accepts crafting materials and routes them to outputs or a Unit Manager.",
   "tooltip.ae2_batchcraft.pattern_p2p.output": "Returns machine products through the linked input tunnel.",
   "tooltip.ae2_batchcraft.pattern_p2p.energy": "Transfers Forge Energy to the adjacent machine.",
@@ -47,15 +36,6 @@
   "tooltip.ae2_batchcraft.pattern_p2p.unit_port.redstone": "Outputs task activity as a redstone signal.",
   "tooltip.ae2_batchcraft.pattern_p2p.unit_port.energy": "Receives Forge Energy from the energy tunnel.",
   "tooltip.ae2_batchcraft.pattern_p2p.binding": "Bind a Unit Port with an AE2 Memory Card."
-  ,"gui.ae2_batchcraft.unit_manager.page_common":"General"
-  ,"gui.ae2_batchcraft.unit_manager.page_break":"Break Port"
-  ,"gui.ae2_batchcraft.unit_manager.page_redstone":"Redstone Port"
-  ,"gui.ae2_batchcraft.unit_manager.page_switch":"Switch to %s"
-  ,"gui.ae2_batchcraft.unit_manager.section_return":"Output Return Configuration"
-  ,"gui.ae2_batchcraft.unit_manager.section_extraction":"Product Extraction"
-  ,"gui.ae2_batchcraft.unit_manager.section_break":"Drop Handling"
-  ,"gui.ae2_batchcraft.unit_manager.section_redstone":"Redstone Output"
-  ,"gui.ae2_batchcraft.unit_manager.section_signal":"Signal Parameters"
   ,"gui.ae2_batchcraft.pattern_p2p_unit.page.common":"General"
   ,"gui.ae2_batchcraft.pattern_p2p_unit.page.break":"Break Port"
   ,"gui.ae2_batchcraft.pattern_p2p_unit.page.redstone":"Redstone Port"
@@ -73,18 +53,15 @@
   ,"gui.ae2_batchcraft.pattern_p2p_unit.section.drop_handling":"Drop handling"
   ,"gui.ae2_batchcraft.pattern_p2p_unit.section.signal_parameters":"Signal parameters"
   ,"gui.ae2_batchcraft.pattern_p2p_unit.section.energy_configuration":"Energy configuration"
-  ,"gui.ae2_batchcraft.pattern_p2p_unit.section.task_reset":"Task reset"
   ,"gui.ae2_batchcraft.return_configuration":"Output return configuration"
   ,"gui.ae2_batchcraft.return_mode":"Return mode"
   ,"gui.ae2_batchcraft.product_extraction.title":"Product extraction"
-  ,"gui.ae2_batchcraft.product_extraction.enabled":"Enabled"
   ,"gui.ae2_batchcraft.product_extraction.interval":"Interval"
   ,"gui.ae2_batchcraft.product_extraction.amount":"Amount"
   ,"gui.ae2_batchcraft.product_extraction.unit":"units"
   ,"gui.ae2_batchcraft.time.ticks":"ticks"
   ,"gui.ae2_batchcraft.sync_input_settings":"Sync input settings"
   ,"gui.ae2_batchcraft.reset_task":"Reset task"
-  ,"gui.ae2_batchcraft.reset_task.confirm_button":"Click again to confirm"
   ,"gui.ae2_batchcraft.reset_task.tooltip":"Open task-state reset confirmation"
   ,"gui.ae2_batchcraft.reset_task.confirm.input":"This resets all loaded output tunnels and unit managers for the current frequency. Undelivered materials will be permanently destroyed. Continue?"
   ,"gui.ae2_batchcraft.reset_task.confirm.output":"This clears the active task for the current output tunnel. Undelivered materials will be permanently destroyed. Continue?"
@@ -99,7 +76,6 @@
   ,"gui.ae2_batchcraft.task_allocation_mode.random.tooltip":"Randomly selects an available endpoint"
   ,"gui.ae2_batchcraft.task_allocation_mode.priority.tooltip":"Prioritizes earlier endpoints"
   ,"gui.ae2_batchcraft.task_allocation_mode.switch.tooltip":"Task Allocation\nCurrent: %1$s\n%2$s\nClick to switch to %3$s"
-  ,"gui.ae2_batchcraft.reset_task.pending":"Reset pending"
   ,"gui.ae2_batchcraft.energy.mode.passive":"Passive input"
   ,"gui.ae2_batchcraft.energy.mode.active":"Active input"
   ,"gui.ae2_batchcraft.energy.section.input":"Energy input"
@@ -209,10 +185,11 @@
   ,"gui.ae2_batchcraft.priority":"Priority"
   ,"gui.ae2_batchcraft.unit_port_output_config.title":"Unit Port Output Configuration"
   ,"gui.ae2_batchcraft.unit_port_output_config.markers":"Material Markers"
-  ,"gui.ae2_batchcraft.unit_port_output_config.inverter":"AE2 Inverter Card"
-  ,"gui.ae2_batchcraft.confirm":"Confirm"
+  ,"gui.ae2_batchcraft.unit_port_input_config.title":"Unit Port Input Configuration"
+  ,"gui.ae2_batchcraft.unit_port_input_config.markers":"Material Markers"
   ,"gui.ae2_batchcraft.unit_port_output_config.single_slot.tooltip":"Single-port single-slot\nCurrent: %s\nWhen enabled, this port may output materials from only one pattern slot"
   ,"gui.ae2_batchcraft.pattern_p2p_unit.page.energy":"Unit Port (Energy)"
+  ,"gui.ae2_batchcraft.pattern_p2p_unit.section.single_slot":"Single-port single-slot"
   ,"gui.ae2_batchcraft.pattern_p2p_unit.single_slot.tooltip":"Controls whether an output port may serve only one encoded pattern material slot"
   ,"gui.ae2_batchcraft.pattern_p2p_unit.single_slot.all":"All Enabled"
   ,"gui.ae2_batchcraft.pattern_p2p_unit.single_slot.disabled":"All Disabled"
@@ -225,4 +202,11 @@
   ,"gui.ae2_batchcraft.pattern_p2p_unit.transfer_mode.normal.tooltip":"No additional restriction; the machine determines capacity and item types."
   ,"gui.ae2_batchcraft.pattern_p2p_unit.transfer_mode.single_item.tooltip":"Each transfer port accepts at most one item for the current task."
   ,"gui.ae2_batchcraft.pattern_p2p_unit.transfer_mode.same_type.tooltip":"Each transfer port accepts only one item type for the current task."
+  ,"gui.ae2_batchcraft.product_extraction.parameters":"Product Extraction"
+  ,"gui.ae2_batchcraft.pattern_p2p_unit.page.output_common":"Output General"
+  ,"gui.ae2_batchcraft.pattern_p2p_unit.page.unit_common":"Unit General"
+  ,"gui.ae2_batchcraft.pattern_p2p_unit.page_group.output":"Output Pages"
+  ,"gui.ae2_batchcraft.pattern_p2p_unit.page_group.unit":"Unit Pages"
+  ,"gui.ae2_batchcraft.pattern_p2p_unit.page_group.switch":"Switch to %s",
+  "gui.ae2_batchcraft.pattern_p2p_unit.page.switch":"Switch to %s"
 }

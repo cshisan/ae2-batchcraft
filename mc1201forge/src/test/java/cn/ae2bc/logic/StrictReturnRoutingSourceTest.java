@@ -17,9 +17,9 @@ class StrictReturnRoutingSourceTest {
         assertTrue(part.contains("outputLogic.filterReturnAmount(what, amount)"));
         assertTrue(count(remote, "amount = filteredAmount(what, amount);") >= 2,
                 "slot-based and storage-based inserts must share the task return filter");
-        assertTrue(output.contains("ProductExtractor.extract(ExtractionSource.fromTypeMap(sources),\n"
-                + "                output.getReturnInventory()"));
-        assertTrue(output.contains("return returnBatch.filter(what, amount, returnMode);"));
+        assertTrue(output.contains("ProductExtractor.extract(ExtractionSource.fromTypeMap(sources),"));
+        assertTrue(output.contains("output.getReturnInventory(), settings"));
+        assertTrue(output.contains("return returnBatch.filter(what, amount, getReturnMode());"));
     }
 
     @Test
@@ -33,8 +33,8 @@ class StrictReturnRoutingSourceTest {
         assertTrue(manager.contains("insertReturned(AEKey what, long amount, Actionable mode)"));
 
         String collect = method(port, "private boolean collectDroppedItems", "private long handleCollected");
-        assertTrue(collect.contains(".insertReturned(what, amount, mode)"),
-                "collect ports must insert through the manager filter");
+        assertTrue(collect.contains("handleCollected(manager, what, amount, mode)"),
+                "collect ports must use the common filtered return path");
 
         String collected = method(port, "private long handleCollected", "private boolean updateRedstone");
         assertTrue(collected.contains("simulateReturned(what, amount)"),

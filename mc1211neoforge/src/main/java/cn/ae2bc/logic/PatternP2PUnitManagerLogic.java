@@ -33,6 +33,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.Set;
 import java.util.Comparator;
 import cn.ae2bc.core.unit.TransferPortOutputMode;
 
@@ -61,18 +62,17 @@ public final class PatternP2PUnitManagerLogic implements IGridTickable {
     private final Map<Integer, int[]> persistedSlotPortSides = new java.util.HashMap<>();
     private final Map<AEKey, Long> declaredOutputs = new LinkedHashMap<>();
 
-    private boolean syncMainConfiguration = true;
-    private PatternP2PUnitConfiguration localConfiguration = PatternP2PUnitConfiguration.DEFAULT;
-    private PatternP2PUnitConfiguration cachedMainConfiguration = PatternP2PUnitConfiguration.DEFAULT;
-    private long cachedMainRevision = -1;
+    private final ConfigurationSync.State<PatternP2PUnitConfiguration> configurationState =
+            new ConfigurationSync.State<>(PatternP2PUnitConfiguration.DEFAULT, true, -1);
     private boolean taskActive;
-    private EnergyDistributionMode energyDistributionMode = EnergyDistributionMode.EVEN;
     private @Nullable AEKey primaryKey;
     private @Nullable AEItemKey activePattern;
     private @Nullable UUID batchSessionId;
     private long remainingPrimary;
     private int pendingRetryFailures;
     private long pendingNextRetryTick;
+    /** Declared output types captured for one unit-port extraction pass. */
+    private @Nullable Set<AEKey> productExtractionReturnFilter;
 
     public PatternP2PUnitManagerLogic(IManagedGridNode mainNode, PatternP2PUnitManagerPart manager) {
         this.mainNode = mainNode;
@@ -124,62 +124,48 @@ public final class PatternP2PUnitManagerLogic implements IGridTickable {
     }
 
     public PatternP2PUnitConfiguration getEffectiveConfiguration() {
-        return syncMainConfiguration ? cachedMainConfiguration : localConfiguration;
+        return configurationState.value();
     }
 
     public boolean isSyncMainConfiguration() {
-        return syncMainConfiguration;
+        return configurationState.isSynchronizationEnabled();
     }
 
     public EnergyDistributionMode getEnergyDistributionMode() {
-        return energyDistributionMode;
+        return getEffectiveConfiguration().energyDistributionMode();
     }
 
     public void setEnergyDistributionMode(EnergyDistributionMode mode) {
-        if (applyEnergyDistributionMode(mode)) {
-            var grid = mainNode.getGrid();
-            if (grid != null) {
-                grid.getService(PatternP2PEnergyGridService.class).demandChanged();
-            }
+        if (mode != null) {
+            setLocalConfiguration(configurationState.value().withEnergyDistributionMode(mode));
         }
-    }
-
-    boolean applyEnergyDistributionMode(EnergyDistributionMode mode) {
-        if (mode == null || mode == energyDistributionMode) {
-            return false;
-        }
-        energyDistributionMode = mode;
-        manager.getHost().markForSave();
-        return true;
     }
 
     public void setSyncMainConfiguration(boolean enabled) {
-        if (syncMainConfiguration == enabled) {
+        if (!configurationState.setSynchronizationEnabled(enabled)) {
             return;
         }
-        if (!enabled) {
-            localConfiguration = cachedMainConfiguration;
+        if (enabled) {
+            // Enabling synchronization must immediately apply the current input snapshot;
+            // it must not wait for the next topology or configuration event.
+            manager.synchronizeFromInput();
         }
-        syncMainConfiguration = enabled;
         changed();
         wakePorts();
     }
 
     public void setLocalConfiguration(PatternP2PUnitConfiguration configuration) {
-        if (!syncMainConfiguration && configuration != null && !configuration.equals(localConfiguration)) {
-            localConfiguration = configuration;
+        if (!configurationState.isSynchronizationEnabled() && configuration != null
+                && configurationState.setLocalValue(configuration)) {
             changed();
             wakePorts();
         }
     }
 
     public void applyMainConfiguration(PatternP2PUnitConfiguration configuration, long revision) {
-        if (!ConfigurationSync.shouldApply(
-                cachedMainConfiguration, cachedMainRevision, configuration, revision)) {
+        if (!configurationState.applyBroadcast(configuration, revision)) {
             return;
         }
-        cachedMainConfiguration = configuration;
-        cachedMainRevision = revision;
         changed();
         wakePorts();
     }
@@ -524,8 +510,21 @@ public final class PatternP2PUnitManagerLogic implements IGridTickable {
         if (!isTaskOperational() || amount <= 0) {
             return 0;
         }
+        var extractionFilter = productExtractionReturnFilter;
+        if (extractionFilter != null && getEffectiveConfiguration().returnMode() == ReturnMode.STRICT
+                && !extractionFilter.contains(what)) {
+            return 0;
+        }
         return getEffectiveConfiguration().returnMode() == ReturnMode.STRICT
                 && !declaredOutputs.containsKey(what) ? 0 : amount;
+    }
+
+    public void beginProductExtractionFilter() {
+        productExtractionReturnFilter = Set.copyOf(declaredOutputs.keySet());
+    }
+
+    public void endProductExtractionFilter() {
+        productExtractionReturnFilter = null;
     }
 
     public long simulateReturned(AEKey what, long amount) {
@@ -595,6 +594,7 @@ public final class PatternP2PUnitManagerLogic implements IGridTickable {
     }
 
     private void wakePorts() {
+        manager.applyOutputSlotSharingModeToPorts();
         var grid = mainNode.getGrid();
         if (grid == null) {
             return;
@@ -660,14 +660,26 @@ public final class PatternP2PUnitManagerLogic implements IGridTickable {
 
     public void readFromNBT(CompoundTag data, HolderLookup.Provider registries) {
         resetPendingRetryBackoff();
-        energyDistributionMode = data.contains(ENERGY_DISTRIBUTION_MODE)
+        EnergyDistributionMode legacyEnergyDistributionMode = data.contains(ENERGY_DISTRIBUTION_MODE)
                 ? EnergyDistributionMode.fromId(data.getByte(ENERGY_DISTRIBUTION_MODE))
                 : EnergyDistributionMode.EVEN;
-        syncMainConfiguration = !data.contains(SYNC_MAIN_CONFIGURATION)
+        boolean synchronizationEnabled = !data.contains(SYNC_MAIN_CONFIGURATION)
                 || data.getBoolean(SYNC_MAIN_CONFIGURATION);
-        localConfiguration = PatternP2PUnitConfiguration.read(data.getCompound(LOCAL_CONFIGURATION));
-        cachedMainConfiguration = PatternP2PUnitConfiguration.read(data.getCompound(MAIN_CONFIGURATION));
-        cachedMainRevision = data.getLong(MAIN_REVISION);
+        boolean hasLocalConfiguration = data.contains(LOCAL_CONFIGURATION, Tag.TAG_COMPOUND);
+        CompoundTag localConfigurationData = hasLocalConfiguration
+                ? data.getCompound(LOCAL_CONFIGURATION) : new CompoundTag();
+        CompoundTag legacyMainConfigurationData = data.contains(MAIN_CONFIGURATION, Tag.TAG_COMPOUND)
+                ? data.getCompound(MAIN_CONFIGURATION) : new CompoundTag();
+        // Older saves only had MAIN_CONFIGURATION. Migrate it once into the single
+        // local value now used at runtime.
+        PatternP2PUnitConfiguration restoredConfiguration = hasLocalConfiguration
+                ? PatternP2PUnitConfiguration.read(localConfigurationData)
+                : PatternP2PUnitConfiguration.read(legacyMainConfigurationData);
+        if (!localConfigurationData.contains("EnergyDistributionMode")) {
+            restoredConfiguration = restoredConfiguration.withEnergyDistributionMode(legacyEnergyDistributionMode);
+        }
+        long lastRevision = data.contains(MAIN_REVISION) ? data.getLong(MAIN_REVISION) : -1;
+        configurationState.restore(restoredConfiguration, lastRevision, synchronizationEnabled);
         taskActive = data.getBoolean(TASK_ACTIVE);
         activePattern = taskActive && data.contains(ACTIVE_PATTERN, Tag.TAG_COMPOUND)
                 ? AEItemKey.fromTag(registries, data.getCompound(ACTIVE_PATTERN)) : null;
@@ -702,11 +714,12 @@ public final class PatternP2PUnitManagerLogic implements IGridTickable {
     }
 
     public void writeToNBT(CompoundTag data, HolderLookup.Provider registries) {
-        data.putByte(ENERGY_DISTRIBUTION_MODE, (byte) energyDistributionMode.getId());
-        data.putBoolean(SYNC_MAIN_CONFIGURATION, syncMainConfiguration);
-        data.put(LOCAL_CONFIGURATION, localConfiguration.write());
-        data.put(MAIN_CONFIGURATION, cachedMainConfiguration.write());
-        data.putLong(MAIN_REVISION, cachedMainRevision);
+        // Retained for migration to builds that predate energy mode in the configuration records.
+        data.putByte(ENERGY_DISTRIBUTION_MODE, (byte) getEnergyDistributionMode().getId());
+        data.putBoolean(SYNC_MAIN_CONFIGURATION, configurationState.isSynchronizationEnabled());
+        data.put(LOCAL_CONFIGURATION, configurationState.value().write());
+        data.remove(MAIN_CONFIGURATION);
+        data.putLong(MAIN_REVISION, configurationState.lastAppliedRevision());
         data.putBoolean(TASK_ACTIVE, taskActive);
         if (taskActive && activePattern != null) {
             data.put(ACTIVE_PATTERN, activePattern.toTag(registries));

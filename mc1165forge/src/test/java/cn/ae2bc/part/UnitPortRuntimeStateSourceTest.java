@@ -18,7 +18,7 @@ public final class UnitPortRuntimeStateSourceTest {
         assertTrue(apply.contains("wakeBoundPorts();"));
         assertFalse(apply.contains("invalidateBoundPortRuntimeState();"));
 
-        String reset = section(manager, "public void resetTaskState", "public cn.ae2bc.logic.EnergyDistributionMode");
+        String reset = section(manager, "public void resetTaskState", "public EnergyDistributionMode");
         assertTrue(reset.contains("invalidateBoundPortRuntimeState();"));
 
         String finish = section(manager, "private boolean finishTaskIfComplete", "private static boolean sameItem");
@@ -26,7 +26,7 @@ public final class UnitPortRuntimeStateSourceTest {
     }
 
     @Test
-    public void reloadForcesRedstoneNeighborNotificationAndRestoresMainConfiguration() throws Exception {
+    public void reloadForcesRedstoneNeighborNotificationAndMigratesLegacyMainConfiguration() throws Exception {
         String manager = read("PatternP2PUnitManagerPart.java");
         String port = read("PatternP2PUnitPortPart.java");
         String tunnel = read("PatternP2PTunnelPart.java");
@@ -34,8 +34,12 @@ public final class UnitPortRuntimeStateSourceTest {
         assertTrue(manager.contains("PatternP2PUnitMainConfiguration"));
         assertTrue(manager.contains("PatternP2PUnitMainConfigurationRevision"));
         assertTrue(manager.contains("data.contains(MAIN_CONFIGURATION, 10)"));
-        assertTrue(manager.contains("data.put(MAIN_CONFIGURATION, writeSettings("));
-        assertTrue(manager.contains("data.putLong(MAIN_CONFIGURATION_REVISION, mainConfigurationRevision)"));
+        assertTrue(manager.contains("applyLocalSettings(readSettings(data.getCompound(MAIN_CONFIGURATION)"));
+        assertTrue(manager.contains("data.remove(MAIN_CONFIGURATION);"));
+        assertTrue(manager.contains("data.putLong(MAIN_CONFIGURATION_REVISION, lastAppliedMainConfigurationRevision)"));
+        assertFalse(manager.contains("PatternP2PUnitSettings mainConfiguration"));
+        assertTrue(manager.contains("data.contains(\"PatternP2PUnitOutputSlotSharingMode\")"));
+        assertTrue(manager.contains("data.putInt(\"PatternP2PUnitOutputSlotSharingMode\""));
         assertTrue(tunnel.contains("Ae2bcUnitConfigurationRevision"));
         assertTrue(tunnel.contains("refreshConfigurationConsumers();"));
         assertTrue(port.contains("private boolean redstoneWorldStateDirty = true;"));
@@ -95,8 +99,10 @@ public final class UnitPortRuntimeStateSourceTest {
                 forcedRefresh > finalRefresh && forcedRefresh < commit);
 
         String apply = section(manager, "public void applyMainConfiguration", "public void resetTaskState");
-        assertTrue(apply.contains("sameSettings(mainConfiguration, settings)"));
-        assertTrue(apply.contains("mainConfigurationRevision == revision"));
+        assertTrue(apply.contains("settings == null || !syncMainConfiguration"));
+        assertTrue(apply.contains("sameSettings(getLocalSettings(), settings)"));
+        assertTrue(apply.contains("lastAppliedMainConfigurationRevision == revision"));
+        assertTrue(apply.contains("applyLocalSettings(settings);"));
     }
 
     @Test
@@ -182,7 +188,7 @@ public final class UnitPortRuntimeStateSourceTest {
         assertTrue(load.contains("entry.contains(\"PatternSlot\")"));
         assertTrue(load.contains(": i);"));
         String save = section(manager, "@Override public void writeToNBT",
-                "private static CompoundNBT writeSettings");
+                "private static PatternP2PUnitSettings readSettings");
         assertTrue(save.contains("entry.putInt(\"PatternSlot\", pendingInputSlots.get(i));"));
     }
 
@@ -319,8 +325,9 @@ public final class UnitPortRuntimeStateSourceTest {
         assertTrue(inputConfiguration.contains("part != null"));
         assertTrue(inputConfiguration.contains("!part.isOutput()"));
         assertTrue(screen.contains("showSingleSlotControl = menu.isInputConfiguration();"));
+        assertTrue(screen.contains("page == Page.UNIT_COMMON && showSingleSlotControl"));
         assertTrue("Button, background and title must all use the verified endpoint guard",
-                occurrences(screen, "if (showSingleSlotControl)") == 3);
+                occurrences(screen, "Page.UNIT_COMMON && showSingleSlotControl") == 3);
     }
 
     @Test

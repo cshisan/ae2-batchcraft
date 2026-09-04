@@ -52,11 +52,13 @@ After acceptance, pending materials remain tracked until dispatched. The primary
 
 ## Configuration
 
-With synchronization enabled, the Manager uses the input's return, extraction interval and amount, break recovery, and redstone settings. Disable synchronization to use its local configuration.
+The Manager always has local configuration values. With synchronization enabled, input broadcasts overwrite its return, extraction interval and amount, single-port single-slot, transfer, break, redstone, pulse, and Unit Energy Port distribution values. With synchronization disabled, input broadcasts are ignored and the local values remain in use; enabling synchronization again applies the current input values immediately.
 
-Energy distribution mode is synchronized across the current AE grid. It affects the Manager's Energy Ports even while this Manager has no task.
+Unit Port (Energy) controls the second-stage distribution from FE received by this Manager to its bound Energy Ports. It remains effective while the Manager has no task.
 
 The Manager's output-side ports can be prioritized independently. Output filter markers and the AE2 Inverter Card are configured from an output port's priority screen. The Inverter Card reverses the marker filter in the same way as AE2 filter upgrades.
+
+Input-side ports have a separate return-filter screen with material markers and an optional Inverter Card. When recipe-viewer drag-and-drop is available, item and fluid ingredients can be dragged into marker slots on both input-side and output-side configuration screens.
 
 The Manager-level **Single-port single-slot** setting is separate from the Transfer Port output mode. **All Enabled** reserves each output port for one encoded pattern slot, **All Disabled** allows slot sharing, and **Follow Port Configuration** uses each output port's own toggle. A port's toggle is editable only in the follow-port mode.
 

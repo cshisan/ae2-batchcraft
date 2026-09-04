@@ -18,7 +18,7 @@ public final class UnitPortRuntimeStateSourceTest {
         assertTrue(apply.contains("wakeBoundPorts();"));
         assertFalse(apply.contains("invalidateBoundPortRuntimeState();"));
 
-        String reset = section(manager, "public void resetTaskState", "public cn.ae2bc.logic.EnergyDistributionMode");
+        String reset = section(manager, "public void resetTaskState", "public EnergyDistributionMode");
         assertTrue(reset.contains("invalidateBoundPortRuntimeState();"));
 
         String finish = section(manager, "private boolean finishTaskIfComplete", "private static boolean sameItem");
@@ -73,7 +73,14 @@ public final class UnitPortRuntimeStateSourceTest {
         assertTrue(admission.contains("synchronizeFromInput();"));
 
         String apply = section(manager, "public void applyMainConfiguration", "public void resetTaskState");
-        assertTrue(apply.contains("sameSettings(mainConfiguration, settings)"));
+        assertTrue(apply.contains("settings == null || !syncMainConfiguration"));
+        assertTrue(apply.contains("sameSettings(getLocalSettings(), settings)"));
+        assertTrue(apply.contains("lastAppliedMainConfigurationRevision == revision"));
+        assertTrue(apply.contains("applyLocalSettings(settings);"));
+        assertFalse(manager.contains("PatternP2PUnitSettings mainConfiguration"));
+        assertTrue(manager.contains("data.removeTag(MAIN_CONFIGURATION);"));
+        assertTrue(manager.contains("data.hasKey(\"PatternP2PUnitOutputSlotSharingMode\")"));
+        assertTrue(manager.contains("data.setInteger(\"PatternP2PUnitOutputSlotSharingMode\""));
     }
 
     private static String read(String name) throws Exception {

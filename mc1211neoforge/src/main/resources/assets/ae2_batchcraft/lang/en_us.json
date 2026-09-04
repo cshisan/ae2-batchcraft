@@ -7,9 +7,11 @@
   "gui.ae2_batchcraft.product_extraction.open": "Product extraction settings",
   "gui.ae2_batchcraft.product_extraction.open.tooltip": "Open product extraction settings",
   "gui.ae2_batchcraft.product_extraction.title": "Product Extraction",
+  "gui.ae2_batchcraft.product_extraction.parameters": "Product Extraction",
+  "gui.ae2_batchcraft.product_extraction.output": "Product Extraction",
   "gui.ae2_batchcraft.product_extraction.interval": "Interval:",
   "gui.ae2_batchcraft.product_extraction.amount": "Amount:",
-  "gui.ae2_batchcraft.product_extraction.tick": "ticks",
+  "gui.ae2_batchcraft.product_extraction.tick": "tick",
   "gui.ae2_batchcraft.product_extraction.markers": "Filters",
   "gui.ae2_batchcraft.product_extraction.blacklist": "Deny",
   "gui.ae2_batchcraft.product_extraction.whitelist": "Allow",
@@ -25,20 +27,19 @@
   "gui.ae2_batchcraft.time.ticks": "ticks",
   "gui.ae2_batchcraft.energy.section.input": "Energy Input",
   "gui.ae2_batchcraft.energy_distribution_mode": "Power distribution",
-  "gui.ae2_batchcraft.energy_distribution_mode.tooltip": "Switch power distribution for every Pattern P2P output and unit energy port on this AE network",
   "gui.ae2_batchcraft.energy_distribution_mode.even": "Even",
   "gui.ae2_batchcraft.energy_distribution_mode.round_robin": "Round robin",
   "gui.ae2_batchcraft.return_mode": "Output return mode",
   "gui.ae2_batchcraft.return_configuration": "Output Return Configuration",
-  "gui.ae2_batchcraft.product_extraction.enabled": "Product extraction",
-  "gui.ae2_batchcraft.product_extraction.enabled.tooltip": "The switch only controls whether outputs can extract; the settings below affect outputs and Unit Extraction Ports",
+  "gui.ae2_batchcraft.product_extraction.enabled.tooltip": "interval and amount are configured on the General page",
+  "gui.ae2_batchcraft.product_extraction.output.enabled.tooltip": "follows the input while synchronized and can be edited locally otherwise",
   "gui.ae2_batchcraft.product_extraction.unit": "units",
   "gui.ae2_batchcraft.return_mode.strict": "Strict",
   "gui.ae2_batchcraft.return_mode.strict.tooltip": "Only matching task outputs may return while crafting",
   "gui.ae2_batchcraft.return_mode.unblocked": "Unblocked",
   "gui.ae2_batchcraft.return_mode.unblocked.tooltip": "Allows any output to return",
-  "gui.ae2_batchcraft.sync_input_settings": "Sync input settings",
-  "gui.ae2_batchcraft.sync_input_settings.tooltip": "Uses the input tunnel's return mode",
+  "gui.ae2_batchcraft.sync_input_settings": "Sync",
+  "gui.ae2_batchcraft.sync_input_settings.tooltip": "Follows the input tunnel's return mode, extraction switch, interval, and amount; disabling sync keeps the last synchronized values for local editing",
   "gui.ae2_batchcraft.direction.auto": "Automatic",
   "gui.ae2_batchcraft.direction.down": "Bottom",
   "gui.ae2_batchcraft.direction.up": "Top",
@@ -128,8 +129,13 @@
   "gui.ae2_batchcraft.material_output_form.place": "Place",
   "gui.ae2_batchcraft.material_output_form.tooltip": "Set this material's output form to %s",
   "gui.ae2_batchcraft.pattern_p2p_unit.sync_main_configuration": "Sync",
-  "gui.ae2_batchcraft.pattern_p2p_unit.sync_main_configuration.tooltip": "Uses the input tunnel's return, break recovery, redstone, and pulse settings",
+  "gui.ae2_batchcraft.pattern_p2p_unit.sync_main_configuration.tooltip": "Uses the input tunnel's return, extraction, single-slot, transfer, break, redstone and pulse, and unit energy settings",
   "gui.ae2_batchcraft.pattern_p2p_unit.page.common": "General",
+  "gui.ae2_batchcraft.pattern_p2p_unit.page.output_common": "Output General",
+  "gui.ae2_batchcraft.pattern_p2p_unit.page.unit_common": "Unit General",
+  "gui.ae2_batchcraft.pattern_p2p_unit.page_group.output": "Output Pages",
+  "gui.ae2_batchcraft.pattern_p2p_unit.page_group.unit": "Unit Pages",
+  "gui.ae2_batchcraft.pattern_p2p_unit.page_group.switch": "Switch to %s",
   "gui.ae2_batchcraft.pattern_p2p_unit.page.transfer": "Unit Port (Transfer)",
   "gui.ae2_batchcraft.pattern_p2p_unit.section.transfer_mode": "Transfer Mode",
   "gui.ae2_batchcraft.pattern_p2p_unit.transfer_mode.normal": "Normal",
@@ -142,13 +148,11 @@
   "gui.ae2_batchcraft.pattern_p2p_unit.page.redstone": "Redstone Port",
   "gui.ae2_batchcraft.pattern_p2p_unit.page.switch": "Switch to %s",
   "gui.ae2_batchcraft.pattern_p2p_unit.section.energy_configuration": "Energy Configuration",
-  "gui.ae2_batchcraft.pattern_p2p_unit.section.task_reset": "Task Reset",
   "gui.ae2_batchcraft.pattern_p2p_unit.return_mode.strict": "Strict Mode",
   "gui.ae2_batchcraft.pattern_p2p_unit.return_mode.unblocked": "Unblocked",
   "gui.ae2_batchcraft.configuration.close": "Close",
-  "gui.ae2_batchcraft.pattern_p2p_unit.port.break.scope": "This setting only affects Pattern P2P Unit Port (Break)",
-  "gui.ae2_batchcraft.pattern_p2p_unit.port.redstone.scope": "This setting only affects Pattern P2P Unit Port (Redstone)",
   "gui.ae2_batchcraft.pattern_p2p_unit.break_recovery": "Break recovery",
+  "gui.ae2_batchcraft.pattern_p2p_unit.break_recovery.value": "Break recovery: %s",
   "gui.ae2_batchcraft.pattern_p2p_unit.break_recovery.tooltip": "Returns block drops directly without spawning item entities. Source fluids are absorbed directly in either mode.",
   "gui.ae2_batchcraft.pattern_p2p_unit.redstone_mode": "Redstone output",
   "gui.ae2_batchcraft.pattern_p2p_unit.redstone_mode.tooltip": "Select trigger, pulse, or continuous output",
@@ -202,10 +206,9 @@
   ,"gui.ae2_batchcraft.disabled": "Disabled"
   ,"gui.ae2_batchcraft.unit_port_output_config.title": "Unit Port Output Configuration"
   ,"gui.ae2_batchcraft.unit_port_output_config.markers": "Material markers"
-  ,"gui.ae2_batchcraft.unit_port_output_config.inverter": "Inverter Card"
-  ,"gui.ae2_batchcraft.confirm": "Confirm"
-  ,"gui.ae2_batchcraft.unit_port_output_config.inverted": "Invert marked materials"
   ,"gui.ae2_batchcraft.unit_port_output_config.single_slot.tooltip": "Single-port single-slot\nCurrent: %s\nWhen enabled, this port may output materials from only one pattern slot"
+  ,"gui.ae2_batchcraft.unit_port_input_config.title": "Unit Port Input Configuration"
+  ,"gui.ae2_batchcraft.unit_port_input_config.markers": "Material markers"
   ,"gui.ae2_batchcraft.pattern_p2p_unit.page.energy": "Unit Port (Energy)"
   ,"gui.ae2_batchcraft.pattern_p2p_unit.section.single_slot": "Single-port single-slot"
   ,"gui.ae2_batchcraft.pattern_p2p_unit.single_slot.tooltip": "Controls whether an output port may serve only one encoded pattern material slot"

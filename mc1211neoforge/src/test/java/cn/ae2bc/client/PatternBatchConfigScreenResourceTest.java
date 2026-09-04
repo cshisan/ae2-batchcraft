@@ -52,7 +52,7 @@ class PatternBatchConfigScreenResourceTest {
         assertTrue(inputScreen.contains("addToRightToolbar(\"dispatchModeToolbar\", dispatchModeToolbar)"));
         assertTrue(inputScreen.contains("addToRightToolbar(\"taskAllocationModeToolbar\", taskAllocationModeToolbar)"));
         assertTrue(inputScreen.contains("appeng.client.gui.Icon.S_PROCESSOR"));
-        assertTrue(inputScreen.contains("0.6f, 0, 0"));
+        assertTrue(inputScreen.contains("Icon.S_PROCESSOR, 0.6f"));
         assertFalse(inputScreen.contains("dispatchFull\""));
         assertFalse(inputScreen.contains("dispatchBatch\""));
         assertTrue(inputScreen.contains("PatternDispatchMode.BATCH_DISTRIBUTION"));

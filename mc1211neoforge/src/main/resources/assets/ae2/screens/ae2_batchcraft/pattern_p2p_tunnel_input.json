@@ -1,7 +1,7 @@
 {
   "$schema": "../schema.json",
   "includes": ["../common/common.json"],
-  "generatedBackground": {"width": 176, "height": 186},
+  "generatedBackground": {"width": 172, "height": 186},
   "text": {
     "dialog_title": {"text": {"translate": "item.ae2_batchcraft.pattern_p2p_tunnel_input"}, "position": {"left": 8, "top": 6}},
     "page_title": {"text": {"translate": "gui.ae2_batchcraft.pattern_p2p_unit.page.common"}, "scale": 1.2, "position": {"left": 8, "top": 23}},
@@ -14,18 +14,22 @@
     "pulse_period_unit": {"text": {"translate": "gui.ae2_batchcraft.time.ticks"}, "position": {"left": 143, "top": 138}}
   },
   "widgets": {
-    "close": {"left": 152, "top": -5, "width": 20, "height": 20},
-    "returnStrict": {"left": 12, "top": 50, "width": 73, "height": 18},
-    "returnUnblocked": {"left": 91, "top": 50, "width": 73, "height": 18},
-    "productExtraction": {"left": 128, "top": 79, "width": 36, "height": 14},
-    "breakRecovery": {"left": 12, "top": 52, "width": 50, "height": 14},
-    "redstoneSingle": {"left": 12, "top": 50, "width": 48, "height": 18},
-    "redstonePeriodic": {"left": 64, "top": 50, "width": 48, "height": 18},
-    "redstoneContinuous": {"left": 116, "top": 50, "width": 48, "height": 18},
-    "transferNormal": {"left": 12, "top": 50, "width": 48, "height": 18},
-    "transferSingleItem": {"left": 64, "top": 50, "width": 48, "height": 18},
-    "transferSameType": {"left": 116, "top": 50, "width": 48, "height": 18},
-    "singleSlotMode": {"left": 12, "top": 153, "width": 152, "height": 18},
+    "close": {"left": 148, "top": -5, "width": 20, "height": 20},
+    "returnStrict": {"left": 12, "top": 50, "width": 71, "height": 18},
+    "returnUnblocked": {"left": 89, "top": 50, "width": 71, "height": 18},
+    "productExtractionEnabled": {"left": 12, "top": 50, "width": 71, "height": 18},
+    "productExtractionDisabled": {"left": 89, "top": 50, "width": 71, "height": 18},
+    "breakRecovery": {"left": 12, "top": 50, "width": 148, "height": 18},
+    "redstoneSingle": {"left": 12, "top": 50, "width": 46, "height": 18},
+    "redstonePeriodic": {"left": 63, "top": 50, "width": 46, "height": 18},
+    "redstoneContinuous": {"left": 114, "top": 50, "width": 46, "height": 18},
+    "transferNormal": {"left": 12, "top": 50, "width": 46, "height": 18},
+    "transferSingleItem": {"left": 63, "top": 50, "width": 46, "height": 18},
+    "transferSameType": {"left": 114, "top": 50, "width": 46, "height": 18},
+    "singleSlotAll": {"left": 12, "top": 50, "width": 46, "height": 18},
+    "singleSlotDisabled": {"left": 63, "top": 50, "width": 46, "height": 18},
+    "singleSlotFollowPort": {"left": 114, "top": 50, "width": 46, "height": 18},
+    "energyDistributionMode": {"left": 12, "top": 50, "width": 148, "height": 18},
     "rightToolbar": {"right": 2, "top": 0}
   }
 }

@@ -33,30 +33,30 @@ class TaskEndpointSelectorTest {
     }
 
     @Test
-    void randomMakesOneSelectionAndAllowsRepeatedResults() {
+    void randomStartsAtRandomIndexAndRetriesOtherEndpoints() {
         AtomicInteger attempts = new AtomicInteger();
         List<Integer> selected = new ArrayList<Integer>();
         for (int i = 0; i < 3; i++) {
             selected.add(TaskEndpointSelector.select(TaskAllocationMode.RANDOM, 0, 4,
                     bound -> 2, index -> {
                         attempts.incrementAndGet();
-                        return true;
+                    return index == 0;
                     }));
         }
 
-        assertEquals(Arrays.asList(2, 2, 2), selected);
-        assertEquals(3, attempts.get());
+        assertEquals(Arrays.asList(0, 0, 0), selected);
+        assertEquals(9, attempts.get());
     }
 
     @Test
-    void randomDoesNotRetryARejectedSelection() {
+    void randomReturnsFailureAfterTryingEveryEndpoint() {
         AtomicInteger attempts = new AtomicInteger();
         assertEquals(-1, TaskEndpointSelector.select(TaskAllocationMode.RANDOM, 0, 3,
                 bound -> 1, index -> {
                     attempts.incrementAndGet();
                     return false;
                 }));
-        assertEquals(1, attempts.get());
+        assertEquals(3, attempts.get());
     }
 
     @Test

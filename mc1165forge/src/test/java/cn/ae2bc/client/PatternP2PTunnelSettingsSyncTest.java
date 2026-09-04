@@ -18,12 +18,9 @@ import org.objectweb.asm.tree.MethodNode;
 public final class PatternP2PTunnelSettingsSyncTest {
     @Test
     public void settingsScreensDoNotWriteClientSnapshotsWhenClosed() throws Exception {
-        assertFalse(hasCallNamed(method(readClass("/cn/ae2bc/client/PatternP2PTunnelScreen.class"),
-                "onClose"), "sendCurrentSettings"));
-        assertFalse(hasCallNamed(method(readClass("/cn/ae2bc/client/PatternP2PTunnelEnergyScreen.class"),
-                "onClose"), "sendCurrentSettings"));
-        assertFalse(hasCallNamed(method(readClass("/cn/ae2bc/client/PatternP2PUnitManagerScreen.class"),
-                "onClose"), "sendCurrentSettings"));
+        assertFalse(hasMethod(readClass("/cn/ae2bc/client/PatternP2PTunnelScreen.class"), "onClose"));
+        assertFalse(hasMethod(readClass("/cn/ae2bc/client/PatternP2PTunnelEnergyScreen.class"), "onClose"));
+        assertFalse(hasMethod(readClass("/cn/ae2bc/client/PatternP2PUnitManagerScreen.class"), "onClose"));
     }
 
     @Test
@@ -49,11 +46,15 @@ public final class PatternP2PTunnelSettingsSyncTest {
     }
 
     @Test
-    public void inputSlotSharingUsesTheDedicatedServerUpdate() throws Exception {
+    public void inputSlotSharingUsesTheAuthoritativeFullSettingsUpdate() throws Exception {
         ClassNode screen = readClass("/cn/ae2bc/client/PatternP2PTunnelScreen.class");
-        assertTrue(hasCallNamed(screen, "sendInputOutputSlotSharingMode"));
+        assertFalse(hasCallNamed(screen, "sendInputOutputSlotSharingMode"));
         assertTrue(hasSettingsConstructorWithOutputSlotSharingMode(
                 method(screen, "sendCurrentSettings")));
+        assertTrue(hasCallNamed(screen, "sendPatternSettings"));
+
+        ClassNode packet = readClass("/cn/ae2bc/network/ModNetwork$ExtractionSettingsPacket.class");
+        assertTrue(hasCallNamed(packet, "setInputSettings"));
 
         MethodNode setter = method(readClass("/cn/ae2bc/part/PatternP2PTunnelPart.class"),
                 "setOutputSlotSharingMode");
@@ -118,6 +119,13 @@ public final class PatternP2PTunnelSettingsSyncTest {
             if (name.equals(method.name)) return method;
         }
         throw new AssertionError("Missing method " + name);
+    }
+
+    private static boolean hasMethod(ClassNode node, String name) {
+        for (MethodNode method : node.methods) {
+            if (name.equals(method.name)) return true;
+        }
+        return false;
     }
 
     private static boolean hasCall(MethodNode method, String owner, String name) {
