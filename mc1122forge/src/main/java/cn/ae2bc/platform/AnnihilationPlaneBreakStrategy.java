@@ -15,10 +15,14 @@ import cn.ae2bc.part.PatternP2PUnitPortPart;
 import net.minecraft.block.Block;
 import net.minecraft.block.material.Material;
 import net.minecraft.block.state.IBlockState;
-import net.minecraft.entity.item.EntityItem;
 import net.minecraft.init.Blocks;
 import net.minecraft.item.ItemStack;
-import net.minecraft.util.math.AxisAlignedBB;
+import net.minecraft.item.Item;
+import net.minecraft.init.Items;
+import net.minecraft.enchantment.EnchantmentHelper;
+import net.minecraft.init.Enchantments;
+import net.minecraftforge.common.util.FakePlayer;
+import net.minecraftforge.common.util.FakePlayerFactory;
 import net.minecraft.util.math.BlockPos;
 import net.minecraft.world.World;
 import net.minecraft.world.WorldServer;
@@ -62,7 +66,7 @@ public final class AnnihilationPlaneBreakStrategy
         BlockPos target = port.getTile().getPos().offset(port.getSide().getFacing());
         try {
             if (!canHandleBlock(level, target)) return TickRateModulation.IDLE;
-            List<ItemStack> expectedDrops = Arrays.asList(Platform.getBlockDrops(level, target));
+            List<ItemStack> expectedDrops = getBlockDrops(level, target);
             if (!canReturnDrops(port, manager, expectedDrops)) return TickRateModulation.IDLE;
 
             float energyUsage = calculateEnergyUsage(level, target, expectedDrops);
@@ -78,7 +82,7 @@ public final class AnnihilationPlaneBreakStrategy
             }
 
             energy.extractAEPower(energyUsage, Actionable.MODULATE, PowerMultiplier.CONFIG);
-            if (!breakBlockAndHandleDrops(port, level, target, manager)) {
+            if (!breakBlockAndHandleDrops(port, level, target, manager, expectedDrops)) {
                 return TickRateModulation.IDLE;
             }
             AppEng.proxy.sendToAllNearExcept(null, target.getX(), target.getY(), target.getZ(),
@@ -103,6 +107,43 @@ public final class AnnihilationPlaneBreakStrategy
                 && level.canMineBlockBody(Platform.getPlayer(level), target);
     }
 
+    private List<ItemStack> getBlockDrops(WorldServer level, BlockPos target) {
+        ItemStack harvestTool = createHarvestTool(level, target);
+        if (!harvestTool.isItemEnchanted()) {
+            return Arrays.asList(Platform.getBlockDrops(level, target));
+        }
+
+        IBlockState state = level.getBlockState(target);
+        FakePlayer player = FakePlayerFactory.getMinecraft(level);
+        int fortune = EnchantmentHelper.getEnchantmentLevel(Enchantments.FORTUNE, harvestTool);
+        if (EnchantmentHelper.getEnchantmentLevel(Enchantments.SILK_TOUCH, harvestTool) > 0
+                && state.getBlock().canSilkHarvest(level, target, state, player)) {
+            Item item = Item.getItemFromBlock(state.getBlock());
+            if (item != Items.AIR) {
+                return java.util.Collections.singletonList(
+                        new ItemStack(item, 1, state.getBlock().getMetaFromState(state)));
+            }
+        }
+        return state.getBlock().getDrops(level, target, state, fortune);
+    }
+
+    private ItemStack createHarvestTool(WorldServer level, BlockPos target) {
+        IBlockState state = level.getBlockState(target);
+        String harvestTool = state.getBlock().getHarvestTool(state);
+        ItemStack tool;
+        if ("axe".equals(harvestTool)) {
+            tool = new ItemStack(Items.DIAMOND_AXE);
+        } else if ("shovel".equals(harvestTool)) {
+            tool = new ItemStack(Items.DIAMOND_SHOVEL);
+        } else if ("hoe".equals(harvestTool)) {
+            tool = new ItemStack(Items.DIAMOND_HOE);
+        } else {
+            tool = new ItemStack(Items.DIAMOND_PICKAXE);
+        }
+        EnchantmentHelper.setEnchantments(port.getBreakEnchantments(), tool);
+        return tool;
+    }
+
     private static boolean canReturnDrops(PatternP2PUnitPortPart port,
                                           PatternP2PUnitManagerPart manager,
                                           List<ItemStack> drops) {
@@ -122,15 +163,15 @@ public final class AnnihilationPlaneBreakStrategy
 
     private static boolean breakBlockAndHandleDrops(PatternP2PUnitPortPart port,
                                                     WorldServer level, BlockPos target,
-                                                    PatternP2PUnitManagerPart manager) {
-        if (!level.destroyBlock(target, true)) return false;
-        if (!manager.isBreakRecovery()) return true;
-        AxisAlignedBB area = new AxisAlignedBB(target).grow(0.2);
-        for (EntityItem entity : level.getEntitiesWithinAABB(EntityItem.class, area)) {
-            ItemStack offered = entity.getItem().copy();
-            if (offered.isEmpty() || !port.allowsInputFilter(offered)) continue;
-            ItemStack remainder = manager.returnProduct(offered, false);
-            if (remainder.isEmpty()) entity.setDead(); else entity.setItem(remainder);
+                                                    PatternP2PUnitManagerPart manager,
+                                                    List<ItemStack> drops) {
+        if (!level.destroyBlock(target, false)) return false;
+        for (ItemStack drop : drops) {
+            ItemStack remainder = manager.isBreakRecovery() ? manager.returnProduct(drop, false) : drop;
+            if (!remainder.isEmpty()) {
+                level.spawnEntity(new net.minecraft.entity.item.EntityItem(level,
+                        target.getX() + 0.5, target.getY() + 0.5, target.getZ() + 0.5, remainder));
+            }
         }
         return true;
     }

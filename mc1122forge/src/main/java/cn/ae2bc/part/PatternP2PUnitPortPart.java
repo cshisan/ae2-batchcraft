@@ -8,6 +8,8 @@ import java.util.Objects;
 import java.util.UUID;
 import java.util.List;
 import java.util.Arrays;
+import java.util.Collections;
+import java.util.Map;
 
 import appeng.api.implementations.items.IMemoryCard;
 import appeng.api.implementations.items.MemoryCardMessages;
@@ -18,6 +20,7 @@ import appeng.core.sync.GuiBridge;
 import appeng.util.Platform;
 import appeng.api.parts.IPartCollisionHelper;
 import appeng.api.parts.IPartModel;
+import appeng.api.parts.PartItemStack;
 import appeng.api.util.AECableType;
 import appeng.api.networking.IGridNode;
 import appeng.api.networking.events.MENetworkEventSubscribe;
@@ -36,6 +39,9 @@ import cn.ae2bc.core.schedule.ExtractionDeadlineGate;
 import io.netty.buffer.ByteBuf;
 import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.ItemStack;
+import net.minecraft.init.Items;
+import net.minecraft.enchantment.Enchantment;
+import net.minecraft.enchantment.EnchantmentHelper;
 import net.minecraft.nbt.NBTTagCompound;
 import net.minecraft.util.EnumHand;
 import net.minecraft.util.EnumFacing;
@@ -76,6 +82,7 @@ public final class PatternP2PUnitPortPart extends AEBasePart
             "ae2_batchcraft", "part/p2p/pattern_p2p_unit_port_identity");
 
     private final UnitPortType type;
+    private Map<Enchantment, Integer> enchantments = Collections.emptyMap();
     private final IPartModel modelOff;
     private final IPartModel modelOn;
     private final IPartModel modelActive;
@@ -101,6 +108,9 @@ public final class PatternP2PUnitPortPart extends AEBasePart
     public PatternP2PUnitPortPart(ItemStack stack, UnitPortType type) {
         super(stack);
         this.type = type;
+        this.enchantments = type == UnitPortType.BREAK
+                ? Collections.unmodifiableMap(EnchantmentHelper.getEnchantments(stack))
+                : Collections.emptyMap();
         this.outputFilterMarkers = new ItemStackHandler(18) {
             @Override protected void onContentsChanged(int slot) { getHost().markForSave(); getHost().markForUpdate(); }
             @Override public int getSlotLimit(int slot) { return 1; }
@@ -232,6 +242,22 @@ public final class PatternP2PUnitPortPart extends AEBasePart
     @Override public void setPriority(int value) { setTransferPriority(value); }
     @Override public GuiBridge getGuiBridge() { return GuiBridge.GUI_PRIORITY; }
     @Override public ItemStack getItemStackRepresentation() { return getItemStack(); }
+
+    @Override
+    public ItemStack getItemStack(PartItemStack stackType) {
+        ItemStack result = super.getItemStack(stackType);
+        if (type != UnitPortType.BREAK || stackType != PartItemStack.BREAK || result.isEmpty()) {
+            return result;
+        }
+
+        ItemStack drop = new ItemStack(result.getItem(), result.getCount(), result.getMetadata());
+        if (result.hasTagCompound() && result.getTagCompound().hasKey("ench", 9)) {
+            NBTTagCompound enchantments = new NBTTagCompound();
+            enchantments.setTag("ench", result.getTagCompound().getTag("ench").copy());
+            drop.setTagCompound(enchantments);
+        }
+        return drop;
+    }
     public void setTransferPriority(int value) { transferPriority = Math.max(-9999, Math.min(9999, value)); saveChanges(); getHost().markForUpdate(); }
     public UUID getBoundManagerId() { return boundManagerId; }
     public short getBoundFrequency() { return (short) getBoundFrequencyUnsigned(); }
@@ -647,6 +673,7 @@ public final class PatternP2PUnitPortPart extends AEBasePart
 
     @Override public void readFromNBT(NBTTagCompound data) {
         super.readFromNBT(data);
+        enchantments = readBreakEnchantments(data);
         boundManagerId = data.hasUniqueId("PatternP2PUnitId") ? data.getUniqueId("PatternP2PUnitId") : null;
         boundFrequency = data.getShort("PatternP2PUnitFrequency");
         transferPriority = Math.max(-9999, Math.min(9999, data.getInteger("TransferPriority")));
@@ -664,6 +691,14 @@ public final class PatternP2PUnitPortPart extends AEBasePart
     }
     @Override public void writeToNBT(NBTTagCompound data) {
         super.writeToNBT(data);
+        data.removeTag("BreakEnchantments");
+        if (type == UnitPortType.BREAK && !enchantments.isEmpty()) {
+            ItemStack carrier = new ItemStack(Items.DIAMOND_PICKAXE);
+            EnchantmentHelper.setEnchantments(enchantments, carrier);
+            if (carrier.hasTagCompound() && carrier.getTagCompound().hasKey("ench", 9)) {
+                data.setTag("BreakEnchantments", carrier.getTagCompound().getTag("ench").copy());
+            }
+        }
         if (boundManagerId != null) data.setUniqueId("PatternP2PUnitId", boundManagerId);
         boundFrequency = (short) getBoundFrequencyUnsigned();
         data.setShort("PatternP2PUnitFrequency", boundFrequency);
@@ -675,6 +710,21 @@ public final class PatternP2PUnitPortPart extends AEBasePart
         data.setTag("InputFilterInverter", inputFilterInverter.serializeNBT());
         extractionRecovery.write(data, "ProductExtractionRecovery");
     }
+    public Map<Enchantment, Integer> getBreakEnchantments() {
+        return enchantments;
+    }
+
+    private Map<Enchantment, Integer> readBreakEnchantments(NBTTagCompound data) {
+        if (type != UnitPortType.BREAK || !data.hasKey("BreakEnchantments", 9)) {
+            return Collections.emptyMap();
+        }
+        ItemStack carrier = new ItemStack(Items.DIAMOND_PICKAXE);
+        NBTTagCompound tag = new NBTTagCompound();
+        tag.setTag("ench", data.getTag("BreakEnchantments").copy());
+        carrier.setTagCompound(tag);
+        return Collections.unmodifiableMap(EnchantmentHelper.getEnchantments(carrier));
+    }
+
     @Override public void writeToStream(ByteBuf data) throws java.io.IOException {
         super.writeToStream(data);
         modelPowered = getProxy().isPowered();

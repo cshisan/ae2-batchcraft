@@ -48,7 +48,9 @@ import appeng.parts.PartModel;
 import appeng.parts.p2p.P2PModels;
 import appeng.parts.automation.StackWorldBehaviors;
 import appeng.parts.automation.FluidPickupStrategy;
+import appeng.util.EnchantmentUtil;
 import appeng.util.Platform;
+import appeng.util.SettingsFrom;
 import cn.ae2bc.Ae2bcMod;
 import cn.ae2bc.logic.RedstoneOutputMode;
 import cn.ae2bc.logic.PatternP2PUnitIdentityColors;
@@ -78,6 +80,7 @@ import net.minecraft.world.InteractionHand;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.enchantment.Enchantment;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.energy.IEnergyStorage;
@@ -108,6 +111,7 @@ public final class PatternP2PUnitPortPart extends AEBasePart implements IGridTic
     private static final Map<UnitPortType, PatternP2PUnitPortModels> MODELS = createModels();
 
     private final UnitPortType type;
+    private Map<Enchantment, Integer> enchantments = Map.of();
     private final IActionSource actionSource = new MachineSource(this);
     private final PortReturnInventory returnInventory = new PortReturnInventory();
     private final IItemHandler returnItemHandler = new GenericStackItemStorage(returnInventory);
@@ -390,7 +394,7 @@ public final class PatternP2PUnitPortPart extends AEBasePart implements IGridTic
         if (breakStrategies == null && getLevel() instanceof ServerLevel level && getSide() != null) {
             breakStrategies = StackWorldBehaviors.createPickupStrategies(level,
                     getBlockEntity().getBlockPos().relative(getSide()), getSide().getOpposite(),
-                    getBlockEntity(), java.util.Collections.emptyMap(),
+                    getBlockEntity(), enchantments,
                     getMainNode().getNode().getOwningPlayerProfileId());
         }
         return breakStrategies == null ? List.of() : breakStrategies;
@@ -400,7 +404,7 @@ public final class PatternP2PUnitPortPart extends AEBasePart implements IGridTic
         if (collectFluidStrategy == null && getLevel() instanceof ServerLevel level && getSide() != null) {
             collectFluidStrategy = new FluidPickupStrategy(level,
                     getBlockEntity().getBlockPos().relative(getSide()), getSide().getOpposite(),
-                    getBlockEntity(), java.util.Collections.emptyMap(),
+                    getBlockEntity(), enchantments,
                     getMainNode().getNode().getOwningPlayerProfileId());
         }
         return collectFluidStrategy;
@@ -759,6 +763,8 @@ public final class PatternP2PUnitPortPart extends AEBasePart implements IGridTic
     @Override
     public void readFromNBT(CompoundTag data) {
         super.readFromNBT(data );
+        enchantments = type == UnitPortType.BREAK
+                ? Map.copyOf(EnchantmentUtil.getEnchantments(data)) : Map.of();
         boundPatternP2PUnitId = data.hasUUID("PatternP2PUnitId") ? data.getUUID("PatternP2PUnitId") : null;
         boundFrequency = data.getShort(BOUND_FREQUENCY_TAG);
         transferPriority = Math.max(MIN_TRANSFER_PRIORITY, Math.min(MAX_TRANSFER_PRIORITY, data.getInt("TransferPriority")));
@@ -781,6 +787,10 @@ public final class PatternP2PUnitPortPart extends AEBasePart implements IGridTic
     @Override
     public void writeToNBT(CompoundTag data) {
         super.writeToNBT(data );
+        data.remove("Enchantments");
+        if (type == UnitPortType.BREAK && !enchantments.isEmpty()) {
+            EnchantmentUtil.setEnchantments(data, enchantments);
+        }
         if (boundPatternP2PUnitId != null) {
             data.putUUID("PatternP2PUnitId", boundPatternP2PUnitId);
         } else {
@@ -794,6 +804,29 @@ public final class PatternP2PUnitPortPart extends AEBasePart implements IGridTic
         inputFilterMarkers.writeToChildTag(data, "InputFilterMarkers");
         inputFilterInverter.writeToNBT(data, "InputFilterInverter");
         productExtractionRecovery.write(data, PRODUCT_EXTRACTION_RECOVERY );
+    }
+
+    @Override
+    public void importSettings(SettingsFrom from, CompoundTag data, Player player) {
+        if (from == SettingsFrom.DISMANTLE_ITEM && type == UnitPortType.BREAK) {
+            enchantments = Map.copyOf(EnchantmentUtil.getEnchantments(data));
+            breakStrategies = null;
+            collectFluidStrategy = null;
+            return;
+        }
+        super.importSettings(from, data, player);
+    }
+
+    @Override
+    public void exportSettings(SettingsFrom from, CompoundTag data) {
+        if (from == SettingsFrom.DISMANTLE_ITEM && type == UnitPortType.BREAK) {
+            data.remove("Enchantments");
+            if (!enchantments.isEmpty()) {
+                EnchantmentUtil.setEnchantments(data, enchantments);
+            }
+            return;
+        }
+        super.exportSettings(from, data);
     }
 
     private static void readFilterMarkers(GenericStackInv markers, CompoundTag data, String name) {

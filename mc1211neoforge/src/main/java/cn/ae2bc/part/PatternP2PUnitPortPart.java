@@ -51,6 +51,7 @@ import appeng.parts.automation.FluidPickupStrategy;
 import appeng.menu.MenuOpener;
 import appeng.menu.locator.MenuLocators;
 import appeng.util.Platform;
+import appeng.util.SettingsFrom;
 import cn.ae2bc.Ae2bcMod;
 import cn.ae2bc.logic.RedstoneOutputMode;
 import cn.ae2bc.logic.PatternP2PUnitIdentityColors;
@@ -70,7 +71,10 @@ import cn.ae2bc.pattern.MaterialOutputForm;
 import cn.ae2bc.registry.ModContent;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.component.DataComponentMap;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.NbtOps;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.network.RegistryFriendlyByteBuf;
@@ -104,6 +108,7 @@ import cn.ae2bc.core.unit.OutputSlotSharingMode;
 public final class PatternP2PUnitPortPart extends AEBasePart implements IGridTickable, ProductExtractionTask, IPriorityHost {
     private static final String PRODUCT_EXTRACTION_RECOVERY = "ProductExtractionRecovery";
     private static final String BOUND_FREQUENCY_TAG = "BoundFrequency";
+    private static final String ENCHANTMENTS_TAG = "enchantments";
     public static final int MIN_TRANSFER_PRIORITY = -9999;
     public static final int MAX_TRANSFER_PRIORITY = 9999;
     private static final ResourceLocation IDENTITY_MODEL = ResourceLocation.fromNamespaceAndPath(
@@ -111,6 +116,7 @@ public final class PatternP2PUnitPortPart extends AEBasePart implements IGridTic
     private static final Map<UnitPortType, PatternP2PUnitPortModels> MODELS = createModels();
 
     private final UnitPortType type;
+    private ItemEnchantments enchantments = ItemEnchantments.EMPTY;
     private final IActionSource actionSource = new MachineSource(this);
     private final PortReturnInventory returnInventory = new PortReturnInventory();
     private final IItemHandler returnItemHandler = new GenericStackItemStorage(returnInventory);
@@ -302,7 +308,7 @@ public final class PatternP2PUnitPortPart extends AEBasePart implements IGridTic
         if (breakStrategies == null && getLevel() instanceof ServerLevel level && getSide() != null) {
             breakStrategies = StackWorldBehaviors.createPickupStrategies(level,
                     getBlockEntity().getBlockPos().relative(getSide()), getSide().getOpposite(),
-                    getBlockEntity(), ItemEnchantments.EMPTY,
+                    getBlockEntity(), enchantments,
                     getMainNode().getNode().getOwningPlayerProfileId());
         }
         return breakStrategies == null ? List.of() : breakStrategies;
@@ -407,7 +413,7 @@ public final class PatternP2PUnitPortPart extends AEBasePart implements IGridTic
         if (collectFluidStrategy == null && getLevel() instanceof ServerLevel level && getSide() != null) {
             collectFluidStrategy = new FluidPickupStrategy(level,
                     getBlockEntity().getBlockPos().relative(getSide()), getSide().getOpposite(),
-                    getBlockEntity(), ItemEnchantments.EMPTY,
+                    getBlockEntity(), enchantments,
                     getMainNode().getNode().getOwningPlayerProfileId());
         }
         return collectFluidStrategy;
@@ -766,6 +772,14 @@ public final class PatternP2PUnitPortPart extends AEBasePart implements IGridTic
     @Override
     public void readFromNBT(CompoundTag data, HolderLookup.Provider registries) {
         super.readFromNBT(data, registries);
+        enchantments = ItemEnchantments.EMPTY;
+        if (type == UnitPortType.BREAK && data.contains(ENCHANTMENTS_TAG, Tag.TAG_COMPOUND)) {
+            ItemEnchantments.CODEC.parse(registries.createSerializationContext(NbtOps.INSTANCE),
+                            data.getCompound(ENCHANTMENTS_TAG))
+                    .resultOrPartial(error -> Ae2bcMod.LOGGER.warn(
+                            "Failed to load break unit port enchantments: {}", error))
+                    .ifPresent(value -> enchantments = value);
+        }
         boundPatternP2PUnitId = data.hasUUID("PatternP2PUnitId") ? data.getUUID("PatternP2PUnitId") : null;
         boundFrequency = data.getShort(BOUND_FREQUENCY_TAG);
         transferPriority = Math.clamp(data.getInt("TransferPriority"), MIN_TRANSFER_PRIORITY, MAX_TRANSFER_PRIORITY);
@@ -786,6 +800,14 @@ public final class PatternP2PUnitPortPart extends AEBasePart implements IGridTic
     @Override
     public void writeToNBT(CompoundTag data, HolderLookup.Provider registries) {
         super.writeToNBT(data, registries);
+        data.remove(ENCHANTMENTS_TAG);
+        if (type == UnitPortType.BREAK && !enchantments.isEmpty()) {
+            ItemEnchantments.CODEC.encodeStart(
+                            registries.createSerializationContext(NbtOps.INSTANCE), enchantments)
+                    .resultOrPartial(error -> Ae2bcMod.LOGGER.warn(
+                            "Failed to save break unit port enchantments: {}", error))
+                    .ifPresent(tag -> data.put(ENCHANTMENTS_TAG, tag));
+        }
         if (boundPatternP2PUnitId != null) {
             data.putUUID("PatternP2PUnitId", boundPatternP2PUnitId);
         } else {
@@ -799,6 +821,28 @@ public final class PatternP2PUnitPortPart extends AEBasePart implements IGridTic
         inputFilterMarkers.writeToChildTag(data, "InputFilterMarkers", registries);
         inputFilterInverter.writeToNBT(data, "InputFilterInverter", registries);
         productExtractionRecovery.write(data, PRODUCT_EXTRACTION_RECOVERY, registries);
+    }
+
+    @Override
+    public void importSettings(SettingsFrom from, DataComponentMap components, Player player) {
+        if (from == SettingsFrom.DISMANTLE_ITEM && type == UnitPortType.BREAK) {
+            enchantments = components.getOrDefault(DataComponents.ENCHANTMENTS, ItemEnchantments.EMPTY);
+            breakStrategies = null;
+            collectFluidStrategy = null;
+            return;
+        }
+        super.importSettings(from, components, player);
+    }
+
+    @Override
+    public void exportSettings(SettingsFrom from, DataComponentMap.Builder builder) {
+        if (from == SettingsFrom.DISMANTLE_ITEM && type == UnitPortType.BREAK) {
+            if (!enchantments.isEmpty()) {
+                builder.set(DataComponents.ENCHANTMENTS, enchantments);
+            }
+            return;
+        }
+        super.exportSettings(from, builder);
     }
 
     private static void readFilterMarkers(GenericStackInv markers, CompoundTag data, String name,

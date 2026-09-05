@@ -2,6 +2,7 @@ package cn.ae2bc.registry;
 
 import cn.ae2bc.item.PatternP2PUnitManagerItem;
 import cn.ae2bc.item.PatternP2PPartItem;
+import cn.ae2bc.item.PatternP2PUnitPortItem;
 import cn.ae2bc.menu.PatternP2PTunnelEnergyMenu;
 import cn.ae2bc.menu.PatternP2PTunnelMenu;
 import cn.ae2bc.menu.PatternP2PUnitManagerMenu;
@@ -63,7 +64,7 @@ public final class ModContent {
             UNIT_MANAGERS = registerUnitManagers();
     public static final RegistryObject<PatternP2PUnitManagerItem<PatternP2PUnitManagerPart>> UNIT_MANAGER =
             UNIT_MANAGERS.get(AEColor.TRANSPARENT);
-    public static final java.util.Map<UnitPortType, RegistryObject<PatternP2PPartItem<PatternP2PUnitPortPart>>> UNIT_PORTS =
+    public static final java.util.Map<UnitPortType, RegistryObject<PatternP2PUnitPortItem>> UNIT_PORTS =
             registerUnitPorts();
     public static final RegistryObject<ContainerType<PatternP2PTunnelMenu>> PATTERN_P2P_SETTINGS =
             CONTAINERS.register("pattern_p2p_settings",
@@ -85,17 +86,15 @@ public final class ModContent {
     private ModContent() {
     }
 
-    private static java.util.Map<UnitPortType, RegistryObject<PatternP2PPartItem<PatternP2PUnitPortPart>>> registerUnitPorts() {
-        java.util.Map<UnitPortType, RegistryObject<PatternP2PPartItem<PatternP2PUnitPortPart>>> result =
-                new java.util.EnumMap<UnitPortType, RegistryObject<PatternP2PPartItem<PatternP2PUnitPortPart>>>(UnitPortType.class);
+    private static java.util.Map<UnitPortType, RegistryObject<PatternP2PUnitPortItem>> registerUnitPorts() {
+        java.util.Map<UnitPortType, RegistryObject<PatternP2PUnitPortItem>> result =
+                new java.util.EnumMap<UnitPortType, RegistryObject<PatternP2PUnitPortItem>>(UnitPortType.class);
         for (UnitPortType type : UnitPortType.values()) {
             final UnitPortType captured = type;
             result.put(type, ITEMS.register("pattern_p2p_unit_port_" + type.getId(),
-                    () -> new PatternP2PPartItem<PatternP2PUnitPortPart>(
+                    () -> new PatternP2PUnitPortItem(
                             new Item.Properties().tab(CREATIVE_TAB),
-                            stack -> new PatternP2PUnitPortPart(stack, captured),
-                            "tooltip.ae2_batchcraft.pattern_p2p.unit_port." + captured.getId(),
-                            "tooltip.ae2_batchcraft.pattern_p2p.binding")));
+                            captured)));
         }
         return java.util.Collections.unmodifiableMap(result);
     }

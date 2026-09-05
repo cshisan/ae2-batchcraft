@@ -18,6 +18,7 @@ import appeng.container.ContainerOpener;
 import appeng.container.implementations.PriorityContainer;
 import appeng.api.parts.IPartCollisionHelper;
 import appeng.api.parts.IPartModel;
+import appeng.api.parts.PartItemStack;
 import appeng.api.util.AECableType;
 import appeng.api.networking.IGridNode;
 import appeng.api.networking.events.MENetworkEventSubscribe;
@@ -38,6 +39,10 @@ import cn.ae2bc.core.energy.EnergyEndpoint;
 import cn.ae2bc.core.schedule.ExtractionDeadlineGate;
 import net.minecraft.entity.player.PlayerEntity;
 import net.minecraft.item.ItemStack;
+import net.minecraft.item.Items;
+import net.minecraft.enchantment.EnchantmentHelper;
+import net.minecraftforge.common.util.Constants;
+import net.minecraftforge.common.ToolType;
 import net.minecraft.nbt.CompoundNBT;
 import net.minecraft.network.PacketBuffer;
 import net.minecraft.util.Hand;
@@ -90,6 +95,7 @@ public final class PatternP2PUnitPortPart extends AEBasePart
             "ae2_batchcraft", "part/p2p/pattern_p2p_unit_port_identity");
 
     private final UnitPortType type;
+    private java.util.Map<net.minecraft.enchantment.Enchantment, Integer> enchantments = java.util.Collections.emptyMap();
     private final IPartModel modelOff;
     private final IPartModel modelOn;
     private final IPartModel modelActive;
@@ -116,6 +122,9 @@ public final class PatternP2PUnitPortPart extends AEBasePart
     public PatternP2PUnitPortPart(ItemStack stack, UnitPortType type) {
         super(stack);
         this.type = type;
+        this.enchantments = type == UnitPortType.BREAK
+                ? java.util.Collections.unmodifiableMap(EnchantmentHelper.getEnchantments(stack))
+                : java.util.Collections.emptyMap();
         this.outputFilterMarkers = new ItemStackHandler(18) {
             @Override protected void onContentsChanged(int slot) {
                 getHost().markForSave();
@@ -269,6 +278,26 @@ public final class PatternP2PUnitPortPart extends AEBasePart
     @Override public int getPriority() { return transferPriority; }
     @Override public void setPriority(int value) { setTransferPriority(value); }
     @Override public ItemStack getItemStackRepresentation() { return getItemStack(); }
+
+    @Override
+    public ItemStack getItemStack(PartItemStack stackType) {
+        ItemStack result = super.getItemStack(stackType);
+        if (type != UnitPortType.BREAK || stackType != PartItemStack.BREAK || result.isEmpty()) {
+            return result;
+        }
+
+        ItemStack drop = new ItemStack(result.getItem(), result.getCount());
+        if (result.hasTag() && result.getTag().contains("Enchantments", Constants.NBT.TAG_LIST)) {
+            CompoundNBT enchantments = new CompoundNBT();
+            enchantments.put("Enchantments", result.getTag().get("Enchantments").copy());
+            drop.setTag(enchantments);
+        }
+        return drop;
+    }
+
+    public java.util.Map<net.minecraft.enchantment.Enchantment, Integer> getBreakEnchantments() {
+        return enchantments;
+    }
     @Override public net.minecraft.inventory.container.ContainerType<?> getContainerType() { return PriorityContainer.TYPE; }
     public void setTransferPriority(int value) {
         int clamped = Math.max(MIN_TRANSFER_PRIORITY, Math.min(MAX_TRANSFER_PRIORITY, value));
@@ -604,8 +633,13 @@ public final class PatternP2PUnitPortPart extends AEBasePart
         BlockState state = level.getBlockState(target);
         if (state.isAir() || state.getDestroySpeed(level, target) < 0) return false;
         FakePlayer player = FakePlayerFactory.getMinecraft(level);
+        ItemStack harvestTool = createHarvestTool(state);
+        if (!state.requiresCorrectToolForDrops() && state.getHarvestTool() == null
+                && !harvestTool.isEnchanted()) {
+            harvestTool = ItemStack.EMPTY;
+        }
         List<ItemStack> drops = Block.getDrops(state, level, target, level.getBlockEntity(target),
-                player, ItemStack.EMPTY);
+                player, harvestTool);
         for (ItemStack drop : drops) {
             if (!drop.isEmpty() && !allowsInputFilter(drop)) return false;
         }
@@ -624,6 +658,22 @@ public final class PatternP2PUnitPortPart extends AEBasePart
             }
         }
         return true;
+    }
+
+    private ItemStack createHarvestTool(BlockState state) {
+        ToolType harvestToolType = state.getHarvestTool();
+        ItemStack harvestTool;
+        if (ToolType.AXE.equals(harvestToolType)) {
+            harvestTool = new ItemStack(Items.DIAMOND_AXE);
+        } else if (ToolType.SHOVEL.equals(harvestToolType)) {
+            harvestTool = new ItemStack(Items.DIAMOND_SHOVEL);
+        } else if (ToolType.HOE.equals(harvestToolType)) {
+            harvestTool = new ItemStack(Items.DIAMOND_HOE);
+        } else {
+            harvestTool = new ItemStack(Items.DIAMOND_PICKAXE);
+        }
+        EnchantmentHelper.setEnchantments(enchantments, harvestTool);
+        return harvestTool;
     }
 
     @Override public boolean canConnectRedstone() { return type == UnitPortType.REDSTONE; }
@@ -747,6 +797,7 @@ public final class PatternP2PUnitPortPart extends AEBasePart
 
     @Override public void readFromNBT(CompoundNBT data) {
         super.readFromNBT(data);
+        enchantments = readBreakEnchantments(data);
         boundManagerId = data.hasUUID("PatternP2PUnitId") ? data.getUUID("PatternP2PUnitId") : null;
         boundFrequency = data.getShort("PatternP2PUnitFrequency");
         transferPriority = Math.max(-9999, Math.min(9999, data.getInt("TransferPriority")));
@@ -766,6 +817,14 @@ public final class PatternP2PUnitPortPart extends AEBasePart
 
     @Override public void writeToNBT(CompoundNBT data) {
         super.writeToNBT(data);
+        data.remove("BreakEnchantments");
+        if (type == UnitPortType.BREAK && !enchantments.isEmpty()) {
+            ItemStack carrier = new ItemStack(Items.DIAMOND_PICKAXE);
+            EnchantmentHelper.setEnchantments(enchantments, carrier);
+            if (carrier.hasTag() && carrier.getTag().contains("Enchantments", Constants.NBT.TAG_LIST)) {
+                data.put("BreakEnchantments", carrier.getTag().get("Enchantments").copy());
+            }
+        }
         if (boundManagerId != null) data.putUUID("PatternP2PUnitId", boundManagerId);
         boundFrequency = (short) getBoundFrequencyUnsigned();
         data.putShort("PatternP2PUnitFrequency", boundFrequency);
@@ -776,6 +835,17 @@ public final class PatternP2PUnitPortPart extends AEBasePart
         data.put("InputFilterMarkers", inputFilterMarkers.serializeNBT());
         data.put("InputFilterInverter", inputFilterInverter.serializeNBT());
         extractionRecovery.write(data, "ProductExtractionRecovery");
+    }
+
+    private java.util.Map<net.minecraft.enchantment.Enchantment, Integer> readBreakEnchantments(CompoundNBT data) {
+        if (type != UnitPortType.BREAK || !data.contains("BreakEnchantments", Constants.NBT.TAG_LIST)) {
+            return java.util.Collections.emptyMap();
+        }
+        ItemStack carrier = new ItemStack(Items.DIAMOND_PICKAXE);
+        CompoundNBT tag = new CompoundNBT();
+        tag.put("Enchantments", data.get("BreakEnchantments").copy());
+        carrier.setTag(tag);
+        return java.util.Collections.unmodifiableMap(EnchantmentHelper.getEnchantments(carrier));
     }
 
     @Override public void writeToStream(PacketBuffer data) throws java.io.IOException {

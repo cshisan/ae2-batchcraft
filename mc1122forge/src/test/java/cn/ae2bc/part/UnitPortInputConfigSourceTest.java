@@ -35,7 +35,7 @@ public final class UnitPortInputConfigSourceTest {
         assertTrue(port.contains("offered.isEmpty() || !allowsInputFilter(offered)"));
         assertTrue(port.contains("manager == null || !allowsInputFilter(stack)"));
         assertTrue(strategy.contains("!port.allowsInputFilter(drop)"));
-        assertTrue(strategy.contains("offered.isEmpty() || !port.allowsInputFilter(offered)"));
+        assertTrue(strategy.contains("manager.returnProduct(drop, false)"));
         assertTrue(port.contains("InputFilterMarkers"));
         assertTrue(port.contains("InputFilterInverter"));
     }

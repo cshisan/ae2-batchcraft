@@ -11,10 +11,15 @@ import appeng.api.storage.StorageHelper;
 import appeng.me.helpers.PlayerSource;
 import appeng.me.service.P2PService;
 import appeng.parts.p2p.P2PTunnelPart;
+import appeng.util.SettingsFrom;
+import cn.ae2bc.Ae2bcMod;
+import cn.ae2bc.core.unit.UnitPortType;
 import cn.ae2bc.part.PatternP2PTunnelPart;
+import cn.ae2bc.part.PatternP2PUnitPortPart;
 import cn.ae2bc.platform.ItemData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
@@ -56,7 +61,6 @@ public final class ComponentPlacementService {
         }
 
         IPartItem<?> cableItem = (IPartItem<?>) cable.getItem();
-        IPartItem<?> partItem = (IPartItem<?>) part.getItem();
         PlayerSource actionSource = new PlayerSource(player);
 
         int required = countEligibleTargets(level, player, positions);
@@ -98,7 +102,8 @@ public final class ComponentPlacementService {
                 continue;
             }
 
-            if (placeAt(level, player, pos, cableItem, partItem, settings.direction(), frequency)) {
+            if (placeAt(level, player, pos, cableItem, partReservation.stack(),
+                    settings.direction(), frequency)) {
                 placed++;
             } else {
                 refund(menuHost, player, actionSource, partReservation);
@@ -111,7 +116,7 @@ public final class ComponentPlacementService {
     }
 
     private static boolean placeAt(ServerLevel level, ServerPlayer player, BlockPos pos,
-                                    IPartItem<?> cableItem, IPartItem<?> partItem, Direction direction,
+                                    IPartItem<?> cableItem, ItemStack partStack, Direction direction,
                                    short frequency) {
         BlockSnapshot snapshot = BlockSnapshot.create(level.dimension(), level, pos);
         IPartHost host = PartHelper.getOrPlacePartHost(level, pos, false, player);
@@ -119,13 +124,13 @@ public final class ComponentPlacementService {
             return false;
         }
 
-        IPart cablePart = addPart(host, cableItem, null, player);
+        IPart cablePart = host.addPart(cableItem, null, player);
         if (cablePart == null || !isUnobstructed(level, pos, host)) {
             removePart(host, cablePart);
             return false;
         }
 
-        IPart placedPart = addPart(host, partItem, direction, player);
+        IPart placedPart = addPart(host, partStack, direction, player);
         if (placedPart == null || !isUnobstructed(level, pos, host)) {
             removePart(host, placedPart);
             removePart(host, cablePart);
@@ -191,8 +196,18 @@ public final class ComponentPlacementService {
         return available;
     }
 
-    private static IPart addPart(IPartHost host, IPartItem<?> partItem, Direction side, ServerPlayer player) {
-        return host.addPart(partItem, side, player);
+    private static IPart addPart(IPartHost host, ItemStack stack, Direction side, ServerPlayer player) {
+        if (!(stack.getItem() instanceof IPartItem<?> partItem)) {
+            return null;
+        }
+        IPart part = host.addPart(partItem, side, player);
+        if (part instanceof PatternP2PUnitPortPart unitPort && unitPort.getType() == UnitPortType.BREAK) {
+            CompoundTag data = stack.getTag();
+            if (data != null) {
+                unitPort.importSettings(SettingsFrom.DISMANTLE_ITEM, data, player);
+            }
+        }
+        return part;
     }
 
     private static boolean isUnobstructed(ServerLevel level, BlockPos pos, IPartHost host) {

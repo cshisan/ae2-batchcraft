@@ -8,6 +8,7 @@ import appeng.items.parts.ColoredPartItem;
 import appeng.api.util.AEColor;
 import cn.ae2bc.placer.ComponentPlacerItem;
 import cn.ae2bc.Ae2bcMod;
+import cn.ae2bc.item.PatternP2PUnitPortItem;
 import cn.ae2bc.part.PatternP2PTunnelPart;
 import cn.ae2bc.part.PatternP2PTunnelEnergyPart;
 import cn.ae2bc.part.PatternP2PUnitPortPart;
@@ -155,8 +156,8 @@ public final class ModContent {
 
     private static DeferredHolder<Item, PartItem<PatternP2PUnitPortPart>> patternP2PUnitPort(
             String id, UnitPortType type) {
-        return ITEMS.register(id, () -> new PartItem<>(new Item.Properties(),
-                PatternP2PUnitPortPart.class, item -> new PatternP2PUnitPortPart(item, type)));
+        return ITEMS.<PartItem<PatternP2PUnitPortPart>>register(id,
+                () -> new PatternP2PUnitPortItem(new Item.Properties(), type));
     }
 
     private static Map<AEColor, DeferredHolder<Item, ColoredPartItem<PatternP2PUnitManagerPart>>> registerPatternP2PUnitManagers() {

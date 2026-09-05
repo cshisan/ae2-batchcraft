@@ -10,6 +10,8 @@ import net.minecraft.entity.player.EntityPlayer;
 import net.minecraft.item.Item;
 import net.minecraft.item.ItemStack;
 import net.minecraft.client.util.ITooltipFlag;
+import net.minecraft.enchantment.Enchantment;
+import net.minecraft.enchantment.EnumEnchantmentType;
 import net.minecraft.world.World;
 import java.util.List;
 import net.minecraft.util.EnumActionResult;
@@ -31,6 +33,15 @@ public final class PatternP2PUnitPortItem extends Item implements IPartItem<Patt
     }
     @Override public PatternP2PUnitPortPart createPartFromItemStack(ItemStack stack) {
         return new PatternP2PUnitPortPart(stack, type);
+    }
+
+    @Override public boolean isEnchantable(ItemStack stack) { return type == UnitPortType.BREAK; }
+    @Override public int getItemEnchantability() { return type == UnitPortType.BREAK ? 10 : 0; }
+    @Override public boolean canApplyAtEnchantingTable(ItemStack stack, Enchantment enchantment) {
+        return type == UnitPortType.BREAK && enchantment.type == EnumEnchantmentType.DIGGER;
+    }
+    @Override public boolean isBookEnchantable(ItemStack stack, ItemStack book) {
+        return type == UnitPortType.BREAK;
     }
     @Override public EnumActionResult onItemUse(EntityPlayer player, World world, BlockPos pos,
             EnumHand hand, EnumFacing facing, float hitX, float hitY, float hitZ) {
