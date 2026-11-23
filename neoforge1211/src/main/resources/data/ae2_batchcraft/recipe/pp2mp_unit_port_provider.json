@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "redstone",
+  "ingredients": [
+    {
+      "item": "ae2:export_bus"
+    },
+    {
+      "item": "ae2:engineering_processor"
+    }
+  ],
+  "result": {
+    "id": "ae2_batchcraft:pp2mp_unit_port_provider",
+    "count": 1
+  }
+}

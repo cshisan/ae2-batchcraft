@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "redstone",
+  "ingredients": [
+    {
+      "tag": "ae2_batchcraft:pp2mp_unit_managers"
+    },
+    {
+      "tag": "c:dyes/light_blue"
+    }
+  ],
+  "result": {
+    "id": "ae2_batchcraft:pp2mp_unit_manager_light_blue",
+    "count": 1
+  }
+}

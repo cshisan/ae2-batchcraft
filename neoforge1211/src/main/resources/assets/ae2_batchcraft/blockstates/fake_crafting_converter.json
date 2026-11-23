@@ -1,0 +1,7 @@
+{
+  "variants": {
+    "": {
+      "model": "ae2_batchcraft:block/fake_crafting_converter"
+    }
+  }
+}

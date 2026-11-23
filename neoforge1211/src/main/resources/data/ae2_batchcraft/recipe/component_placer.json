@@ -1,0 +1,27 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "equipment",
+  "pattern": [
+    " I ",
+    "RWR",
+    " O "
+  ],
+  "key": {
+    "I": {
+      "item": "ae2_batchcraft:pp2mp_input"
+    },
+    "O": {
+      "item": "ae2_batchcraft:pp2mp_output"
+    },
+    "R": {
+      "item": "minecraft:redstone"
+    },
+    "W": {
+      "item": "ae2:wireless_terminal"
+    }
+  },
+  "result": {
+    "id": "ae2_batchcraft:component_placer",
+    "count": 1
+  }
+}

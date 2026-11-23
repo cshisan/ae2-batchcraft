@@ -1,0 +1,18 @@
+{
+  "$schema": "../schema.json",
+  "includes": [
+    "../terminals/pattern_encoding_terminal.json"
+  ],
+  "slots": {
+    "AE2BC_REAL_OUTPUT_MARKER": {
+      "left": 147,
+      "bottom": 153
+    }
+  },
+  "widgets": {
+    "encodePattern": {
+      "left": 147,
+      "bottom": 127
+    }
+  }
+}

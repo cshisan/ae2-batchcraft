@@ -1,0 +1,126 @@
+{
+  "$schema": "../schema.json",
+  "includes": [
+    "../common/common.json",
+    "screen_header.json"
+  ],
+  "generatedBackground": {
+    "width": 176,
+    "height": 141
+  },
+  "text": {
+    "dialog_title": {
+      "text": {
+        "translate": "gui.ae2_batchcraft.material_output_config.title",
+        "font": "minecraft:default",
+        "bold": false,
+        "italic": false
+      },
+      "scale": 1.0,
+      "position": {
+        "left": 8,
+        "top": 6
+      }
+    },
+    "output_direction": {
+      "text": {
+        "translate": "gui.ae2_batchcraft.output_direction",
+        "font": "minecraft:default",
+        "bold": false,
+        "italic": false
+      },
+      "scale": 1.0,
+      "position": {
+        "left": 8,
+        "top": 23
+      }
+    },
+    "output_form": {
+      "text": {
+        "translate": "gui.ae2_batchcraft.material_output_form",
+        "font": "minecraft:default",
+        "bold": false,
+        "italic": false
+      },
+      "scale": 1.0,
+      "position": {
+        "left": 8,
+        "top": 103
+      }
+    }
+  },
+  "widgets": {
+    "auto": {
+      "left": 118,
+      "top": 35,
+      "width": 50,
+      "height": 18
+    },
+    "back": {
+      "left": 152,
+      "top": -5,
+      "width": 20,
+      "height": 20
+    },
+    "front": {
+      "left": 63,
+      "top": 35,
+      "width": 50,
+      "height": 18
+    },
+    "left": {
+      "left": 8,
+      "top": 56,
+      "width": 50,
+      "height": 18
+    },
+    "up": {
+      "left": 63,
+      "top": 56,
+      "width": 50,
+      "height": 18
+    },
+    "right": {
+      "left": 118,
+      "top": 56,
+      "width": 50,
+      "height": 18
+    },
+    "down": {
+      "left": 8,
+      "top": 77,
+      "width": 50,
+      "height": 18
+    },
+    "opposite": {
+      "left": 63,
+      "top": 77,
+      "width": 50,
+      "height": 18
+    },
+    "outputnormal": {
+      "left": 8,
+      "top": 115,
+      "width": 37,
+      "height": 18
+    },
+    "outputdrop": {
+      "left": 49,
+      "top": 115,
+      "width": 37,
+      "height": 18
+    },
+    "outputplace": {
+      "left": 90,
+      "top": 115,
+      "width": 37,
+      "height": 18
+    },
+    "outputfake_crafting_converter": {
+      "left": 131,
+      "top": 115,
+      "width": 37,
+      "height": 18
+    }
+  }
+}

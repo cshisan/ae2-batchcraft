@@ -1,0 +1,61 @@
+{
+  "$schema": "../schema.json",
+  "includes": [
+    "pp2mp_network_encoding_terminal.json"
+  ],
+  "terminalStyle": {
+    "slotsPerRow": 1,
+    "sortable": false,
+    "header": {
+      "texture": "guis/pattern.png",
+      "srcRect": [
+        0,
+        0,
+        175,
+        0
+      ]
+    },
+    "firstRow": {
+      "texture": "guis/pattern.png",
+      "srcRect": [
+        0,
+        17,
+        175,
+        0
+      ]
+    },
+    "row": {
+      "texture": "guis/pattern.png",
+      "srcRect": [
+        0,
+        35,
+        175,
+        32767
+      ]
+    },
+    "lastRow": {
+      "texture": "guis/pattern.png",
+      "srcRect": [
+        0,
+        53,
+        175,
+        0
+      ]
+    },
+    "bottom": {
+      "texture": "guis/pattern.png",
+      "srcRect": [
+        0,
+        71,
+        175,
+        180
+      ]
+    }
+  },
+  "widgets": {
+    "scrollbar": {
+      "left": -10000,
+      "top": 0
+    }
+  }
+}

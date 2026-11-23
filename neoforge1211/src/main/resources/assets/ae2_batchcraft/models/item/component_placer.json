@@ -1,0 +1,6 @@
+{
+  "parent": "ae2:item/wireless_terminal",
+  "textures": {
+    "layer0": "ae2_batchcraft:item/component_placer"
+  }
+}

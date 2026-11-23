@@ -1,0 +1,57 @@
+{
+  "$schema": "../schema.json",
+  "includes": [
+    "../common/common.json",
+    "screen_header.json"
+  ],
+  "generatedBackground": {
+    "width": 256,
+    "height": 124
+  },
+  "text": {
+    "dialog_title": {
+      "text": {
+        "translate": "gui.ae2_batchcraft.reset_task.confirm.title",
+        "font": "minecraft:default",
+        "bold": false,
+        "italic": false
+      },
+      "scale": 1.0,
+      "position": {
+        "left": 8,
+        "top": 6
+      }
+    },
+    "warning": {
+      "position": {
+        "left": 8,
+        "top": 23
+      },
+      "maxWidth": 240
+    }
+  },
+  "images": {
+    "title_separator_dark": {
+      "texture": "guis/background.png",
+      "srcRect": [4, 253, 242, 1]
+    },
+    "title_separator_light": {
+      "texture": "guis/background.png",
+      "srcRect": [4, 1, 242, 1]
+    }
+  },
+  "widgets": {
+    "confirm": {
+      "left": 8,
+      "top": 98,
+      "width": 112,
+      "height": 18
+    },
+    "cancel": {
+      "left": 136,
+      "top": 98,
+      "width": 112,
+      "height": 18
+    }
+  }
+}

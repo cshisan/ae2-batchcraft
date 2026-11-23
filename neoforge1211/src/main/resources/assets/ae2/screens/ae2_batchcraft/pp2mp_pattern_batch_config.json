@@ -1,0 +1,49 @@
+{
+  "$schema": "../schema.json",
+  "includes": [
+    "../common/common.json",
+    "screen_header.json"
+  ],
+  "generatedBackground": {
+    "width": 176,
+    "height": 95
+  },
+  "text": {
+    "dialog_title": {
+      "text": {
+        "translate": "gui.ae2_batchcraft.pattern_batch_count.title",
+        "font": "minecraft:default",
+        "bold": false,
+        "italic": false
+      },
+      "scale": 1.0,
+      "position": {
+        "left": 8,
+        "top": 6
+      }
+    },
+    "batch_count": {
+      "text": {
+        "translate": "gui.ae2_batchcraft.pattern_batch_count"
+      },
+      "position": {
+        "left": 12,
+        "top": 23
+      }
+    }
+  },
+  "widgets": {
+    "back": {
+      "left": 152,
+      "top": -5,
+      "width": 20,
+      "height": 20
+    },
+    "confirm": {
+      "left": 112,
+      "top": 38,
+      "width": 52,
+      "height": 18
+    }
+  }
+}

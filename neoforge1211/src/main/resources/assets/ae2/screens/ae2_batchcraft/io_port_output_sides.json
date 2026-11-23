@@ -1,0 +1,30 @@
+{
+  "$schema": "../schema.json",
+  "includes": ["../common/common.json", "screen_header.json"],
+  "generatedBackground": {
+    "width": 176,
+    "height": 116
+  },
+  "text": {
+    "dialog_title": {
+      "text": {
+        "translate": "gui.ae2_batchcraft.io_port.output_sides",
+        "font": "minecraft:default",
+        "bold": false,
+        "italic": false
+      },
+      "scale": 1.0,
+      "position": { "left": 8, "top": 6 }
+    }
+  },
+  "widgets": {
+    "front": { "left": 78, "top": 50 },
+    "back": { "left": 100, "top": 72 },
+    "top": { "left": 78, "top": 28 },
+    "bottom": { "left": 78, "top": 72 },
+    "left": { "left": 100, "top": 50 },
+    "right": { "left": 56, "top": 50 },
+    "clear": { "right": 26, "bottom": 28 },
+    "return": { "right": 23, "top": -5 }
+  }
+}

@@ -1,0 +1,9 @@
+{
+  "$schema": "../schema.json",
+  "includes": [
+    "../common/common.json",
+    "pp2mp_general.json",
+    "pp2mp_output_widgets.json",
+    "pp2mp_unit_widgets.json"
+  ]
+}

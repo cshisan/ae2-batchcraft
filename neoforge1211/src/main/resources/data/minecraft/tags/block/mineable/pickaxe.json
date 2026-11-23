@@ -1,0 +1,7 @@
+{
+  "replace": false,
+  "values": [
+    "ae2_batchcraft:io_port",
+    "ae2_batchcraft:fake_crafting_converter"
+  ]
+}

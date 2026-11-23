@@ -1,0 +1,106 @@
+{
+  "$schema": "../schema.json",
+  "includes": [
+    "../common/common.json",
+    "../common/player_inventory.json",
+    "screen_header.json"
+  ],
+  "generatedBackground": {
+    "width": 176,
+    "height": 225
+  },
+  "slots": {
+    "CONFIG": {
+      "left": 8,
+      "top": 90,
+      "grid": "BREAK_AFTER_9COLS"
+    },
+    "PLAYER_INVENTORY": {
+      "left": 8,
+      "top": 141,
+      "grid": "BREAK_AFTER_9COLS"
+    },
+    "PLAYER_HOTBAR": {
+      "left": 8,
+      "top": 199,
+      "grid": "HORIZONTAL"
+    }
+  },
+  "text": {
+    "dialog_title": {
+      "text": {
+        "translate": "gui.ae2_batchcraft.unit_port_output_type.title",
+        "font": "minecraft:default",
+        "bold": false,
+        "italic": false
+      },
+      "scale": 1,
+      "position": {
+        "left": 8,
+        "top": 6
+      }
+    },
+    "markers": {
+      "text": {
+        "translate": "gui.ae2_batchcraft.unit_port_output_type.markers",
+        "bold": false
+      },
+      "position": {
+        "left": 8,
+        "top": 78
+      }
+    },
+    "player_inventory_title": {
+      "text": {
+        "translate": "container.inventory",
+        "bold": false
+      },
+      "position": {
+        "left": 8,
+        "top": 129
+      }
+    },
+    "feeding_mode_label": {
+      "text": {
+        "translate": "gui.ae2_batchcraft.feeding_mode.title",
+        "bold": false
+      },
+      "position": {
+        "left": 8,
+        "top": 23
+      }
+    }
+  },
+  "widgets": {
+    "sync": {
+      "left": 125,
+      "top": 21,
+      "width": 80,
+      "height": 12
+    },
+    "feeding_mode_normal": {
+      "left": 8,
+      "top": 34,
+      "width": 78,
+      "height": 18
+    },
+    "feeding_mode_slot_exclusive": {
+      "left": 90,
+      "top": 34,
+      "width": 78,
+      "height": 18
+    },
+    "feeding_mode_single": {
+      "left": 8,
+      "top": 54,
+      "width": 78,
+      "height": 18
+    },
+    "feeding_mode_same_type": {
+      "left": 90,
+      "top": 54,
+      "width": 78,
+      "height": 18
+    }
+  }
+}

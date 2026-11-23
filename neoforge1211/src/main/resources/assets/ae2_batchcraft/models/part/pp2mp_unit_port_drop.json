@@ -1,0 +1,7 @@
+{
+  "parent": "ae2:part/p2p/p2p_tunnel_base",
+  "textures": {
+    "type": "ae2_batchcraft:part/pp2mp_unit_port_drop"
+  },
+  "loader": "ae2_batchcraft:pp2mp_unit_port"
+}

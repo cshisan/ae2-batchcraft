@@ -1,0 +1,71 @@
+{
+  "$schema": "../schema.json",
+  "includes": [
+    "screen_header.json"
+  ],
+  "generatedBackground": {
+    "width": 172,
+    "height": 134
+  },
+  "text": {
+    "page_title": {
+      "text": {
+        "text": "",
+        "font": "minecraft:default",
+        "bold": false,
+        "italic": false
+      },
+      "scale": 1.0,
+      "position": {
+        "left": 8,
+        "top": 23
+      }
+    }
+  },
+  "images": {
+    "title_separator_dark": {
+      "texture": "guis/background.png",
+      "srcRect": [4, 253, 158, 1]
+    },
+    "title_separator_light": {
+      "texture": "guis/background.png",
+      "srcRect": [4, 1, 158, 1]
+    }
+  },
+  "widgets": {
+    "general_return_strict": {
+      "left": 12,
+      "top": 50,
+      "width": 71,
+      "height": 18
+    },
+    "general_return_unblocked": {
+      "left": 89,
+      "top": 50,
+      "width": 71,
+      "height": 18
+    },
+    "extraction_interval": {
+      "left": 100,
+      "top": 94,
+      "width": 36,
+      "height": 12
+    },
+    "extraction_quantity": {
+      "left": 100,
+      "top": 110,
+      "width": 36,
+      "height": 12
+    },
+    "rightToolbar": {
+      "right": 2,
+      "top": 0
+    },
+    "general_sync": {
+      "left": 12,
+      "top": 25,
+      "width": 18,
+      "height": 18
+    }
+  }
+}

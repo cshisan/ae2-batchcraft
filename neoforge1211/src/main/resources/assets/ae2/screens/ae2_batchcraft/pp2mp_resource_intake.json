@@ -1,0 +1,86 @@
+{
+  "$schema": "../schema.json",
+  "includes": [
+    "../common/common.json",
+    "screen_header.json"
+  ],
+  "generatedBackground": {
+    "width": 172,
+    "height": 182
+  },
+  "text": {
+    "dialog_title": {
+      "text": {
+        "translate": "item.ae2_batchcraft.pp2mp_resource_intake",
+        "font": "minecraft:default",
+        "bold": false,
+        "italic": false
+      },
+      "scale": 1.0,
+      "position": {
+        "left": 8,
+        "top": 6
+      }
+    }
+  },
+  "images": {
+    "title_separator_dark": {
+      "texture": "guis/background.png",
+      "srcRect": [4, 253, 158, 1]
+    },
+    "title_separator_light": {
+      "texture": "guis/background.png",
+      "srcRect": [4, 1, 158, 1]
+    }
+  },
+  "widgets": {
+    "passive": {
+      "left": 12,
+      "top": 34,
+      "width": 71,
+      "height": 18
+    },
+    "active": {
+      "left": 89,
+      "top": 34,
+      "width": 71,
+      "height": 18
+    },
+    "extraction_interval": {
+      "left": 100,
+      "top": 59,
+      "width": 36,
+      "height": 12
+    },
+    "extraction_quantity": {
+      "left": 100,
+      "top": 73,
+      "width": 36,
+      "height": 12
+    },
+    "distribution_round_robin": {
+      "left": 12,
+      "top": 107,
+      "width": 46,
+      "height": 18
+    },
+    "distribution_priority": {
+      "left": 63,
+      "top": 107,
+      "width": 46,
+      "height": 18
+    },
+    "distribution_even": {
+      "left": 114,
+      "top": 107,
+      "width": 46,
+      "height": 18
+    },
+    "provider_filter": {
+      "left": 12,
+      "top": 149,
+      "width": 148,
+      "height": 18
+    }
+  }
+}

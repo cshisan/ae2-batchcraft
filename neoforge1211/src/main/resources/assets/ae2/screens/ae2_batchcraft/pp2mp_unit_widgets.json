@@ -1,0 +1,95 @@
+{
+  "$schema": "../schema.json",
+  "widgets": {
+    "unit_break_pickup_enabled": {
+      "left": 12,
+      "top": 50,
+      "width": 71,
+      "height": 18
+    },
+    "unit_break_pickup_disabled": {
+      "left": 89,
+      "top": 50,
+      "width": 71,
+      "height": 18
+    },
+    "unit_redstone_single": {
+      "left": 12,
+      "top": 50,
+      "width": 46,
+      "height": 18
+    },
+    "unit_redstone_periodic": {
+      "left": 63,
+      "top": 50,
+      "width": 46,
+      "height": 18
+    },
+    "unit_redstone_continuous": {
+      "left": 114,
+      "top": 50,
+      "width": 46,
+      "height": 18
+    },
+    "unit_redstone_strength": {
+      "left": 104,
+      "top": 94,
+      "width": 36,
+      "height": 12
+    },
+    "unit_redstone_pulse_width": {
+      "left": 104,
+      "top": 110,
+      "width": 36,
+      "height": 12
+    },
+    "unit_redstone_pulse_period": {
+      "left": 104,
+      "top": 126,
+      "width": 36,
+      "height": 12
+    },
+    "unit_subpage_general": {
+      "left": 6,
+      "top": 20,
+      "width": 52,
+      "height": 14
+    },
+    "unit_subpage_break": {
+      "left": 60,
+      "top": 20,
+      "width": 52,
+      "height": 14
+    },
+    "unit_subpage_redstone": {
+      "left": 114,
+      "top": 20,
+      "width": 52,
+      "height": 14
+    },
+    "feeding_mode_normal": {
+      "left": 12,
+      "top": 52,
+      "width": 74,
+      "height": 18
+    },
+    "feeding_mode_slot_exclusive": {
+      "left": 90,
+      "top": 52,
+      "width": 74,
+      "height": 18
+    },
+    "feeding_mode_single": {
+      "left": 12,
+      "top": 72,
+      "width": 74,
+      "height": 18
+    },
+    "feeding_mode_same_type": {
+      "left": 90,
+      "top": 72,
+      "width": 74,
+      "height": 18
+    }
+  }
+}

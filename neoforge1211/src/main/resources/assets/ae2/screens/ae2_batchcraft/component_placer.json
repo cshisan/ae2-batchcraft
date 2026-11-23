@@ -1,0 +1,318 @@
+{
+  "$schema": "../schema.json",
+  "includes": [
+    "../common/common.json"
+  ],
+  "generatedBackground": {
+    "width": 176,
+    "height": 240
+  },
+  "slots": {
+    "AE2BC_PLACER_CABLE": {
+      "left": 20,
+      "top": 34,
+      "grid": "HORIZONTAL"
+    },
+    "AE2BC_PLACER_PART": {
+      "left": 60,
+      "top": 34,
+      "grid": "HORIZONTAL"
+    },
+    "STORAGE": {
+      "left": 8,
+      "top": 127,
+      "grid": "HORIZONTAL"
+    },
+    "PLAYER_INVENTORY": {
+      "left": 8,
+      "bottom": 84,
+      "grid": "BREAK_AFTER_9COLS"
+    },
+    "PLAYER_HOTBAR": {
+      "left": 8,
+      "bottom": 26,
+      "grid": "HORIZONTAL"
+    }
+  },
+  "text": {
+    "dialog_title": {
+      "text": {
+        "translate": "gui.ae2_batchcraft.component_placer.title",
+        "font": "minecraft:default",
+        "bold": false,
+        "italic": false
+      },
+      "scale": 1.0,
+      "position": {
+        "left": 8,
+        "top": 6
+      }
+    },
+    "cable_label": {
+      "text": {
+        "translate": "gui.ae2_batchcraft.component_placer.cable"
+      },
+      "position": {
+        "left": 28,
+        "top": 23
+      },
+      "align": "CENTER"
+    },
+    "part_label": {
+      "text": {
+        "translate": "gui.ae2_batchcraft.component_placer.part"
+      },
+      "position": {
+        "left": 68,
+        "top": 23
+      },
+      "align": "CENTER"
+    },
+    "frequencyText": {
+      "text": {
+        "translate": "gui.ae2_batchcraft.component_placer.frequency"
+      },
+      "position": {
+        "left": 108,
+        "top": 23
+      },
+      "align": "CENTER"
+    },
+    "unitIdText": {
+      "text": {
+        "translate": "gui.ae2_batchcraft.component_placer.unit_id"
+      },
+      "position": {
+        "left": 148,
+        "top": 23
+      },
+      "align": "CENTER"
+    },
+    "modeText": {
+      "text": {
+        "translate": "gui.ae2_batchcraft.component_placer.mode.placement"
+      },
+      "position": {
+        "left": 168,
+        "top": 6
+      },
+      "align": "RIGHT"
+    },
+    "offsetX": {
+      "text": {
+        "text": "X: 0"
+      },
+      "position": {
+        "left": 36,
+        "top": 56
+      },
+      "align": "CENTER"
+    },
+    "offsetY": {
+      "text": {
+        "text": "Y: 0"
+      },
+      "position": {
+        "left": 36,
+        "top": 71
+      },
+      "align": "CENTER"
+    },
+    "offsetZ": {
+      "text": {
+        "text": "Z: 0"
+      },
+      "position": {
+        "left": 36,
+        "top": 86
+      },
+      "align": "CENTER"
+    },
+    "materials_label": {
+      "text": {
+        "translate": "gui.ae2_batchcraft.component_placer.materials"
+      },
+      "position": {
+        "left": 8,
+        "top": 117
+      }
+    },
+    "aeLinkWarning": {
+      "text": {
+        "translate": "gui.ae2_batchcraft.component_placer.not_linked",
+        "color": "red"
+      },
+      "position": {
+        "left": 168,
+        "top": 117
+      },
+      "align": "RIGHT"
+    },
+    "aeLinkConnected": {
+      "text": {
+        "translate": "gui.ae2_batchcraft.component_placer.linked",
+        "color": "green"
+      },
+      "position": {
+        "left": 168,
+        "top": 117
+      },
+      "align": "RIGHT"
+    },
+    "player_inventory_title": {
+      "text": {
+        "translate": "container.inventory"
+      },
+      "position": {
+        "left": 8,
+        "top": 146
+      }
+    }
+  },
+  "tooltips": {
+    "cable_label": {
+      "left": 8,
+      "top": 21,
+      "width": 40,
+      "height": 12,
+      "tooltip": [
+        { "translate": "gui.ae2_batchcraft.component_placer.cable" },
+        { "translate": "gui.ae2_batchcraft.component_placer.cable.tooltip" }
+      ]
+    },
+    "part_label": {
+      "left": 48,
+      "top": 21,
+      "width": 40,
+      "height": 12,
+      "tooltip": [
+        { "translate": "gui.ae2_batchcraft.component_placer.part" },
+        { "translate": "gui.ae2_batchcraft.component_placer.part.tooltip" }
+      ]
+    },
+    "frequency_label": {
+      "left": 88,
+      "top": 21,
+      "width": 40,
+      "height": 12,
+      "tooltip": [
+        { "translate": "gui.ae2_batchcraft.component_placer.frequency" },
+        { "translate": "gui.ae2_batchcraft.component_placer.frequency.tooltip" }
+      ]
+    },
+    "unit_id_label": {
+      "left": 128,
+      "top": 21,
+      "width": 40,
+      "height": 12,
+      "tooltip": [
+        { "translate": "gui.ae2_batchcraft.component_placer.unit_id" },
+        { "translate": "gui.ae2_batchcraft.component_placer.unit_id.tooltip" }
+      ]
+    }
+  },
+  "widgets": {
+    "frequency": {
+      "left": 101,
+      "top": 35,
+      "width": 14,
+      "height": 14
+    },
+    "unitId": {
+      "left": 141,
+      "top": 35,
+      "width": 14,
+      "height": 14
+    },
+    "directionFront": {
+      "left": 106,
+      "top": 53,
+      "width": 32,
+      "height": 14
+    },
+    "directionLeft": {
+      "left": 72,
+      "top": 68,
+      "width": 32,
+      "height": 14
+    },
+    "directionUp": {
+      "left": 106,
+      "top": 68,
+      "width": 32,
+      "height": 14
+    },
+    "directionRight": {
+      "left": 140,
+      "top": 68,
+      "width": 32,
+      "height": 14
+    },
+    "directionDown": {
+      "left": 72,
+      "top": 83,
+      "width": 32,
+      "height": 14
+    },
+    "directionBack": {
+      "left": 106,
+      "top": 83,
+      "width": 32,
+      "height": 14
+    },
+    "offsetXMinus": {
+      "left": 8,
+      "top": 53,
+      "width": 14,
+      "height": 14
+    },
+    "offsetXPlus": {
+      "left": 51,
+      "top": 53,
+      "width": 14,
+      "height": 14
+    },
+    "offsetYMinus": {
+      "left": 8,
+      "top": 68,
+      "width": 14,
+      "height": 14
+    },
+    "offsetYPlus": {
+      "left": 51,
+      "top": 68,
+      "width": 14,
+      "height": 14
+    },
+    "offsetZMinus": {
+      "left": 8,
+      "top": 83,
+      "width": 14,
+      "height": 14
+    },
+    "offsetZPlus": {
+      "left": 51,
+      "top": 83,
+      "width": 14,
+      "height": 14
+    },
+    "resetOffsets": {
+      "left": 8,
+      "top": 100,
+      "width": 48,
+      "height": 14
+    },
+    "clearSelection": {
+      "left": 58,
+      "top": 100,
+      "width": 60,
+      "height": 14
+    },
+    "execute": {
+      "left": 120,
+      "top": 100,
+      "width": 48,
+      "height": 14
+    }
+  }
+}

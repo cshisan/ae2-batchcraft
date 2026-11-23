@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "redstone",
+  "ingredients": [
+    {
+      "item": "ae2:level_emitter"
+    },
+    {
+      "item": "ae2:logic_processor"
+    }
+  ],
+  "result": {
+    "id": "ae2_batchcraft:pp2mp_unit_port_redstone",
+    "count": 1
+  }
+}

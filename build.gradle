@@ -1,0 +1,71 @@
+plugins {
+    id 'base'
+    id 'java-base'
+}
+
+def buildModulePaths = [
+        project_module_shared,
+        project_module_neoforge1211
+]
+
+tasks.register('buildAll') {
+    group = 'build'
+    description = 'Builds shared code and every supported platform.'
+    dependsOn buildModulePaths.collect { "${it}:build" }
+}
+
+tasks.register('cleanAll') {
+    group = 'build setup'
+    description = 'Cleans the root project and every subproject.'
+    dependsOn 'clean', buildModulePaths.collect { "${it}:clean" }
+}
+
+subprojects {
+    repositories {
+        mavenCentral()
+        if (project.name != project_module_shared) {
+            repositories {
+                exclusiveContent {
+                    forRepository {
+                        maven { url = 'https://maven.blamejared.com/' }
+                    }
+                    filter { includeGroup 'mezz.jei' }
+                }
+                exclusiveContent {
+                    forRepository {
+                        maven { url = 'https://modmaven.dev/' }
+                    }
+                    filter { includeGroup 'appeng' }
+                }
+            }
+        }
+    }
+
+    plugins.withId('java') {
+        dependencies {
+            add('compileOnly', 'org.jspecify:jspecify:1.0.0')
+            add('compileOnly', 'org.projectlombok:lombok:1.18.30')
+            add('annotationProcessor', 'org.projectlombok:lombok:1.18.30')
+            add('testImplementation', 'org.junit.jupiter:junit-jupiter-api:5.11.4')
+            add('testRuntimeOnly', 'org.junit.jupiter:junit-jupiter-engine:5.11.4')
+            add('testRuntimeOnly', 'org.junit.platform:junit-platform-launcher:1.11.4')
+        }
+
+        tasks.named('test', Test) {
+            useJUnitPlatform()
+        }
+    }
+
+
+
+    if (project_module_shared.endsWith(project.name)) {
+        apply plugin: 'idea'
+        idea {
+            module {
+                downloadSources = true
+                downloadJavadoc = true
+            }
+        }
+    }
+}
+

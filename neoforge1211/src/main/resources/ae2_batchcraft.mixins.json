@@ -1,0 +1,17 @@
+{
+  "required": true,
+  "minVersion": "0.8",
+  "package": "org.ae2bc.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "PatternProviderLogicAccessor",
+    "PatternProviderLogicMixin",
+    "PatternProviderReturnInventoryMixin"
+  ],
+  "client": [
+    "PriorityScreenMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}

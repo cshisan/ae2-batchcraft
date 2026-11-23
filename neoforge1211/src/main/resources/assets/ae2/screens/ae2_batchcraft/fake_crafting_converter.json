@@ -1,0 +1,69 @@
+{
+  "$schema": "../schema.json",
+  "includes": [
+    "../common/common.json",
+    "../common/player_inventory.json",
+    "screen_header.json"
+  ],
+  "generatedBackground": {
+    "width": 178,
+    "height": 172
+  },
+  "slots": {
+    "ae2_batchcraft_fake_input_markers": {
+      "left": 8,
+      "top": 24,
+      "grid": "HORIZONTAL"
+    },
+    "ae2_batchcraft_fake_output_markers": {
+      "left": 8,
+      "top": 55,
+      "grid": "HORIZONTAL"
+    },
+    "PLAYER_INVENTORY": {
+      "left": 8,
+      "top": 88,
+      "grid": "BREAK_AFTER_9COLS"
+    },
+    "PLAYER_HOTBAR": {
+      "left": 8,
+      "top": 146,
+      "grid": "HORIZONTAL"
+    }
+  },
+  "text": {
+    "dialog_title": {
+      "text": {
+        "translate": "block.ae2_batchcraft.fake_crafting_converter",
+        "font": "minecraft:default",
+        "bold": false,
+        "italic": false
+      },
+      "scale": 1.0,
+      "position": {
+        "left": 8,
+        "top": 6
+      }
+    },
+    "player_inventory_title": {
+      "text": {
+        "translate": "container.inventory",
+        "bold": false
+      },
+      "position": {
+        "left": 8,
+        "top": 76
+      }
+    }
+  },
+  "images": {
+    "title_separator_dark": {
+      "texture": "guis/background.png",
+      "srcRect": [4, 253, 164, 1]
+    },
+    "title_separator_light": {
+      "texture": "guis/background.png",
+      "srcRect": [4, 1, 164, 1]
+    }
+  }
+}

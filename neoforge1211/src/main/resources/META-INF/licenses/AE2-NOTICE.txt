@@ -1,0 +1,16 @@
+BatchCraft IO Port
+
+Ae2bcIoPortBlockEntity adapts the storage-cell transfer algorithm of Applied
+Energistics 2, appeng.blockentity.storage.IOPortBlockEntity (19.2.17).
+Copyright (c) 2013 - 2014, AlgorithmX2, All rights reserved.
+
+Source: https://github.com/AppliedEnergistics/Applied-Energistics-2
+License: GNU Lesser General Public License, version 3 or any later version.
+See LGPL-3.0.txt and GPL-3.0.txt in this directory.
+
+Changes: independent block and menu, five upgrade slots, higher operation
+budget, configurable completed-cell routing, explicit redstone gating,
+retry while destinations are blocked, and explicit inventory persistence.
+
+The adapted implementation remains available under LGPL-3.0-or-later,
+without any warranty, including merchantability or fitness for a purpose.

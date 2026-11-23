@@ -1,0 +1,30 @@
+ExtendedAE IO Port model, textures and output-sides icon
+
+The resource assets/ae2_batchcraft/textures/gui/btn/output_sides.png
+is derived from ExtendedAE by GlodBlock and contributors.
+Source: ExtendedAE-1.21-2.2.42-neoforge.jar,
+assets/extendedae/textures/guis/nicons.png.
+Change: cropped the 16x16 region at (0, 16), without rescaling or recoloring.
+
+Project: https://github.com/GlodBlock/ExtendedAE
+Source branch: https://github.com/GlodBlock/ExtendedAE/tree/1.21-neoforge
+License: GNU Lesser General Public License, version 3.
+The icon remains available under that license.
+See LGPL-3.0.txt and GPL-3.0.txt in this directory.
+
+The corresponding editable image is the PNG resource itself.
+docs/images/import-io-port-icon.ps1 reproduces the crop from the source jar.
+
+The block/io_port models and textures are derived from the same jar:
+assets/extendedae/models/block/ex_io_port.json,
+assets/extendedae/blockstates/ex_io_port.json,
+assets/extendedae/textures/block/ex_io_port_front[_off].png,
+assets/extendedae/textures/block/ex_io_port_top[_off].png,
+assets/extendedae/textures/block/generics/back.png and generics/side.png.
+
+Changes: renamed resources to ae2_batchcraft:io_port; replaced green palette
+65E883/D0FB9D/F4FFB5 with the existing pattern-provider orange palette
+B76E22/CE9835/E8C64B. Geometry, pixel dimensions and other colors are preserved.
+The powered model inherits the local unpowered geometry and swaps front/top.
+These derived assets remain under LGPL-3.0.
+docs/images/import-io-port-model.ps1 reproduces the import and recoloring.

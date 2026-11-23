@@ -1,0 +1,7 @@
+{
+  "loader": "ae2_batchcraft:unshaded",
+  "parent": "ae2:part/p2p/p2p_tunnel_base",
+  "textures": {
+    "type": "ae2:part/pattern_provider"
+  }
+}

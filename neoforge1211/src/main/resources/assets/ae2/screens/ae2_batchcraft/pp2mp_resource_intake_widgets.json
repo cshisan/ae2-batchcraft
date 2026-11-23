@@ -1,0 +1,11 @@
+{
+  "$schema": "../schema.json",
+  "widgets": {
+    "provider_filter": {
+      "left": 12,
+      "top": 50,
+      "width": 148,
+      "height": 18
+    }
+  }
+}

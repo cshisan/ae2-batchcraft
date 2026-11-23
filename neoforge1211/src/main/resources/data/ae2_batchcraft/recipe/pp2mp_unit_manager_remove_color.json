@@ -1,0 +1,22 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "redstone",
+  "ingredients": [
+    {
+      "type": "neoforge:difference",
+      "base": {
+        "tag": "ae2_batchcraft:pp2mp_unit_managers"
+      },
+      "subtracted": {
+        "item": "ae2_batchcraft:pp2mp_unit_manager_fluix"
+      }
+    },
+    {
+      "tag": "ae2:can_remove_color"
+    }
+  ],
+  "result": {
+    "id": "ae2_batchcraft:pp2mp_unit_manager_fluix",
+    "count": 1
+  }
+}

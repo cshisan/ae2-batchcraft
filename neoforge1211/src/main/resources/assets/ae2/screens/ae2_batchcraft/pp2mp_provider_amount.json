@@ -1,0 +1,63 @@
+{
+  "$schema": "../schema.json",
+  "includes": [
+    "../set_processing_pattern_amount.json",
+    "screen_header.json"
+  ],
+  "background": null,
+  "generatedBackground": {
+    "width": 176,
+    "height": 94
+  },
+  "text": {
+    "dialog_title": {
+      "text": {
+        "translate": "gui.ae2.SelectAmount",
+        "font": "minecraft:default",
+        "bold": false,
+        "italic": false
+      },
+      "scale": 1.0,
+      "position": {
+        "left": 8,
+        "top": 6
+      }
+    }
+  },
+  "slots": {
+    "MACHINE_OUTPUT": {
+      "left": 23,
+      "top": 46
+    }
+  },
+  "images": {
+    "amount_slot": {
+      "texture": "guis/craft_amt.png",
+      "srcRect": [22, 52, 18, 18]
+    }
+  },
+  "widgets": {
+    "amount_slot": {
+      "left": 22,
+      "top": 45
+    },
+    "amountToStock": {
+      "left": 20,
+      "top": 23,
+      "width": 138,
+      "height": 62
+    },
+    "amountToStockInput": {
+      "left": 48,
+      "top": 48,
+      "width": 66,
+      "height": 12
+    },
+    "save": {
+      "left": 120,
+      "top": 44,
+      "width": 38,
+      "height": 20
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": ["SLS", "LIL", "SLS"],
+  "key": {
+    "S": { "item": "ae2:speed_card" },
+    "L": { "item": "ae2:logic_processor" },
+    "I": { "item": "ae2:io_port" }
+  },
+  "result": { "id": "ae2_batchcraft:io_port" }
+}

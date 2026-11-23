@@ -1,0 +1,7 @@
+{
+  "parent": "ae2:item/p2p_tunnel_base",
+  "gui_light": "front",
+  "textures": {
+    "type": "ae2_batchcraft:part/pp2mp_unit_port_break"
+  }
+}

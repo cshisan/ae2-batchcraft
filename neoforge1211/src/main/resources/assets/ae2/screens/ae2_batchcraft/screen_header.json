@@ -1,0 +1,38 @@
+{
+  "$schema": "../schema.json",
+  "text": {
+    "dialog_title": {
+      "text": {
+        "text": "",
+        "font": "minecraft:default",
+        "bold": false,
+        "italic": false
+      },
+      "scale": 1.0,
+      "position": {
+        "left": 8,
+        "top": 6
+      }
+    }
+  },
+  "images": {
+    "title_separator_dark": {
+      "texture": "guis/background.png",
+      "srcRect": [4, 253, 162, 1]
+    },
+    "title_separator_light": {
+      "texture": "guis/background.png",
+      "srcRect": [4, 1, 162, 1]
+    }
+  },
+  "widgets": {
+    "title_separator_dark": {
+      "left": 7,
+      "top": 17
+    },
+    "title_separator_light": {
+      "left": 7,
+      "top": 18
+    }
+  }
+}

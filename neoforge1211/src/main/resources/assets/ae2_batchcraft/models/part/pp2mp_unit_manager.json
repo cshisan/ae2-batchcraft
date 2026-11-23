@@ -1,0 +1,4 @@
+{
+  "parent": "ae2_batchcraft:pp2mp_unit_manager_base",
+  "loader": "ae2_batchcraft:unshaded"
+}

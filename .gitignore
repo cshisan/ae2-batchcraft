@@ -1,0 +1,32 @@
+.gradle/
+build/
+out/
+run/
+.run/
+logs/
+*.log
+*.tmp
+
+# IntelliJ / IDEA
+.idea/
+*.iml
+
+# Eclipse
+.classpath
+.project
+.settings/
+
+# VS Code
+.vscode/
+
+# ai
+.agents
+Agents.md
+
+# local
+*-local.*
+docs/
+
+# OS files
+.DS_Store
+Thumbs.db

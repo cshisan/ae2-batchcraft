@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "redstone",
+  "ingredients": [
+    {
+      "item": "ae2:formation_plane"
+    },
+    {
+      "item": "ae2:calculation_processor"
+    }
+  ],
+  "result": {
+    "id": "ae2_batchcraft:pp2mp_unit_port_place",
+    "count": 1
+  }
+}

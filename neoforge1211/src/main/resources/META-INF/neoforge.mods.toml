@@ -1,0 +1,41 @@
+modLoader = "javafml"
+loaderVersion = "[4,)"
+license = "GNU GPL 3.0"
+
+[[mods]]
+modId = "ae2_batchcraft"
+version = "2.0.0"
+displayName = "AE2 BatchCraft"
+authors = "cshisan"
+description = "AE2 BatchCraft"
+
+[[mixins]]
+config = "ae2_batchcraft.mixins.json"
+
+[[dependencies.ae2_batchcraft]]
+modId = "minecraft"
+type = "required"
+versionRange = "[1.21.1,1.21.2)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.ae2_batchcraft]]
+modId = "neoforge"
+type = "required"
+versionRange = "[21.1,)"
+ordering = "NONE"
+side = "BOTH"
+
+[[dependencies.ae2_batchcraft]]
+modId = "ae2"
+type = "required"
+versionRange = "[19.0.0,20.0.0)"
+ordering = "AFTER"
+side = "BOTH"
+
+[[dependencies.ae2_batchcraft]]
+modId = "guideme"
+type = "optional"
+versionRange = "[21.1.16,)"
+ordering = "AFTER"
+side = "CLIENT"

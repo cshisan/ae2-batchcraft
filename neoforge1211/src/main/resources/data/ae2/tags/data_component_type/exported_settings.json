@@ -1,0 +1,8 @@
+{
+  "replace": false,
+  "values": [
+    "ae2_batchcraft:exported_pp2mp_unit_id",
+    "ae2_batchcraft:component_placer_frequency",
+    "ae2_batchcraft:component_placer_unit_id"
+  ]
+}

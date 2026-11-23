@@ -1,0 +1,14 @@
+{
+  "parent": "minecraft:item/generated",
+  "textures": {
+    "layer0": "ae2_batchcraft:item/pp2mp_pattern"
+  },
+  "overrides": [
+    {
+      "predicate": {
+        "ae2_batchcraft:encoded": 1.0
+      },
+      "model": "ae2_batchcraft:item/pp2mp_pattern_encoded"
+    }
+  ]
+}

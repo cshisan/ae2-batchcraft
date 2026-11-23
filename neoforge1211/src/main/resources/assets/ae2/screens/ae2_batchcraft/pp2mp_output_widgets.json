@@ -1,0 +1,17 @@
+{
+  "$schema": "../schema.json",
+  "widgets": {
+    "output_extraction_enabled": {
+      "left": 12,
+      "top": 50,
+      "width": 71,
+      "height": 18
+    },
+    "output_extraction_disabled": {
+      "left": 89,
+      "top": 50,
+      "width": 71,
+      "height": 18
+    }
+  }
+}

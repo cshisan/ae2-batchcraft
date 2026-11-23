@@ -1,0 +1,26 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "category": "misc",
+  "pattern": [
+    "PQP",
+    "QCR",
+    "PQP"
+  ],
+  "key": {
+    "P": {
+      "item": "minecraft:paper"
+    },
+    "Q": {
+      "item": "minecraft:quartz"
+    },
+    "C": {
+      "item": "minecraft:crafting_table"
+    },
+    "R": {
+      "item": "minecraft:redstone"
+    }
+  },
+  "result": {
+    "id": "ae2_batchcraft:fake_crafting_converter"
+  }
+}

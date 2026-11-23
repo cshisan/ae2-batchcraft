@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "category": "redstone",
+  "ingredients": [
+    {
+      "item": "ae2_batchcraft:pp2mp_output"
+    },
+    {
+      "item": "ae2:engineering_processor"
+    }
+  ],
+  "result": {
+    "id": "ae2_batchcraft:pp2mp_unit_manager_fluix",
+    "count": 1
+  }
+}

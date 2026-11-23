@@ -1,0 +1,22 @@
+{
+  "replace": false,
+  "values": [
+    "ae2_batchcraft:pp2mp_unit_manager_fluix",
+    "ae2_batchcraft:pp2mp_unit_manager_white",
+    "ae2_batchcraft:pp2mp_unit_manager_light_gray",
+    "ae2_batchcraft:pp2mp_unit_manager_gray",
+    "ae2_batchcraft:pp2mp_unit_manager_black",
+    "ae2_batchcraft:pp2mp_unit_manager_lime",
+    "ae2_batchcraft:pp2mp_unit_manager_yellow",
+    "ae2_batchcraft:pp2mp_unit_manager_orange",
+    "ae2_batchcraft:pp2mp_unit_manager_brown",
+    "ae2_batchcraft:pp2mp_unit_manager_red",
+    "ae2_batchcraft:pp2mp_unit_manager_pink",
+    "ae2_batchcraft:pp2mp_unit_manager_magenta",
+    "ae2_batchcraft:pp2mp_unit_manager_purple",
+    "ae2_batchcraft:pp2mp_unit_manager_blue",
+    "ae2_batchcraft:pp2mp_unit_manager_light_blue",
+    "ae2_batchcraft:pp2mp_unit_manager_cyan",
+    "ae2_batchcraft:pp2mp_unit_manager_green"
+  ]
+}
