@@ -1,6 +1,7 @@
 package org.ae2bc.part.unit.port.part;
 
 import appeng.api.parts.IPartItem;
+import appeng.api.networking.IGrid;
 import appeng.api.stacks.AEKey;
 import appeng.menu.MenuOpener;
 import appeng.menu.locator.MenuLocators;
@@ -14,6 +15,7 @@ import org.ae2bc.core.unit.UnitPortType;
 import org.ae2bc.core.dispatch.ResourceTransferPlan;
 import org.ae2bc.core.dispatch.WorkBudget;
 import org.ae2bc.part.general.Pp2mpAdjacentTarget;
+import org.ae2bc.part.general.Pp2mpGridService;
 import org.ae2bc.part.general.Pp2mpProviderTarget;
 import org.ae2bc.part.general.Pp2mpSendTarget;
 import org.ae2bc.part.general.provider_filter.Pp2mpProviderFilterData;
@@ -34,6 +36,7 @@ public final class Pp2mpUnitProviderPortPart extends Pp2mpUnitIoTypePortPart
     private final Pp2mpProviderTarget providerTarget;
     private final @Getter Pp2mpProviderFilterData providerFilter;
     private @Getter boolean providerSync = true;
+    private boolean loadingFilter;
 
     public Pp2mpUnitProviderPortPart(IPartItem<?> partItem) {
         super(partItem, UnitPortType.PROVIDER, Pp2mpUnitPortPartModel.MODEL_PROVIDER);
@@ -80,21 +83,31 @@ public final class Pp2mpUnitProviderPortPart extends Pp2mpUnitIoTypePortPart
         return this::setProviderSync;
     }
 
-    /* 仅同步规则，不覆盖端口本地标记和实际升级卡。 */
+    /* 调度和菜单统一读取已覆盖的本地规则。 */
     @Override
     public Pp2mpProviderFilterData getEffectiveProviderFilter() {
-        if (this.providerSync) {
-            Pp2mpUnitManagerPart manager = this.findManager();
-            if (manager != null && this.isBoundTo(manager)) {
-                return manager.getEffectiveProviderFilter();
-            }
+        IGrid grid = this.grid();
+        if (!this.isClientSide() && grid != null) {
+            Pp2mpGridService.get(grid).refreshConfigurations();
         }
         return this.providerFilter;
+    }
+
+    public void applyProviderFilter(Pp2mpProviderFilterData source) {
+        if (this.providerSync) {
+            this.providerFilter.copyFrom(source);
+        }
     }
 
     public void setProviderSync(boolean synced) {
         if (this.providerSync != synced) {
             this.providerSync = synced;
+            if (synced) {
+                Pp2mpUnitManagerPart manager = this.findManager();
+                if (manager != null && this.isBoundTo(manager)) {
+                    this.applyProviderFilter(manager.getEffectiveProviderFilter());
+                }
+            }
             this.saveProviderFilter();
         }
     }
@@ -109,9 +122,15 @@ public final class Pp2mpUnitProviderPortPart extends Pp2mpUnitIoTypePortPart
 
     @Override
     protected void onFilterChanged() {
-        super.onFilterChanged();
-        if (this.providerFilter != null) {
+        if (!this.loadingFilter && this.providerFilter != null) {
             this.providerFilter.onChanged();
+        }
+    }
+
+    @Override
+    public void upgradesChanged() {
+        if (!this.loadingFilter && this.providerFilter != null) {
+            this.providerFilter.onUpgradesChanged();
         }
     }
 
@@ -124,26 +143,28 @@ public final class Pp2mpUnitProviderPortPart extends Pp2mpUnitIoTypePortPart
 
     @Override
     public void readFromNBT(CompoundTag data, HolderLookup.Provider registries) {
-        super.readFromNBT(data, registries);
-        this.providerFilter.readLimits(data);
-        // 旧存档没有同步字段，保留端口原本的本地配置。
-        this.providerSync = data.getBoolean(PROVIDER_SYNC);
+        this.loadingFilter = true;
+        try {
+            super.readFromNBT(data, registries);
+            this.providerFilter.readLimits(data);
+            this.providerSync = data.getBoolean(PROVIDER_SYNC);
+        } finally {
+            this.loadingFilter = false;
+        }
     }
 
     @Override
     public void writeToStream(RegistryFriendlyByteBuf data) {
         super.writeToStream(data);
-        this.providerFilter.writeToStream(data);
         data.writeBoolean(this.providerSync);
     }
 
     @Override
     public boolean readFromStream(RegistryFriendlyByteBuf data) {
         boolean changed = super.readFromStream(data);
-        boolean filterChanged = this.providerFilter.readFromStream(data);
         boolean previousSync = this.providerSync;
         this.providerSync = data.readBoolean();
-        return changed || filterChanged || previousSync != this.providerSync;
+        return changed || previousSync != this.providerSync;
     }
 
     @Override

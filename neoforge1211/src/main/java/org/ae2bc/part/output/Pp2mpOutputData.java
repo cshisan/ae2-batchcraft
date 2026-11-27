@@ -9,7 +9,6 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.RegistryFriendlyByteBuf;
-import org.ae2bc.common.Version;
 import org.ae2bc.common.utils.MinecraftHelper;
 import org.ae2bc.core.constant.Pp2mpOutputKeys;
 import org.ae2bc.core.part.*;
@@ -38,7 +37,7 @@ public class Pp2mpOutputData extends Pp2mpTaskData implements ConfigLocal<InputC
     }
 
     public void update(OutputConfig config) {
-        if (!this.configSyncSwitch && !Version.equals(config, this.config)) {
+        if (!this.configSyncSwitch && config != null && !this.config.equals(config)) {
             this.update(() -> this.config = config);
         }
     }
@@ -52,8 +51,11 @@ public class Pp2mpOutputData extends Pp2mpTaskData implements ConfigLocal<InputC
 
     @Override
     public void apply(InputConfig inputConfig) {
-        if (this.configSyncSwitch && inputConfig.version() != this.config.version()) {
-            this.update(() -> this.config = new OutputConfig(inputConfig));
+        if (this.configSyncSwitch) {
+            OutputConfig incoming = new OutputConfig(inputConfig);
+            if (!this.config.equals(incoming)) {
+                this.update(() -> this.config = incoming);
+            }
         }
     }
 
@@ -66,7 +68,6 @@ public class Pp2mpOutputData extends Pp2mpTaskData implements ConfigLocal<InputC
         OutputPageAttrCodec.write(outputData, this.config.output());
 
         data.putBoolean(Pp2mpOutputKeys.OUTPUT_SYNCED_ENABLED, this.configSyncSwitch);
-        data.putInt(Pp2mpOutputKeys.CONFIG_VERSION, this.config.version());
         data.put(GeneralPageAttrCodec.CONFIG_GENERAL, generalData);
         data.put(OutputPageAttrCodec.CONFIG_OUTPUT, outputData);
         CompoundTag task = this.writeTask(data, registries);
@@ -82,16 +83,16 @@ public class Pp2mpOutputData extends Pp2mpTaskData implements ConfigLocal<InputC
 
     /* 从NBT读取 */
     public void readFromNBT(CompoundTag data, HolderLookup.Provider registries) {
-        int version = data.getInt(Pp2mpOutputKeys.CONFIG_VERSION);
         CompoundTag general = GeneralPageAttrCodec.read(data);
         CompoundTag output = OutputPageAttrCodec.read(data);
 
         this.config = OutputConfig.restore(
-                version, GeneralPageAttrCodec.returnMode(general),
+                GeneralPageAttrCodec.returnMode(general),
                 OutputPageAttrCodec.productExtraction(output),
                 GeneralPageAttrCodec.extractionParam(general), GeneralPageAttrCodec.blocking(general)
         );
-        this.configSyncSwitch = data.getBoolean(Pp2mpOutputKeys.OUTPUT_SYNCED_ENABLED);
+        this.configSyncSwitch = !data.contains(Pp2mpOutputKeys.OUTPUT_SYNCED_ENABLED)
+                || data.getBoolean(Pp2mpOutputKeys.OUTPUT_SYNCED_ENABLED);
         CompoundTag task = this.readTask(data, registries);
         this.pendingInputs.clear();
         ListTag pending = task.getList(Pp2mpOutputKeys.PENDING_INPUTS, Tag.TAG_COMPOUND);
@@ -109,7 +110,6 @@ public class Pp2mpOutputData extends Pp2mpTaskData implements ConfigLocal<InputC
 
     public void writeToStream(RegistryFriendlyByteBuf data) {
         data.writeBoolean(this.configSyncSwitch);
-        data.writeInt(this.config.version());
         GeneralPageAttrPacket.write(data, this.config.general());
         OutputPageAttrPacket.write(data, this.config.output());
     }
@@ -118,16 +118,15 @@ public class Pp2mpOutputData extends Pp2mpTaskData implements ConfigLocal<InputC
         boolean oldSync = this.configSyncSwitch;
         this.configSyncSwitch = data.readBoolean();
 
-        int oldVersion = this.config.version();
-        int version = data.readInt();
+        OutputConfig previous = this.config;
         GeneralPageConfig general = GeneralPageAttrPacket.read(data);
         OutputPageConfig output = OutputPageAttrPacket.read(data);
         this.config = OutputConfig.restore(
-                version, general.returnMode(),
+                general.returnMode(),
                 output.productExtraction(),
                 general.extractionParam(), general.blocking()
         );
 
-        return oldSync != this.configSyncSwitch || oldVersion != this.config.version();
+        return oldSync != this.configSyncSwitch || !previous.equals(this.config);
     }
 }

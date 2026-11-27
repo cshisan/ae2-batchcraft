@@ -4,6 +4,7 @@
   "package": "org.ae2bc.mixin",
   "compatibilityLevel": "JAVA_21",
   "mixins": [
+    "P2PTunnelAttunementMixin",
     "PatternProviderLogicAccessor",
     "PatternProviderLogicMixin",
     "PatternProviderReturnInventoryMixin"

@@ -70,11 +70,11 @@ public class Pp2mpInputData implements ConfigCenter<InputConfig> {
     }
 
     public ConfigSource<InputConfig> eventSource() {
-        return eventSource;
+        return this.eventSource;
     }
 
     public void update(InputConfig config) {
-        if (config != null && this.config.version() != config.version()) {
+        if (config != null && !this.config.equals(config)) {
             this.config = config;
             this.markForSave.run();
             this.markForUpdate.run();
@@ -84,7 +84,7 @@ public class Pp2mpInputData implements ConfigCenter<InputConfig> {
 
     @Override
     public void push() {
-        this.eventSource.firePush(config);
+        this.eventSource.firePush(this.config);
     }
 
     /* 写入NBT */
@@ -98,7 +98,6 @@ public class Pp2mpInputData implements ConfigCenter<InputConfig> {
         CompoundTag unitData = new CompoundTag();
         UnitPageAttrCodec.write(unitData, this.config.unit());
 
-        data.putInt(Pp2mpInputKeys.CONFIG_VERSION, this.config.version());
         data.put(GeneralPageAttrCodec.CONFIG_GENERAL, generalData);
         data.put(OutputPageAttrCodec.CONFIG_OUTPUT, outputData);
         data.put(UnitPageAttrCodec.CONFIG_UNIT, unitData);
@@ -121,13 +120,12 @@ public class Pp2mpInputData implements ConfigCenter<InputConfig> {
 
     /* 从NBT读取 */
     public void readFromNBT(CompoundTag data, HolderLookup.Provider registries) {
-        short version = data.getShort(Pp2mpInputKeys.CONFIG_VERSION);
         CompoundTag general = GeneralPageAttrCodec.read(data);
         CompoundTag output = OutputPageAttrCodec.read(data);
         CompoundTag unit = UnitPageAttrCodec.read(data);
 
         this.config = InputConfig.restore(
-                version, GeneralPageAttrCodec.returnMode(general),
+                GeneralPageAttrCodec.returnMode(general),
                 OutputPageAttrCodec.productExtraction(output),
                 UnitPageAttrCodec.breakPickup(unit),
                 UnitPageAttrCodec.outputPortMode(unit),
@@ -150,7 +148,6 @@ public class Pp2mpInputData implements ConfigCenter<InputConfig> {
     }
 
     public void writeToStream(RegistryFriendlyByteBuf data) {
-        data.writeShort(this.config.version());
         data.writeVarInt(this.config.taskAllocationMode().id);
         data.writeVarInt(this.config.taskSplitMode().id);
         GeneralPageAttrPacket.write(data, this.config.general());
@@ -159,9 +156,8 @@ public class Pp2mpInputData implements ConfigCenter<InputConfig> {
     }
 
     public boolean readFromStream(RegistryFriendlyByteBuf data) {
-        int oldVersion = this.config.version();
+        InputConfig previous = this.config;
 
-        int version = data.readShort();
         TaskAllocationMode taskAllocationMode = TaskAllocationMode.null2defaultOf(data.readVarInt());
         TaskSplitMode taskSplitMode = TaskSplitMode.null2defaultOf(data.readVarInt());
         GeneralPageConfig general = GeneralPageAttrPacket.read(data);
@@ -169,7 +165,6 @@ public class Pp2mpInputData implements ConfigCenter<InputConfig> {
         UnitPageConfig unit = UnitPageAttrPacket.read(data);
 
         this.config = InputConfig.restore(
-                version,
                 general.returnMode(),
                 output.productExtraction(),
                 unit.breakPickup(),
@@ -180,7 +175,7 @@ public class Pp2mpInputData implements ConfigCenter<InputConfig> {
                 taskSplitMode, general.blocking()
         );
 
-        return oldVersion != this.config.version();
+        return !previous.equals(this.config);
     }
 
     public boolean hasBatchTask() {

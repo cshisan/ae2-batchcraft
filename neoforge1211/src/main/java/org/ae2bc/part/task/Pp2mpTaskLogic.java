@@ -10,6 +10,7 @@ import net.minecraft.core.Direction;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import org.ae2bc.fake_crafting_converter.FakeCraftingConverterBlockEntity;
+import org.ae2bc.part.general.Pp2mpGridService;
 import org.ae2bc.pattern.MaterialOutputModeResolver;
 import org.ae2bc.pattern.Pp2mpTaskBatch;
 import org.ae2bc.core.unit.ReturnMode;
@@ -43,6 +44,14 @@ public abstract class Pp2mpTaskLogic implements Pp2mpTaskEndpoint {
         this.gridSupplier = gridSupplier;
         this.task = task;
         this.receiveInventory = receiveInventory;
+    }
+
+    /* 接单和续跑前消费待处理的配置校准，避免延后拓扑刷新时使用旧值。 */
+    public final void refreshConfigurations() {
+        IGrid grid = this.gridSupplier.get();
+        if (grid != null) {
+            Pp2mpGridService.get(grid).refreshConfigurations();
+        }
     }
 
     @Override

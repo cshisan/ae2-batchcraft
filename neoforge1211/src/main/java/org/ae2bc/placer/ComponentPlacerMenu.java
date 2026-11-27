@@ -5,6 +5,7 @@ import appeng.api.implementations.items.IMemoryCard;
 import appeng.api.implementations.items.MemoryCardColors;
 import appeng.api.implementations.items.MemoryCardMessages;
 import appeng.api.stacks.AEItemKey;
+import appeng.api.storage.ILinkStatus;
 import appeng.api.upgrades.IUpgradeInventory;
 import appeng.menu.AEBaseMenu;
 import appeng.menu.SlotSemantic;
@@ -29,6 +30,7 @@ import org.ae2bc.core.placer.Pos;
 import org.ae2bc.placer.packet.ComponentPlacerClientPacket;
 import org.ae2bc.registry.component.Pp2mpUnitManagerRegistry;
 import org.ae2bc.storage.MarkerSlot;
+import org.jetbrains.annotations.Nullable;
 
 public final class ComponentPlacerMenu extends AEBaseMenu {
     public static final MenuType<ComponentPlacerMenu> TYPE = MenuTypeBuilder
@@ -51,6 +53,8 @@ public final class ComponentPlacerMenu extends AEBaseMenu {
     private final ComponentPlacerMenuHost host;
     private @Getter Direction direction = ComponentPlacerPose.DEFAULT.direction();
     private @Getter DataModel model = DataModel.DEFAULT;
+    private @Getter boolean paired;
+    private @Getter @Nullable Component linkError;
     private ComponentPlacerClientPacket lastSentState;
 
     public ComponentPlacerMenu(int id, Inventory playerInventory, ComponentPlacerMenuHost host) {
@@ -91,17 +95,21 @@ public final class ComponentPlacerMenu extends AEBaseMenu {
     /* 服务端比较完整快照，首次打开和配置、选区、连接状态变化时同步。 */
     @Override
     public void broadcastChanges() {
-        if (this.isServerSide()) {
+        super.broadcastChanges();
+        if (this.isServerSide() && this.isValidMenu()) {
             ItemStack stack = this.host.getItemStack();
+            ILinkStatus linkStatus = this.host.getLinkStatus();
             this.direction = ComponentPlacerData.pose(stack).direction();
-            this.model = ComponentPlacerData.createDataModel(stack, this.host.getLinkStatus().connected());
-            ComponentPlacerClientPacket packet = new ComponentPlacerClientPacket(this.containerId, this.direction, this.model);
+            this.model = ComponentPlacerData.createDataModel(stack, linkStatus.connected());
+            this.paired = this.host.getItem().getLinkedPosition(stack) != null;
+            this.linkError = linkStatus.statusDescription();
+            ComponentPlacerClientPacket packet = new ComponentPlacerClientPacket(
+                    this.containerId, this.direction, this.model, this.paired, this.linkError);
             if (!packet.equals(this.lastSentState)) {
                 this.sendPacketToClient(packet);
                 this.lastSentState = packet;
             }
         }
-        super.broadcastChanges();
     }
 
     public IUpgradeInventory getUpgrades() {
@@ -254,11 +262,21 @@ public final class ComponentPlacerMenu extends AEBaseMenu {
         }
         player.displayClientMessage(Component.translatable("message.ae2_batchcraft.component_placer.result",
                 result.placed(), result.occupied(), result.materialFailed(), result.placementFailed()), false);
+        ILinkStatus linkStatus = this.host.getLinkStatus();
+        if (result.materialFailed() > 0 && !linkStatus.connected()) {
+            Component reason = linkStatus.statusDescription();
+            player.displayClientMessage(Component.translatable(
+                    "message.ae2_batchcraft.component_placer.network_unavailable",
+                    reason != null ? reason : Component.translatable(
+                            "gui.ae2_batchcraft.component_placer.disconnected")), false);
+        }
     }
 
     /* 应用服务端快照，不触发客户端操作或再次发送同步包。 */
-    public void change(Direction direction, DataModel model) {
+    public void change(Direction direction, DataModel model, boolean paired, @Nullable Component linkError) {
         this.direction = direction;
         this.model = model;
+        this.paired = paired;
+        this.linkError = linkError;
     }
 }

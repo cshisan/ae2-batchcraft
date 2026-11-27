@@ -1,8 +1,10 @@
 package org.ae2bc.core.common;
 
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
 @Getter
+@EqualsAndHashCode
 public class ProductExtractionParam {
     private final short interval;
     private final int quantity;

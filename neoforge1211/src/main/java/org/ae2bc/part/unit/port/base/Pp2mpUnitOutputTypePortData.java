@@ -15,7 +15,7 @@ public class Pp2mpUnitOutputTypePortData extends Pp2mpUnitPortData implements Co
     private @Getter
     @Setter int priority = 0;
     private @Getter
-    @Setter OutputPortMode outputPortMode = OutputPortMode.NORMAL;
+    @Setter OutputPortMode outputPortMode = UnitConfig.DEFAULT.unit().outputPortMode();
 
     public Pp2mpUnitOutputTypePortData(Runnable markForSave, Runnable markForUpdate) {
         super(markForSave, markForUpdate);
@@ -36,7 +36,8 @@ public class Pp2mpUnitOutputTypePortData extends Pp2mpUnitPortData implements Co
     }
 
     public void readFromNBT(CompoundTag data) {
-        this.syncEnabled = data.getBoolean(Pp2mpUnitPortKeys.UNIT_PORT_SYNCED_ENABLED);
+        this.syncEnabled = !data.contains(Pp2mpUnitPortKeys.UNIT_PORT_SYNCED_ENABLED)
+                || data.getBoolean(Pp2mpUnitPortKeys.UNIT_PORT_SYNCED_ENABLED);
         this.priority = data.getInt(Pp2mpUnitPortKeys.PRIORITY);
         this.outputPortMode = OutputPortMode.null2defaultOf(data.getInt(Pp2mpUnitPortKeys.OUTPUT_PORT_MODE));
     }

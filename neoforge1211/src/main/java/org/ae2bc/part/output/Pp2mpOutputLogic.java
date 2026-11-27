@@ -237,6 +237,7 @@ public class Pp2mpOutputLogic extends Pp2mpTaskLogic {
 
     @Override
     public boolean canAcceptTask() {
+        this.refreshConfigurations();
         if (!this.canStartTask(this.data.getConfig().general().blocking())) {
             return false;
         }

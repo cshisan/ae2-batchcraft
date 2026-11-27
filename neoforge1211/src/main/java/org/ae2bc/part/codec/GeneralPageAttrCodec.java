@@ -3,6 +3,7 @@ package org.ae2bc.part.codec;
 import net.minecraft.nbt.CompoundTag;
 import org.ae2bc.core.common.ProductExtractionParam;
 import org.ae2bc.core.part.GeneralPageConfig;
+import org.ae2bc.core.part.InputConfig;
 import org.ae2bc.core.unit.ReturnMode;
 
 public class GeneralPageAttrCodec {
@@ -32,9 +33,13 @@ public class GeneralPageAttrCodec {
         return !data.contains(GeneralPageAttrCodec.BLOCKING) || data.getBoolean(GeneralPageAttrCodec.BLOCKING);
     }
 
+    /* 缺失字段使用输入端默认值，不覆盖已保存的参数。 */
     public static ProductExtractionParam extractionParam(CompoundTag data) {
-        short interval = data.getShort(CONFIG_GENERAL_EXTRACTION_INTERVAL);
-        int quantity = data.getInt(CONFIG_GENERAL_EXTRACTION_QUANTITY);
+        ProductExtractionParam defaults = InputConfig.DEFAULT.general().extractionParam();
+        short interval = data.contains(GeneralPageAttrCodec.CONFIG_GENERAL_EXTRACTION_INTERVAL)
+                ? data.getShort(GeneralPageAttrCodec.CONFIG_GENERAL_EXTRACTION_INTERVAL) : defaults.getInterval();
+        int quantity = data.contains(GeneralPageAttrCodec.CONFIG_GENERAL_EXTRACTION_QUANTITY)
+                ? data.getInt(GeneralPageAttrCodec.CONFIG_GENERAL_EXTRACTION_QUANTITY) : defaults.getQuantity();
         return new ProductExtractionParam(interval, quantity);
     }
 }

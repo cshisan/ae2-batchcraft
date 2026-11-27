@@ -206,6 +206,9 @@ public final class Pp2mpResourceIntakePart extends P2PTunnelPart<Pp2mpResourceIn
 
     /* 只在过滤配置变更时通知网络覆盖已开启同步的输出端和单元管理器。 */
     private void onProviderFilterChanged() {
+        if (this.logic != null) {
+            this.logic.onProviderFilterChanged();
+        }
         this.markForSaveAndUpdate();
         IGrid grid = this.grid();
         if (grid != null) {

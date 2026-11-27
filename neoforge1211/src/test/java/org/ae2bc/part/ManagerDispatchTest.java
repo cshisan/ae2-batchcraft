@@ -816,6 +816,8 @@ class ManagerDispatchTest {
                 this.ports.put(type, outputPorts);
                 Mockito.when(this.service.getOutputPorts((short) 1, (short) 2, type)).thenReturn(outputPorts);
             }
+            this.data.eventSource().register(config -> this.ports.values().forEach(
+                    ports -> ports.forEach(port -> port.getData().apply(config))));
             this.logic = new Pp2mpUnitManagerLogic(node, this.part);
         }
 
@@ -846,6 +848,7 @@ class ManagerDispatchTest {
             Mockito.when(port.getEndpointId()).thenReturn("port-" + this.nextPortId++);
             Mockito.when(port.isBoundTo(this.part)).thenReturn(true);
             Mockito.when(port.getData()).thenReturn(new Pp2mpUnitOutputTypePortData(() -> { }, () -> { }));
+            port.getData().apply(this.data.getConfig());
             Mockito.when(port.output(Mockito.same(this.part), Mockito.any(GenericStack.class),
                             Mockito.any(MaterialOutputMode.class), Mockito.any(Actionable.class)))
                     .thenAnswer(call -> Math.min(capacity, call.getArgument(1, GenericStack.class).amount()));

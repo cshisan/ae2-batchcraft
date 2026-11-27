@@ -20,7 +20,7 @@ public class OutputPageAttrAdapter extends SyncedPageAttrAdapter implements Outp
     public void updateGeneral(UnaryOperator<GeneralPageConfig> updater) {
         OutputConfig config = this.menu.getConfig();
         GeneralPageConfig general = updater.apply(config.general());
-        this.menu.configChange(new OutputConfig(config.version(), general, config.output()));
+        this.menu.configChange(new OutputConfig(general, config.output()));
     }
 
     @Override
@@ -32,6 +32,6 @@ public class OutputPageAttrAdapter extends SyncedPageAttrAdapter implements Outp
     public void updateOutput(UnaryOperator<OutputPageConfig> updater) {
         OutputConfig config = this.menu.getConfig();
         OutputPageConfig output = updater.apply(config.output());
-        this.menu.configChange(new OutputConfig(config.version(), config.general(), output));
+        this.menu.configChange(new OutputConfig(config.general(), output));
     }
 }

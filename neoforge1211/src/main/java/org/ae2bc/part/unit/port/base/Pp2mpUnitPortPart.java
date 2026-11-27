@@ -74,9 +74,9 @@ public abstract class Pp2mpUnitPortPart extends AEBasePart implements Pp2mpPart 
 
     /* 端口目标或过滤变化后仅唤醒当前绑定的管理器。 */
     protected final void alertManager() {
-        Pp2mpUnitManagerPart manager = this.findManager();
-        if (manager != null && this.isBoundTo(manager)) {
-            manager.getLogic().alertPendingRetry();
+        IGrid grid = this.grid();
+        if (grid != null) {
+            Pp2mpGridService.get(grid).wakeUnitManager(this.frequency, this.unitId);
         }
     }
 
@@ -210,12 +210,6 @@ public abstract class Pp2mpUnitPortPart extends AEBasePart implements Pp2mpPart 
         IGrid grid = this.grid();
         if (grid != null) {
             Pp2mpGridService.get(grid).topologyChanged();
-            Pp2mpUnitManagerPart manager = Pp2mpGridService.get(grid).findManager(
-                    this.frequency, this.unitId
-            );
-            if (manager != null) {
-                manager.refreshConfigEventRegister();
-            }
         }
     }
 

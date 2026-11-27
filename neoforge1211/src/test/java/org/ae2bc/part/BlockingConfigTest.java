@@ -19,7 +19,7 @@ import org.junit.jupiter.api.Test;
 
 class BlockingConfigTest {
     @Test
-    void localTogglesAdvanceVersionAndSyncRejectsLocalChanges() {
+    void localTogglesChangeContentAndSyncRejectsLocalChanges() {
         InputConfig input = InputConfig.builder(InputConfig.DEFAULT).blocking(false).build();
         Pp2mpOutputData output = new Pp2mpOutputData(() -> { }, () -> { }, () -> { });
         Pp2mpUnitManagerData manager = new Pp2mpUnitManagerData(Items.STONE, () -> { }, () -> { });
@@ -27,8 +27,8 @@ class BlockingConfigTest {
         manager.apply(input);
         OutputConfig oldOutput = output.getConfig();
         UnitConfig oldManager = manager.getConfig();
-        output.update(new OutputConfig(oldOutput.version(), oldOutput.general().withBlocking(true), oldOutput.output()));
-        manager.update(new UnitConfig(oldManager.version(), oldManager.general().withBlocking(true), oldManager.unit()));
+        output.update(new OutputConfig(oldOutput.general().withBlocking(true), oldOutput.output()));
+        manager.update(new UnitConfig(oldManager.general().withBlocking(true), oldManager.unit()));
         Assertions.assertSame(oldOutput, output.getConfig());
         Assertions.assertSame(oldManager, manager.getConfig());
         output.setConfigSyncSwitch(false);
@@ -36,14 +36,14 @@ class BlockingConfigTest {
         for (boolean enabled : new boolean[]{true, false, true}) {
             OutputConfig previousOutput = output.getConfig();
             UnitConfig previousManager = manager.getConfig();
-            output.update(new OutputConfig(previousOutput.version(),
+            output.update(new OutputConfig(
                     previousOutput.general().withBlocking(enabled), previousOutput.output()));
-            manager.update(new UnitConfig(previousManager.version(),
+            manager.update(new UnitConfig(
                     previousManager.general().withBlocking(enabled), previousManager.unit()));
             Assertions.assertEquals(enabled, output.getConfig().general().blocking());
             Assertions.assertEquals(enabled, manager.getConfig().general().blocking());
-            Assertions.assertNotEquals(previousOutput.version(), output.getConfig().version());
-            Assertions.assertNotEquals(previousManager.version(), manager.getConfig().version());
+            Assertions.assertNotEquals(previousOutput, output.getConfig());
+            Assertions.assertNotEquals(previousManager, manager.getConfig());
         }
         output.setConfigSyncSwitch(true);
         manager.setSyncEnabled(true);

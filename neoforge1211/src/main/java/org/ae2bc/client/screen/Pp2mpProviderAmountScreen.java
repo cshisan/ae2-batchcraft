@@ -15,7 +15,8 @@ import org.ae2bc.part.general.provider_filter.Pp2mpProviderFilterMenu;
 public final class Pp2mpProviderAmountScreen extends AESubScreen<Pp2mpProviderFilterMenu, Pp2mpProviderFilterScreen> {
     private final int markerSlot;
     private final GenericStack marker;
-    private final int menuVersion;
+    private final int binding;
+    private final long expectedAmount;
     private final NumberEntryWidget amount;
 
     public Pp2mpProviderAmountScreen(Pp2mpProviderFilterScreen parent, GenericStack marker, int markerSlot) {
@@ -24,7 +25,8 @@ public final class Pp2mpProviderAmountScreen extends AESubScreen<Pp2mpProviderFi
         this.widgets.addBackgroundPanel("amount_slot");
         this.marker = marker;
         this.markerSlot = markerSlot;
-        this.menuVersion = this.getMenu().getMenuVersion();
+        this.binding = this.getMenu().getBinding();
+        this.expectedAmount = this.getMenu().getLimit(markerSlot);
 
         this.widgets.addButton("save", GuiText.Set.text(), this::confirm);
         this.widgets.add("back", new TabButton(
@@ -35,7 +37,7 @@ public final class Pp2mpProviderAmountScreen extends AESubScreen<Pp2mpProviderFi
         this.amount = this.widgets.addNumberEntryWidget(
                 "amountToStock", NumberEntryType.of(marker.what())
         );
-        this.amount.setLongValue(this.getMenu().getLimit(markerSlot));
+        this.amount.setLongValue(this.expectedAmount);
         this.amount.setMaxValue(999999L * (long) marker.what().getAmountPerOperation());
         this.amount.setTextFieldStyle(this.style.getWidget("amountToStockInput"));
         this.amount.setMinValue(0);
@@ -56,7 +58,7 @@ public final class Pp2mpProviderAmountScreen extends AESubScreen<Pp2mpProviderFi
             long normalized = Longs.constrainToRange(
                     value, 0, 999999L * (long) this.marker.what().getAmountPerOperation()
             );
-            this.getMenu().setLimit(this.markerSlot, this.marker.what(), normalized, this.menuVersion);
+            this.getMenu().setLimit(this.markerSlot, this.marker.what(), this.expectedAmount, normalized, this.binding);
             this.returnToParent();
         });
     }

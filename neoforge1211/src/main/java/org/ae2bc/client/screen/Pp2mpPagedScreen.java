@@ -149,10 +149,6 @@ public class Pp2mpPagedScreen<T extends AEBaseMenu> extends AEBaseScreen<T> {
         this.updateBlockingButton();
     }
 
-    protected final Route currentRoute() {
-        return this.currentRoute;
-    }
-
     /* 切换路由 */
     protected final void switchRoute(Route route) {
         if (route == null || !this.pages.containsKey(route)) {
@@ -261,7 +257,7 @@ public class Pp2mpPagedScreen<T extends AEBaseMenu> extends AEBaseScreen<T> {
                 this.addBlockingButton(() -> outputMenu.getConfig().general(), () -> !outputMenu.isSyncSwitch(),
                         enabled -> {
                             OutputConfig config = outputMenu.getConfig();
-                            outputMenu.configChange(new OutputConfig(config.version(),
+                            outputMenu.configChange(new OutputConfig(
                                     config.general().withBlocking(enabled), config.output()));
                         });
             }
@@ -271,7 +267,7 @@ public class Pp2mpPagedScreen<T extends AEBaseMenu> extends AEBaseScreen<T> {
                 this.addBlockingButton(() -> managerMenu.getConfig().general(), () -> !managerMenu.isSyncSwitch(),
                         enabled -> {
                             UnitConfig config = managerMenu.getConfig();
-                            managerMenu.configChange(new UnitConfig(config.version(),
+                            managerMenu.configChange(new UnitConfig(
                                     config.general().withBlocking(enabled), config.unit()));
                         });
             }

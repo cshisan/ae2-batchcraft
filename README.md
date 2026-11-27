@@ -2,7 +2,7 @@
 
 **Share processing patterns across a parallel production line.**
 
-Minecraft **1.21.1** · **NeoForge** · **Applied Energistics 2** · Project version **2.0.0**
+Minecraft **1.21.1** · **NeoForge** · **Applied Energistics 2** · Project version **2.0.1**
 
 **English** | [简体中文](README_zh-CN.md)
 
@@ -183,7 +183,7 @@ The first build needs network access to download dependencies.
 
 On Linux or macOS, use `./gradlew` instead of `.\gradlew.bat`.
 
-The mod JAR is written to `neoforge1211/build/libs/ae2-batchcraft-1.21.1-2.0.0-neoforge.jar`.
+The mod JAR is written to `neoforge1211/build/libs/ae2-batchcraft-1.21.1-2.0.1-neoforge.jar`.
 It includes the shared code; the `shared` module's JAR is not a separate mod to install.
 
 | Directory | Contents |

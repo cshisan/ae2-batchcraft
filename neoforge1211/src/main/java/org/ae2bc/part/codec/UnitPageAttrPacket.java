@@ -29,7 +29,7 @@ public interface UnitPageAttrPacket {
                 breakPickup, outputPortMode,
                 RedstonePortParam.of(
                         redstoneMode, redstoneStrength,
-                        redstonePulsePeriod, redstonePulseWidth
+                        redstonePulseWidth, redstonePulsePeriod
                 )
         );
     }

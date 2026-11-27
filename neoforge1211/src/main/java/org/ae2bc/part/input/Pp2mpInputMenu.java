@@ -1,6 +1,7 @@
 package org.ae2bc.part.input;
 
 import appeng.menu.AEBaseMenu;
+import appeng.api.networking.IGrid;
 import appeng.menu.implementations.MenuTypeBuilder;
 import lombok.Getter;
 import net.minecraft.resources.ResourceLocation;
@@ -11,6 +12,7 @@ import org.ae2bc.core.constant.Pp2mpInputKeys;
 import org.ae2bc.core.dispatch.TaskAllocationMode;
 import org.ae2bc.core.dispatch.TaskSplitMode;
 import org.ae2bc.core.part.InputConfig;
+import org.ae2bc.part.general.Pp2mpGridService;
 
 @Getter
 public class Pp2mpInputMenu extends AEBaseMenu {
@@ -24,7 +26,13 @@ public class Pp2mpInputMenu extends AEBaseMenu {
         super(TYPE, id, playerInventory, part);
         this.part = part;
         this.registerClientAction(Pp2mpInputKeys.INPUT_CONFIG, InputConfig.class, config -> {
-            if (this.isServerSide()) part.getData().update(config);
+            if (this.isServerSide()) {
+                IGrid grid = this.part.grid();
+                if (grid != null) {
+                    Pp2mpGridService.get(grid).refreshConfigurations();
+                }
+                this.part.getData().update(config);
+            }
         });
         this.registerClientAction(RESET_TASK_STATE, () -> {
             if (this.isServerSide()) {

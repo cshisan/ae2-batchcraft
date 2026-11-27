@@ -172,9 +172,7 @@ public class Pp2mpInputPart extends P2PTunnelPart<Pp2mpInputPart> implements Pp2
 
         IGrid grid = super.getMainNode().getGrid();
         if (grid != null) {
-            Pp2mpGridService gridService = Pp2mpGridService.get(grid);
-            gridService.topologyChanged();
-            gridService.invalidateReturnStorageCaches(super.getFrequency());
+            Pp2mpGridService.get(grid).topologyChanged();
         }
     }
 
@@ -184,9 +182,7 @@ public class Pp2mpInputPart extends P2PTunnelPart<Pp2mpInputPart> implements Pp2
 
         IGrid grid = super.getMainNode().getGrid();
         if (grid != null) {
-            Pp2mpGridService gridService = Pp2mpGridService.get(grid);
-            gridService.topologyChanged();
-            gridService.invalidateReturnStorageCaches(super.getFrequency());
+            Pp2mpGridService.get(grid).topologyChanged();
         }
     }
 

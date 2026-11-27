@@ -20,7 +20,7 @@ public class UnitPageAttrAdapter extends SyncedPageAttrAdapter implements UnitAt
     public void updateGeneral(UnaryOperator<GeneralPageConfig> updater) {
         UnitConfig config = this.menu.getConfig();
         GeneralPageConfig general = updater.apply(config.general());
-        this.menu.configChange(new UnitConfig(config.version(), general, config.unit()));
+        this.menu.configChange(new UnitConfig(general, config.unit()));
     }
 
     @Override
@@ -32,6 +32,6 @@ public class UnitPageAttrAdapter extends SyncedPageAttrAdapter implements UnitAt
     public void updateUnit(UnaryOperator<UnitPageConfig> updater) {
         UnitConfig config = this.menu.getConfig();
         UnitPageConfig unit = updater.apply(config.unit());
-        this.menu.configChange(new UnitConfig(config.version(), config.general(), unit));
+        this.menu.configChange(new UnitConfig(config.general(), unit));
     }
 }

@@ -2,18 +2,23 @@ package org.ae2bc.placer;
 
 import appeng.api.config.Actionable;
 import appeng.api.config.PowerMultiplier;
+import appeng.api.config.PowerUnit;
+import appeng.api.features.P2PTunnelAttunement;
 import appeng.api.stacks.AEItemKey;
 import appeng.api.stacks.AEKeyType;
 import appeng.api.stacks.GenericStack;
 import appeng.api.storage.ILinkStatus;
 import appeng.api.util.AEColor;
 import appeng.core.definitions.AEParts;
+import appeng.core.definitions.AEItems;
 import appeng.helpers.externalstorage.GenericStackInv;
 import appeng.me.helpers.PlayerSource;
 import appeng.menu.locator.ItemMenuHostLocator;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
+import net.neoforged.neoforge.capabilities.Capabilities;
+import net.neoforged.neoforge.energy.IEnergyStorage;
 import org.ae2bc.core.placer.MaterialsMode;
 import org.ae2bc.registry.ItemRegistry;
 import org.junit.jupiter.api.Assertions;
@@ -25,6 +30,60 @@ import java.util.List;
 import java.util.Set;
 
 class ComponentPlacerPowerTest {
+    @Test
+    void chargingCapabilityDoesNotTurnThePlacerIntoAnFeTunnelAttunementTool() {
+        ItemStack stack = new ItemStack(ItemRegistry.COMPONENT_PLACER.get());
+        for (boolean frequency : List.of(false, true)) {
+            ComponentPlacerData.frequencyMode(stack, frequency);
+            Assertions.assertNotNull(stack.getCapability(Capabilities.EnergyStorage.ITEM));
+            Assertions.assertTrue(P2PTunnelAttunement.getTunnelPartByTriggerItem(stack).isEmpty());
+        }
+        Assertions.assertTrue(P2PTunnelAttunement.getTunnelPartByTriggerItem(
+                AEItems.WIRELESS_TERMINAL.stack()).is(AEParts.FE_P2P_TUNNEL.asItem()));
+    }
+
+    @Test
+    void registeredFeCapabilityChargesTheExistingBatteryAndRespectsSimulationAndCapacity() {
+        ComponentPlacerItem item = ItemRegistry.COMPONENT_PLACER.get();
+        ItemStack stack = new ItemStack(item);
+        IEnergyStorage energy = stack.getCapability(Capabilities.EnergyStorage.ITEM);
+        Assertions.assertNotNull(energy);
+        Assertions.assertTrue(energy.canReceive());
+        Assertions.assertFalse(energy.canExtract());
+        Assertions.assertEquals(0, energy.getEnergyStored());
+
+        int offered = Math.min(1000, energy.getMaxEnergyStored());
+        Assertions.assertTrue(offered > 0);
+        Assertions.assertEquals(offered, energy.receiveEnergy(offered, true));
+        Assertions.assertEquals(0, item.getAECurrentPower(stack));
+        Assertions.assertEquals(offered, energy.receiveEnergy(offered, false));
+        Assertions.assertEquals(PowerUnit.FE.convertTo(PowerUnit.AE, offered), item.getAECurrentPower(stack));
+        Assertions.assertEquals(offered, energy.getEnergyStored());
+        Assertions.assertEquals(0, energy.extractEnergy(offered, true));
+        Assertions.assertEquals(0, energy.extractEnergy(offered, false));
+        Assertions.assertEquals(offered, energy.getEnergyStored());
+
+        int remaining = energy.getMaxEnergyStored() - energy.getEnergyStored();
+        Assertions.assertEquals(remaining, energy.receiveEnergy(energy.getMaxEnergyStored(), false));
+        Assertions.assertEquals(item.getAEMaxPower(stack), item.getAECurrentPower(stack));
+        Assertions.assertEquals(0, energy.receiveEnergy(offered, false));
+    }
+
+    @Test
+    void feCapacityTracksEnergyCardUpgrades() {
+        ComponentPlacerItem item = ItemRegistry.COMPONENT_PLACER.get();
+        ItemStack stack = new ItemStack(item);
+        IEnergyStorage energy = stack.getCapability(Capabilities.EnergyStorage.ITEM);
+        Assertions.assertNotNull(energy);
+        int originalCapacity = energy.getMaxEnergyStored();
+        item.getUpgrades(stack).setItemDirect(0, AEItems.ENERGY_CARD.stack());
+        Assertions.assertTrue(energy.getMaxEnergyStored() > originalCapacity);
+        Assertions.assertEquals((int) PowerUnit.AE.convertTo(PowerUnit.FE, item.getAEMaxPower(stack)),
+                energy.getMaxEnergyStored());
+        Assertions.assertEquals(energy.getMaxEnergyStored(), energy.receiveEnergy(energy.getMaxEnergyStored(), false));
+        Assertions.assertEquals(item.getAEMaxPower(stack), item.getAECurrentPower(stack));
+    }
+
     @Test
     void creativePowerRequestsNeverRequireOrChangeCharge() {
         for (double charge : List.of(0.0, 12.0)) {
@@ -105,6 +164,22 @@ class ComponentPlacerPowerTest {
         Assertions.assertNotNull(PlacementMaterials.extract(fixture.host, fixture.source, material));
         Assertions.assertEquals(3, fixture.network.getAmount(0));
         Assertions.assertEquals(4, fixture.item.getAECurrentPower(fixture.stack));
+    }
+
+    @Test
+    void disconnectedPlacerStillUsesAndRefundsLocalMaterialsWithoutPower() {
+        Fixture fixture = new Fixture(false, 0);
+        Mockito.doReturn(ILinkStatus.ofDisconnected()).when(fixture.host).getLinkStatus();
+        ItemStack material = ItemRegistry.PP2MP_OUTPUT.get().getDefaultInstance();
+        fixture.host.getMaterials().setItemDirect(0, material.copyWithCount(2));
+        PlacementMaterials.Reservation reservation = PlacementMaterials.extract(fixture.host, fixture.source, material);
+        Assertions.assertNotNull(reservation);
+        Assertions.assertEquals(MaterialsMode.LOCAL, reservation.source());
+        Assertions.assertEquals(1, fixture.host.getMaterials().getStackInSlot(0).getCount());
+        PlacementMaterials.refund(fixture.host, fixture.player, fixture.source, reservation);
+        Assertions.assertEquals(2, fixture.host.getMaterials().getStackInSlot(0).getCount());
+        Assertions.assertEquals(0, fixture.item.getAECurrentPower(fixture.stack));
+        Mockito.verify(fixture.host, Mockito.never()).getInventory();
     }
 
     private static final class Fixture {

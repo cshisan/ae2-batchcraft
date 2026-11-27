@@ -35,6 +35,34 @@ import java.util.List;
 
 class GridInvalidationTest {
     @Test
+    void portWakeWaitsForPendingTopologyAndStillWakesAnUnchangedManager() {
+        IGrid grid = Mockito.mock(IGrid.class);
+        Pp2mpUnitManagerPart manager = Mockito.mock(Pp2mpUnitManagerPart.class);
+        Pp2mpUnitManagerLogic logic = Mockito.mock(Pp2mpUnitManagerLogic.class);
+        Mockito.when(manager.getFrequency()).thenReturn((short) 1);
+        Mockito.when(manager.getUnitId()).thenReturn((short) 2);
+        Mockito.when(manager.getLogic()).thenReturn(logic);
+        Mockito.when(grid.getMachines(Pp2mpUnitManagerPart.class)).thenReturn(Set.of(manager));
+        Pp2mpGridService service = new Pp2mpGridService(grid);
+
+        for (int notification = 0; notification < 64; notification++) {
+            service.topologyChanged();
+            service.wakeUnitManager((short) 1, (short) 2);
+        }
+        Mockito.verifyNoInteractions(logic);
+        Mockito.verify(grid, Mockito.never()).getMachines(Pp2mpInputPart.class);
+        service.onServerEndTick();
+        Mockito.verify(logic).alertPendingRetry();
+        Mockito.verify(manager).refreshConfigEventRegister();
+        Mockito.verify(grid).getMachines(Pp2mpInputPart.class);
+
+        Mockito.clearInvocations(grid, logic);
+        service.wakeUnitManager((short) 1, (short) 2);
+        Mockito.verify(logic).alertPendingRetry();
+        Mockito.verifyNoInteractions(grid);
+    }
+
+    @Test
     void orderedPortsInvalidateOnPriorityChangesWithoutRescanningTheGrid() {
         IGrid grid = Mockito.mock(IGrid.class);
         Pp2mpUnitTransferPortPart first = Mockito.mock(Pp2mpUnitTransferPortPart.class);
@@ -158,7 +186,8 @@ class GridInvalidationTest {
         service.topologyChanged();
         service.onServerEndTick();
         Mockito.verify(grid).getMachines(Pp2mpInputPart.class);
-        Mockito.verify(output, Mockito.times(2)).refreshProviderFilter();
+        Mockito.verify(output).refreshConfigRegister();
+        Mockito.verify(output).refreshProviderFilter();
         Mockito.clearInvocations(grid);
         service.getOutputs((short) 1);
         service.getManagers((short) 1);

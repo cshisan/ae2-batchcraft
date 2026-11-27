@@ -125,10 +125,10 @@ public class Pp2mpOutputPart extends P2PTunnelPart<Pp2mpInputPart>
         }
 
         // 设置频率
-        this.setFrequency(this, storedFrequency, data, data::isTaskActive, () -> {
+        this.setFrequency(this, storedFrequency, this.data::isTaskActive, () -> {
             super.importSettings(SettingsFrom.MEMORY_CARD, heldItem.getComponents(), player);
             memoryCard.notifyUser(player, MemoryCardMessages.SETTINGS_LOADED);
-        });
+        }, this::refreshConfigRegister);
         return true;
     }
 
@@ -150,15 +150,13 @@ public class Pp2mpOutputPart extends P2PTunnelPart<Pp2mpInputPart>
     public boolean readFromStream(RegistryFriendlyByteBuf data) {
         boolean changed = super.readFromStream(data);
         boolean dataChanged = this.data.readFromStream(data);
-        boolean filterChanged = this.providerFilter.readFromStream(data);
-        return dataChanged || filterChanged || changed;
+        return dataChanged || changed;
     }
 
     @Override
     public void writeToStream(RegistryFriendlyByteBuf data) {
         super.writeToStream(data);
         this.data.writeToStream(data);
-        this.providerFilter.writeToStream(data);
     }
 
 
@@ -186,7 +184,10 @@ public class Pp2mpOutputPart extends P2PTunnelPart<Pp2mpInputPart>
     /* 供应规则始终读取本地副本，现有同步开关控制是否由资源接收端覆盖。 */
     @Override
     public Pp2mpProviderFilterData getEffectiveProviderFilter() {
-        this.refreshProviderFilter();
+        IGrid grid = this.grid();
+        if (grid != null && !this.isClientSide()) {
+            Pp2mpGridService.get(grid).refreshConfigurations();
+        }
         return this.providerFilter;
     }
 
@@ -246,36 +247,30 @@ public class Pp2mpOutputPart extends P2PTunnelPart<Pp2mpInputPart>
     @Override
     public void onTunnelConfigChange() {
         super.onTunnelConfigChange();
-        this.clearReceiveTargetCache();
-        IGrid grid = super.getMainNode().getGrid();
-        if (grid != null) {
-            Pp2mpGridService.get(grid).topologyChanged();
-        }
-        this.refreshConfigRegister();
-        this.wakeProductExtractor();
+        this.invalidateConfigBinding();
     }
 
     @Override
     public void onTunnelNetworkChange() {
         super.onTunnelNetworkChange();
-        this.clearReceiveTargetCache();
-        IGrid grid = super.getMainNode().getGrid();
-        if (grid != null) {
-            Pp2mpGridService.get(grid).topologyChanged();
-        }
-        this.refreshConfigRegister();
-        this.wakeProductExtractor();
+        this.invalidateConfigBinding();
     }
 
     @Override
     protected void onMainNodeStateChanged(IGridNodeListener.State reason) {
         super.onMainNodeStateChanged(reason);
+        this.invalidateConfigBinding();
+    }
+
+    /* 被动通知只使绑定失效，离网立即解绑，实际使用前或 tick 末统一校准。 */
+    private void invalidateConfigBinding() {
         this.clearReceiveTargetCache();
-        IGrid grid = super.getMainNode().getGrid();
+        IGrid grid = this.grid();
         if (grid != null) {
             Pp2mpGridService.get(grid).topologyChanged();
+        } else {
+            this.clearConfigBinding();
         }
-        this.refreshConfigRegister();
         this.wakeProductExtractor();
     }
 
@@ -286,6 +281,7 @@ public class Pp2mpOutputPart extends P2PTunnelPart<Pp2mpInputPart>
 
     @Override
     public void removeFromWorld() {
+        this.clearConfigBinding();
         this.logic.clearTarget();
         this.receiveTarget.clear();
         super.removeFromWorld();
@@ -302,29 +298,29 @@ public class Pp2mpOutputPart extends P2PTunnelPart<Pp2mpInputPart>
     }
 
     public void refreshConfigRegister() {
+        if (this.isClientSide()) {
+            return;
+        }
+        IGrid grid = this.grid();
+        Pp2mpInputPart input = this.findInput(this.getFrequency(), grid);
+        if (this.boundInput != input) {
+            this.clearConfigBinding();
+            this.boundInput = input;
+            if (input != null) {
+                input.getData().eventSource().register(this.data);
+            }
+        }
+        if (input != null) {
+            this.data.apply(input.getData().getConfig());
+        }
         this.refreshProviderFilter();
+    }
+
+    /* 离网或换源时解除真实订阅，不通过频率反查旧来源。 */
+    public void clearConfigBinding() {
         if (this.boundInput != null) {
             this.boundInput.getData().eventSource().unregister(this.data);
             this.boundInput = null;
         }
-
-        IGrid grid = super.getMainNode().getGrid();
-        if (grid == null || super.getFrequency() == 0) {
-            return;
-        }
-
-        Pp2mpInputPart input = this.findInput(super.getFrequency(), grid);
-        if (input == null) {
-            return;
-        }
-        this.boundInput = input;
-
-        input.getData().eventSource().register(this.data);
-        if (!this.data.isConfigSyncSwitch()) {
-            this.wakeProductExtractor();
-            return;
-        }
-        this.data.apply(input.getData().getConfig());
-        this.wakeProductExtractor();
     }
 }

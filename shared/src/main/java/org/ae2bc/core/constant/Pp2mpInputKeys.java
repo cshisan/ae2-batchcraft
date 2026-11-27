@@ -4,7 +4,6 @@ public interface Pp2mpInputKeys {
     String LEGACY_PROVIDER_FILTER = "ProviderFilter";
     String LEGACY_PROVIDER_UPGRADES = "ProviderUpgrades";
     String INPUT_CONFIG = "InputConfig";
-    String CONFIG_VERSION = "ConfigVersion";
     String ROUND_ROBIN_CURSOR = "RoundRobinCursor";
     String TASK_ALLOCATION_MODE = "TaskAllocationMode";
     String TASK_SPLIT_MODE = "TaskSplitMode";

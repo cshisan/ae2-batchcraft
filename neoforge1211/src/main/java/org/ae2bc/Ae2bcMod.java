@@ -11,6 +11,7 @@ import appeng.core.definitions.AEItems;
 import appeng.helpers.externalstorage.GenericStackFluidStorage;
 import appeng.helpers.externalstorage.GenericStackItemStorage;
 import appeng.items.tools.powered.WirelessTerminalItem;
+import appeng.items.tools.powered.powersink.PoweredItemCapabilities;
 import com.mojang.logging.LogUtils;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.IEventBus;
@@ -78,6 +79,7 @@ public final class Ae2bcMod {
         bus.addListener(Pp2mpProviderFilterPacket::register);
         bus.addListener(IoPortTransferPacket::register);
         NeoForge.EVENT_BUS.addListener(EventPriority.HIGHEST, ComponentPlacerItem::onRightClickBlock);
+        NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST, ComponentPlacerItem::onUseItemOnBlock);
     }
 
     private static void registerUpgrades(FMLCommonSetupEvent event) {
@@ -188,6 +190,11 @@ public final class Ae2bcMod {
 
     @SuppressWarnings("UnstableApiUsage")
     private static void registerBlockCapabilities(RegisterCapabilitiesEvent event) {
+        event.registerItem(
+                Capabilities.EnergyStorage.ITEM,
+                (stack, context) -> new PoweredItemCapabilities(stack, ItemRegistry.COMPONENT_PLACER.get()),
+                ItemRegistry.COMPONENT_PLACER.get()
+        );
         event.registerBlockEntity(
                 AECapabilities.IN_WORLD_GRID_NODE_HOST,
                 BlockRegistry.IO_PORT_ENTITY.get(),

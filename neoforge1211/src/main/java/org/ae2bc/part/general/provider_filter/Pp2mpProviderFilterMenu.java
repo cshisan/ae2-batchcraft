@@ -30,8 +30,6 @@ import org.ae2bc.core.screen.Route;
 import org.jspecify.annotations.NonNull;
 import org.jspecify.annotations.Nullable;
 
-import java.util.ArrayList;
-import java.util.List;
 import java.util.Objects;
 import java.util.Set;
 import java.util.function.Consumer;
@@ -54,11 +52,9 @@ public final class Pp2mpProviderFilterMenu extends AEBaseMenu {
     private final long[] displayedLimits = new long[Pp2mpProviderFilterData.SLOT_COUNT];
     private boolean synced;
     private boolean whitelist = true;
-    private Pp2mpProviderFilterData lastSource;
-    private int lastVersion = Integer.MIN_VALUE;
-    private boolean lastSynced;
+    private @Nullable Pp2mpProviderFilterPacket lastSnapshot;
     private @Getter boolean initialized;
-    private @Getter int menuVersion;
+    private @Getter int binding;
 
     /* 所有宿主共用一个菜单类型，只向可编辑的本地配置写入。 */
     public Pp2mpProviderFilterMenu(int id, Inventory inventory, Pp2mpProviderFilterHost host) {
@@ -74,12 +70,7 @@ public final class Pp2mpProviderFilterMenu extends AEBaseMenu {
                         return;
                     }
                     Pp2mpProviderFilterData local = Pp2mpProviderFilterMenu.this.host.getProviderFilter();
-                    GenericStack marker = this.convertToSuitableStack(stack);
-                    AEKey key = marker == null ? null : marker.what();
-                    if (!Objects.equals(local.markers().getKey(slot), key)) {
-                        local.setLimit(slot, 0);
-                    }
-                    local.markers().setStack(slot, marker);
+                    local.setMarker(slot, this.convertToSuitableStack(stack));
                 }
                 super.setItemDirect(slot, stack);
             }
@@ -171,36 +162,37 @@ public final class Pp2mpProviderFilterMenu extends AEBaseMenu {
     }
 
     /* 使用 AEKey 编码完整资源身份，避免原始注册 ID 丢失数据组件或其他类型信息。 */
-    public void setLimit(int slot, AEKey expectedKey, long amount, int menuVersion) {
+    public void setLimit(int slot, AEKey expectedKey, long expectedAmount, long amount, int expectedBinding) {
         if (this.isServerSide() || !this.isEditable() || !this.isWhitelist()) {
             return;
         }
-        if (this.menuVersion == menuVersion && Objects.equals(this.getMarkerKey(slot), expectedKey)) {
+        if (this.binding == expectedBinding && this.getLimit(slot) == expectedAmount
+                && Objects.equals(this.getMarkerKey(slot), expectedKey)) {
             AEKey.CODEC.encodeStart(this.registryAccess().createSerializationContext(
                     JsonOps.INSTANCE), expectedKey
             ).result().ifPresent(
                     key -> this.sendClientAction(
-                            SET_LIMIT, new LimitChange(slot, Math.max(0, amount), menuVersion, key)
+                            SET_LIMIT, new LimitChange(slot, Math.max(0, amount), expectedAmount, expectedBinding, key)
                     )
             );
         }
     }
 
-    /* 同时校验配置来源、版本与窗口打开时的资源，拒绝过期或越界的数量编辑。 */
+    /* 提交时比较当前资源、旧数量和绑定；无关槽变化不阻止编辑，允许值恢复后的提交。 */
     private void applyLimit(@Nullable LimitChange change) {
         if (!this.isServerSide() || !this.isEditable() || change == null
                 || change.slot() < 0 || change.slot() >= Pp2mpProviderFilterData.SLOT_COUNT
                 || change.amount() < 0 || change.key() == null || change.key().isJsonNull()
-                || change.menuVersion() != this.menuVersion || this.lastSource == null
-                || this.host.getEffectiveProviderFilter() != this.lastSource
-                || this.lastSource.version() != this.lastVersion) {
+                || this.getPlayer().containerMenu != this || !this.stillValid(this.getPlayer())
+                || change.binding() != this.host.getProviderFilterBinding()) {
             return;
         }
-        Pp2mpProviderFilterData local = this.host.getProviderFilter();
+        Pp2mpProviderFilterData local = this.host.getEffectiveProviderFilter();
         AEKey currentKey = local.markers().getKey(change.slot());
         if (!local.isWhitelist() || currentKey == null
-                || !Objects.equals(currentKey, this.displayedMarkers.getKey(change.slot()))
+                || local.limit(change.slot()) != change.expectedAmount()
                 || change.amount() > 999999L * currentKey.getAmountPerOperation()) {
+            this.broadcastChanges();
             return;
         }
         AEKey expectedKey = AEKey.CODEC.parse(
@@ -208,41 +200,40 @@ public final class Pp2mpProviderFilterMenu extends AEBaseMenu {
         if (currentKey.equals(expectedKey)) {
             local.setLimit(change.slot(), change.amount());
         }
+        this.broadcastChanges();
     }
 
     public void returnToParent() {
         this.sendClientAction(BACK);
     }
 
-    /* 按配置版本刷新整组快照；来源和同步权限切换也推进菜单版本。 */
-    private Pp2mpProviderFilterPacket prepareSync(boolean force) {
+    /* 仅业务值、绑定或权限变化时发送，不引入自定义版本计数。 */
+    private @Nullable Pp2mpProviderFilterPacket prepareSync(boolean force) {
         if (this.isClientSide()) {
             return null;
         }
         Pp2mpProviderFilterData source = this.host.getEffectiveProviderFilter();
         this.updateUpgradeAccess();
         boolean synced = this.host.isProviderFilterSynced();
-        if (!force && source == this.lastSource && source.version() == this.lastVersion && synced == this.lastSynced) {
+        Pp2mpProviderFilterPacket packet = new Pp2mpProviderFilterPacket(
+                this.containerId, this.host.getProviderFilterBinding(), synced, source.snapshot()
+        );
+        if (!force && packet.equals(this.lastSnapshot)) {
             return null;
         }
-        List<Long> limits = new ArrayList<>(Pp2mpProviderFilterData.SLOT_COUNT);
-        for (int slot = 0; slot < Pp2mpProviderFilterData.SLOT_COUNT; slot++) {
-            limits.add(source.isMarked(slot) ? source.limit(slot) : 0L);
-        }
-        Pp2mpProviderFilterPacket packet = new Pp2mpProviderFilterPacket(
-                this.containerId, this.menuVersion + 1,
-                synced, source.isWhitelist(), limits
-        );
-        for (int slot = 0; slot < Pp2mpProviderFilterData.SLOT_COUNT; slot++) {
-            AEKey key = source.markers().getKey(slot);
-            this.displayedMarkers.setStack(slot, key == null ? null : new GenericStack(key, 0));
-            this.displayedLimits[slot] = packet.limits().get(slot);
-        }
-        this.lastSource = source;
-        this.lastVersion = source.version();
-        this.lastSynced = synced;
-        this.menuVersion = packet.menuVersion();
+        this.displaySnapshot(packet);
+        this.lastSnapshot = packet;
         return packet;
+    }
+
+    private void displaySnapshot(Pp2mpProviderFilterPacket packet) {
+        for (int slot = 0; slot < Pp2mpProviderFilterData.SLOT_COUNT; slot++) {
+            Pp2mpProviderFilterConfig.Entry entry = packet.config().entries().get(slot);
+            if (!Objects.equals(this.displayedMarkers.getKey(slot), entry.key())) {
+                this.displayedMarkers.setStack(slot, entry.key() == null ? null : new GenericStack(entry.key(), 0));
+            }
+            this.displayedLimits[slot] = entry.amount();
+        }
     }
 
     @Override
@@ -266,18 +257,15 @@ public final class Pp2mpProviderFilterMenu extends AEBaseMenu {
         }
     }
 
-    /* 用版本差判断新旧，兼容 int 连续递增跨越最大值；拒绝重复与过期状态。 */
+    /* 同连接内有序处理菜单状态，仅接受当前窗口的数据。 */
     public void receive(Pp2mpProviderFilterPacket packet) {
-        if (!this.isClientSide() || packet.containerId() != this.containerId
-                || (this.initialized && packet.menuVersion() - this.menuVersion <= 0)) {
+        if (!this.isClientSide() || packet.containerId() != this.containerId) {
             return;
         }
         this.synced = packet.synced();
-        this.menuVersion = packet.menuVersion();
-        this.whitelist = packet.whitelist();
-        for (int slot = 0; slot < Pp2mpProviderFilterData.SLOT_COUNT; slot++) {
-            this.displayedLimits[slot] = packet.limits().get(slot);
-        }
+        this.binding = packet.binding();
+        this.whitelist = packet.config().whitelist();
+        this.displaySnapshot(packet);
         this.initialized = true;
         this.updateUpgradeAccess();
     }
@@ -340,7 +328,7 @@ public final class Pp2mpProviderFilterMenu extends AEBaseMenu {
         }
     }
 
-    private record LimitChange(int slot, long amount, int menuVersion, JsonElement key) {
+    private record LimitChange(int slot, long amount, long expectedAmount, int binding, JsonElement key) {
     }
 
 }

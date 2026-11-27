@@ -55,6 +55,8 @@ public class Pp2mpGridService implements IGridService, IGridServiceProvider {
     private final Map<Integer, Map<UnitPortType, List<Pp2mpUnitOutputTypePortPart>>> orderedPorts = new HashMap<>();
     private boolean dirty = true;
     private boolean resourceIntakeConfigDirty = true;
+    private boolean configBindingsDirty = true;
+    private boolean refreshingConfigurations;
 
     public Pp2mpGridService(IGrid grid) {
         this.grid = grid;
@@ -75,6 +77,7 @@ public class Pp2mpGridService implements IGridService, IGridServiceProvider {
         this.dirty = true;
         this.orderedPorts.clear();
         this.resourceIntakeConfigDirty = true;
+        this.configBindingsDirty = true;
     }
 
     /* 优先级变化仅重建端口顺序，不重新扫描整个网格。 */
@@ -107,20 +110,44 @@ public class Pp2mpGridService implements IGridService, IGridServiceProvider {
     /* 网络拓扑或供应规则变化后统一更新，即使当前没有任务和资源传输也会同步。 */
     @Override
     public void onServerEndTick() {
-        if (!this.resourceIntakeConfigDirty) {
+        this.refreshConfigurations();
+    }
+
+    /* 合并拓扑与规则变更，稳定状态只检查标志；调度前也可安全调用。 */
+    public void refreshConfigurations() {
+        if (this.refreshingConfigurations || !this.configBindingsDirty && !this.resourceIntakeConfigDirty) {
             return;
         }
-        this.rebuildIfNeeded();
-        this.resourceIntakeConfigDirty = false;
-        for (List<Pp2mpOutputPart> parts : this.outputs.values()) {
-            for (Pp2mpOutputPart part : parts) {
-                part.refreshProviderFilter();
+        this.refreshingConfigurations = true;
+        try {
+            this.rebuildIfNeeded();
+            boolean bindingsChanged = this.configBindingsDirty;
+            this.configBindingsDirty = false;
+            this.resourceIntakeConfigDirty = false;
+            for (List<Pp2mpOutputPart> parts : this.outputs.values()) {
+                for (Pp2mpOutputPart part : parts) {
+                    if (bindingsChanged) {
+                        part.clearReceiveTargetCache();
+                        part.refreshConfigRegister();
+                        part.wakeProductExtractor();
+                    } else {
+                        part.refreshProviderFilter();
+                    }
+                }
             }
-        }
-        for (List<Pp2mpUnitManagerPart> parts : this.managersByFrequency.values()) {
-            for (Pp2mpUnitManagerPart part : parts) {
-                part.refreshProviderFilter();
+            for (List<Pp2mpUnitManagerPart> parts : this.managersByFrequency.values()) {
+                for (Pp2mpUnitManagerPart part : parts) {
+                    if (bindingsChanged) {
+                        part.clearReceiveStorageCache();
+                        part.refreshConfigEventRegister();
+                        part.getLogic().alertPendingRetry();
+                    } else {
+                        part.refreshProviderFilter();
+                    }
+                }
             }
+        } finally {
+            this.refreshingConfigurations = false;
         }
     }
 
@@ -146,7 +173,7 @@ public class Pp2mpGridService implements IGridService, IGridServiceProvider {
     }
 
     public List<Pp2mpTaskEndpoint> getEndpoints(short frequency) {
-        this.rebuildIfNeeded();
+        this.refreshConfigurations();
         return this.endpoints.getOrDefault(frequency, List.of());
     }
 
@@ -178,44 +205,14 @@ public class Pp2mpGridService implements IGridService, IGridServiceProvider {
                 : this.managersByKey.get(Pp2mpKey.key(frequency, unitId));
     }
 
-    /* 只有单元 ID 唯一对应一个管理器时才返回该管理器。 */
-    public @Nullable Pp2mpUnitManagerPart findUniqueManagerByUnitId(short unitId) {
-        if (unitId == 0) {
-            return null;
+    /* 拓扑待校准时由统一刷新唤醒，避免每个端口通知都立即重建索引。 */
+    public void wakeUnitManager(short frequency, short unitId) {
+        if (this.configBindingsDirty) {
+            return;
         }
-        Pp2mpUnitManagerPart result = null;
-        for (Pp2mpUnitManagerPart manager : this.grid.getMachines(Pp2mpUnitManagerPart.class)) {
-            if (manager.getUnitId() != unitId) {
-                continue;
-            }
-            if (result != null) {
-                return null;
-            }
-            result = manager;
-        }
-        return result;
-    }
-
-    /* 检查全局单元 ID 分配，同时允许管理器保留自身 ID。 */
-    public boolean isUnitIdUsedByOther(short unitId, @Nullable Pp2mpUnitManagerPart excluded) {
-        if (unitId == 0) {
-            return false;
-        }
-        for (Pp2mpUnitManagerPart manager : this.grid.getMachines(Pp2mpUnitManagerPart.class)) {
-            if (manager != excluded && manager.getUnitId() == unitId) {
-                return true;
-            }
-        }
-        return false;
-    }
-
-    public void invalidateReturnStorageCaches(short frequency) {
-        rebuildIfNeeded();
-        for (Pp2mpOutputPart output : this.outputs.getOrDefault(frequency, List.of())) {
-            output.clearReceiveTargetCache();
-        }
-        for (Pp2mpUnitManagerPart manager : this.managersByFrequency.getOrDefault(frequency, List.of())) {
-            manager.clearReceiveStorageCache();
+        Pp2mpUnitManagerPart manager = this.findManager(frequency, unitId);
+        if (manager != null) {
+            manager.getLogic().alertPendingRetry();
         }
     }
 
@@ -427,6 +424,11 @@ public class Pp2mpGridService implements IGridService, IGridServiceProvider {
 
     @Override
     public void removeNode(IGridNode gridNode) {
+        if (gridNode.getOwner() instanceof Pp2mpOutputPart output) {
+            output.clearConfigBinding();
+        } else if (gridNode.getOwner() instanceof Pp2mpUnitManagerPart manager) {
+            manager.clearConfigBinding();
+        }
         this.topologyChanged();
         IGridServiceProvider.super.removeNode(gridNode);
     }

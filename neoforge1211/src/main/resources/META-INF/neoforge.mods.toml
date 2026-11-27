@@ -4,7 +4,7 @@ license = "GNU GPL 3.0"
 
 [[mods]]
 modId = "ae2_batchcraft"
-version = "2.0.0"
+version = "2.0.1"
 displayName = "AE2 BatchCraft"
 authors = "cshisan"
 description = "AE2 BatchCraft"

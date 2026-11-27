@@ -110,6 +110,7 @@ public class Pp2mpUnitManagerLogic extends Pp2mpTaskLogic {
 
     @Override
     public boolean canAcceptTask() {
+        this.refreshConfigurations();
         boolean operational = this.isOperational();
         boolean accepted = operational && this.canStartTask(this.data.getConfig().general().blocking());
         if (!accepted && Ae2bcMod.LOGGER.isDebugEnabled()) {
@@ -444,10 +445,9 @@ public class Pp2mpUnitManagerLogic extends Pp2mpTaskLogic {
         return gridService.getOutputPorts(this.part.getFrequency(), this.part.getUnitId(), material.mode().matchPort());
     }
 
-    /* 端口关闭同步时使用本地模式，否则采用所属管理器的模式。 */
+    /* 同步只负责覆盖本地值，调度统一读取端口已经应用的模式。 */
     private OutputPortMode outputMode(Pp2mpUnitOutputTypePortPart port) {
-        return port.getData().isSyncEnabled() ? this.data.getConfig().unit().outputPortMode()
-                : port.getData().getOutputPortMode();
+        return port.getData().getOutputPortMode();
     }
 
     /* 根据管理器持有的任务时钟更新所有已绑定的红石端口。 */
@@ -527,6 +527,7 @@ public class Pp2mpUnitManagerLogic extends Pp2mpTaskLogic {
 
     public TickRateModulation tick(int ticksSinceLastCall) {
         this.resetTickWake();
+        this.refreshConfigurations();
         this.drainTaskRecovery();
         boolean hadTask = this.data.isTaskActive();
         this.finishTaskIfComplete();

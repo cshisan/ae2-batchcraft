@@ -9,7 +9,6 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.world.level.ItemLike;
-import org.ae2bc.common.Version;
 import org.ae2bc.core.constant.Pp2mpUnitManagerKeys;
 import org.ae2bc.core.part.*;
 import org.ae2bc.core.pattern.MaterialOutputMode;
@@ -45,17 +44,18 @@ public class Pp2mpUnitManagerData extends Pp2mpTaskData implements ConfigCenter<
     private void onProviderFilterChanged() {
         this.markForSave.run();
         this.markForUpdate.run();
+        this.push();
     }
 
     public ConfigSource<UnitConfig> eventSource() {
-        return eventSource;
+        return this.eventSource;
     }
 
     public void update(UnitConfig config) {
-        if (this.syncEnabled) {
+        if (this.syncEnabled || config == null) {
             return;
         }
-        if (!Version.equals(config, this.config)) {
+        if (!this.config.equals(config)) {
             this.update(() -> this.config = config);
             this.push();
         }
@@ -69,14 +69,17 @@ public class Pp2mpUnitManagerData extends Pp2mpTaskData implements ConfigCenter<
 
     @Override
     public void push() {
-        eventSource.firePush(config);
+        this.eventSource.firePush(this.config);
     }
 
     @Override
     public void apply(InputConfig inputConfig) {
-        if (this.syncEnabled && inputConfig.version() != this.config.version()) {
-            this.update(() -> this.config = new UnitConfig(inputConfig));
-            this.push();
+        if (this.syncEnabled) {
+            UnitConfig incoming = new UnitConfig(inputConfig);
+            if (!this.config.equals(incoming)) {
+                this.update(() -> this.config = incoming);
+                this.push();
+            }
         }
     }
 
@@ -89,7 +92,6 @@ public class Pp2mpUnitManagerData extends Pp2mpTaskData implements ConfigCenter<
         UnitPageAttrCodec.write(unitData, this.config.unit());
 
         data.putBoolean(Pp2mpUnitManagerKeys.UNIT_MANAGER_SYNCED_ENABLED, this.syncEnabled);
-        data.putInt(Pp2mpUnitManagerKeys.CONFIG_VERSION, this.config.version());
         CompoundTag provider = new CompoundTag();
         this.providerFilter.writeToNBT(provider, registries);
         data.put(Pp2mpUnitManagerKeys.PROVIDER_FILTER, provider);
@@ -100,13 +102,13 @@ public class Pp2mpUnitManagerData extends Pp2mpTaskData implements ConfigCenter<
     /* 从NBT读取 */
     public void readFromNBT(CompoundTag data, HolderLookup.Provider registries) {
         this.providerFilter.readFromNBT(data.getCompound(Pp2mpUnitManagerKeys.PROVIDER_FILTER), registries);
-        int version = data.getInt(Pp2mpUnitManagerKeys.CONFIG_VERSION);
         CompoundTag general = GeneralPageAttrCodec.read(data);
         CompoundTag unit = UnitPageAttrCodec.read(data);
 
-        this.syncEnabled = data.getBoolean(Pp2mpUnitManagerKeys.UNIT_MANAGER_SYNCED_ENABLED);
+        this.syncEnabled = !data.contains(Pp2mpUnitManagerKeys.UNIT_MANAGER_SYNCED_ENABLED)
+                || data.getBoolean(Pp2mpUnitManagerKeys.UNIT_MANAGER_SYNCED_ENABLED);
         this.config = UnitConfig.restore(
-                version, GeneralPageAttrCodec.returnMode(general),
+                GeneralPageAttrCodec.returnMode(general),
                 UnitPageAttrCodec.breakPickup(unit),
                 UnitPageAttrCodec.outputPortMode(unit),
                 UnitPageAttrCodec.redstonePortParam(unit),
@@ -155,7 +157,6 @@ public class Pp2mpUnitManagerData extends Pp2mpTaskData implements ConfigCenter<
 
     public void writeToStream(RegistryFriendlyByteBuf data) {
         data.writeBoolean(this.syncEnabled);
-        data.writeInt(this.config.version());
         GeneralPageAttrPacket.write(data, this.config.general());
         UnitPageAttrPacket.write(data, this.config.unit());
     }
@@ -164,12 +165,10 @@ public class Pp2mpUnitManagerData extends Pp2mpTaskData implements ConfigCenter<
         boolean oldSync = this.syncEnabled;
         this.syncEnabled = data.readBoolean();
 
-        int oldVersion = this.config.version();
-        int version = data.readInt();
+        UnitConfig previous = this.config;
         GeneralPageConfig general = GeneralPageAttrPacket.read(data);
         UnitPageConfig unit = UnitPageAttrPacket.read(data);
         this.config = UnitConfig.restore(
-                version,
                 general.returnMode(),
                 unit.breakPickup(),
                 unit.outputPortMode(),
@@ -177,6 +176,6 @@ public class Pp2mpUnitManagerData extends Pp2mpTaskData implements ConfigCenter<
                 general.extractionParam(), general.blocking()
         );
 
-        return oldSync != this.syncEnabled || oldVersion != this.config.version();
+        return oldSync != this.syncEnabled || !previous.equals(this.config);
     }
 }

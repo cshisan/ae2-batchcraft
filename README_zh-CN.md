@@ -2,7 +2,7 @@
 
 **让一套处理样板服务整条并行产线。**
 
-Minecraft **1.21.1** · **NeoForge** · **Applied Energistics 2** · 项目版本 **2.0.0**
+Minecraft **1.21.1** · **NeoForge** · **Applied Energistics 2** · 项目版本 **2.0.1**
 
 [English](README.md) | **简体中文**
 
@@ -161,7 +161,7 @@ PP2MP 样板用于处理配方。
 
 Linux 或 macOS 使用 `./gradlew` 替代 `.\gradlew.bat`。
 
-模组产物为 `neoforge1211/build/libs/ae2-batchcraft-1.21.1-2.0.0-neoforge.jar`，
+模组产物为 `neoforge1211/build/libs/ae2-batchcraft-1.21.1-2.0.1-neoforge.jar`，
 其中已包含公共模块代码，无需另行安装 `shared` 模块的 JAR。
 
 | 目录 | 内容 |

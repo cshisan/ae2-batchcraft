@@ -30,6 +30,7 @@ public final class Pp2mpOutputTicker implements IGridTickable {
         this.part.resetTickWake();
         Pp2mpOutputData data = this.part.getData();
         Pp2mpOutputLogic logic = this.part.getLogic();
+        logic.refreshConfigurations();
         logic.retryTaskCompletion();
         if (!logic.isOperational()) {
             this.cooldown = 0;

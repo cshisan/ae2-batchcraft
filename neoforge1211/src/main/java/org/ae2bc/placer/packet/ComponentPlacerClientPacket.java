@@ -2,7 +2,10 @@ package org.ae2bc.placer.packet;
 
 import appeng.core.network.ClientboundPacket;
 import net.minecraft.core.Direction;
+import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.ComponentSerialization;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
@@ -14,10 +17,12 @@ import org.ae2bc.Ae2bcMod;
 import org.ae2bc.core.placer.DataModel;
 import org.ae2bc.core.placer.SelectionStatus;
 import org.ae2bc.placer.ComponentPlacerMenu;
+import org.jetbrains.annotations.Nullable;
 import org.jspecify.annotations.NonNull;
 
 public record ComponentPlacerClientPacket(int containerId, Direction direction,
-                                          DataModel model) implements ClientboundPacket {
+                                          DataModel model, boolean paired,
+                                          @Nullable Component linkError) implements ClientboundPacket {
     public static final Type<ComponentPlacerClientPacket> TYPE = new Type<>(
             ResourceLocation.fromNamespaceAndPath(Ae2bcMod.MOD_ID, "component_placer_client_packet")
     );
@@ -37,7 +42,7 @@ public record ComponentPlacerClientPacket(int containerId, Direction direction,
                 data.readEnum(SelectionStatus.class),
                 data.readBoolean(), data.readBoolean(),
                 data.readBoolean(), data.readBoolean()
-        ));
+        ), data.readBoolean(), FriendlyByteBuf.readNullable(data, ComponentSerialization.STREAM_CODEC));
     }
 
     private void write(RegistryFriendlyByteBuf data) {
@@ -53,13 +58,15 @@ public record ComponentPlacerClientPacket(int containerId, Direction direction,
         data.writeBoolean(this.model.hasPart());
         data.writeBoolean(this.model.hasSelection());
         data.writeBoolean(this.model.aeConnected());
+        data.writeBoolean(this.paired);
+        FriendlyByteBuf.writeNullable(data, this.linkError, ComponentSerialization.STREAM_CODEC);
     }
 
     @Override
     public void handleOnClient(Player player) {
         AbstractContainerMenu currentMenu = player.containerMenu;
         if (currentMenu instanceof ComponentPlacerMenu menu && currentMenu.containerId == this.containerId) {
-            menu.change(this.direction, this.model());
+            menu.change(this.direction, this.model, this.paired, this.linkError);
         }
     }
 

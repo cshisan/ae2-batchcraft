@@ -3,10 +3,12 @@ package org.ae2bc.core.part;
 import org.ae2bc.common.Utils;
 import org.ae2bc.core.constant.UnitConfigConstants;
 import org.ae2bc.core.unit.*;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.experimental.Accessors;
 
 @Getter
+@EqualsAndHashCode
 @Accessors(fluent = true)
 public class UnitPageConfig {
     private final boolean breakPickup;

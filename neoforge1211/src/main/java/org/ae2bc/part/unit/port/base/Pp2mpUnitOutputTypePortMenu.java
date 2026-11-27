@@ -37,6 +37,7 @@ public class Pp2mpUnitOutputTypePortMenu extends Pp2mpUnitIoTypePortMenu {
                 if (value) {
                     Pp2mpUnitManagerPart manager = this.part.findManager();
                     if (manager != null) {
+                        manager.refreshConfigEventRegister();
                         this.part.getData().apply(manager.getData().getConfig());
                     }
                 }

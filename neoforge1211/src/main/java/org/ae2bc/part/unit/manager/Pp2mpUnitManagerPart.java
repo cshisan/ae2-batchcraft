@@ -39,6 +39,7 @@ import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.client.model.data.ModelData;
 import org.ae2bc.core.constant.Pp2mpUnitManagerKeys;
 import org.ae2bc.core.constant.UnitManagerConstant;
+import org.ae2bc.core.part.UnitConfig;
 import org.ae2bc.core.screen.Route;
 import org.ae2bc.part.InputChildrenPart;
 import org.ae2bc.part.Pp2mpKey;
@@ -49,9 +50,9 @@ import org.ae2bc.part.general.provider_filter.Pp2mpProviderFilterData;
 import org.ae2bc.part.general.provider_filter.Pp2mpProviderFilterHost;
 import org.ae2bc.part.input.Pp2mpInputPart;
 import org.ae2bc.part.resource_intake.Pp2mpResourceIntakePart;
-import org.ae2bc.part.unit.port.base.Pp2mpUnitOutputTypePortData;
 import org.ae2bc.part.unit.port.base.Pp2mpUnitOutputTypePortPart;
 import org.ae2bc.part.unit.port.base.Pp2mpUnitPortPart;
+import org.ae2bc.part.unit.port.part.Pp2mpUnitProviderPortPart;
 import org.ae2bc.registry.ItemRegistry;
 import org.ae2bc.registry.component.Pp2mpUnitManagerRegistry;
 import org.ae2bc.storage.PendingMaterial;
@@ -64,8 +65,6 @@ import java.util.function.Predicate;
 
 public class Pp2mpUnitManagerPart extends CablePart
         implements Pp2mpPart, InputChildrenPart, Pp2mpProviderFilterHost {
-    private final Set<Pp2mpUnitOutputTypePortData> boundOutputPortConfigs =
-            Collections.newSetFromMap(new IdentityHashMap<>());
     private final @Getter Pp2mpUnitManagerData data;
     private final @Getter Pp2mpUnitManagerLogic logic;
     private final Pp2mpReceiveTarget receiveTarget;
@@ -73,6 +72,7 @@ public class Pp2mpUnitManagerPart extends CablePart
     private @Getter short frequency;
     private @Getter short unitId;
     private @Nullable Pp2mpInputPart boundInput;
+    private boolean refreshingConfig;
 
     public Pp2mpUnitManagerPart(ColoredPartItem<?> partItem) {
         super(partItem);
@@ -82,6 +82,7 @@ public class Pp2mpUnitManagerPart extends CablePart
                 () -> this.getHost().markForUpdate()
         );
         this.logic = new Pp2mpUnitManagerLogic(super.getMainNode(), this);
+        this.data.eventSource().register(this::applyPortConfig);
         this.receiveTarget = new Pp2mpReceiveTarget(
                 () -> this.getMainNode().getGrid(),
                 this::getFrequency
@@ -127,7 +128,10 @@ public class Pp2mpUnitManagerPart extends CablePart
     /* 共用已有同步开关，供应规则由资源接收端覆盖到管理器的本地副本。 */
     @Override
     public Pp2mpProviderFilterData getEffectiveProviderFilter() {
-        this.refreshProviderFilter();
+        IGrid grid = this.grid();
+        if (grid != null && !this.isClientSide()) {
+            Pp2mpGridService.get(grid).refreshConfigurations();
+        }
         return this.data.getProviderFilter();
     }
 
@@ -185,8 +189,8 @@ public class Pp2mpUnitManagerPart extends CablePart
     }
 
     public void applyPlacerAttr(short frequency, short unitId) {
-        this.setFrequency(this, frequency, this.data, this.logic::hasTaskState,
-                () -> this.frequency = frequency);
+        this.setFrequency(this, frequency, this.logic::hasTaskState,
+                () -> this.frequency = frequency, this::refreshConfigEventRegister);
         if (unitId != 0) {
             this.unitId = unitId;
         }
@@ -243,13 +247,13 @@ public class Pp2mpUnitManagerPart extends CablePart
             ), true);
             return true;
         }
-        this.setFrequency(this, storedFrequency, this.data, this.logic::hasTaskState, () -> {
+        this.setFrequency(this, storedFrequency, this.logic::hasTaskState, () -> {
             super.importSettings(SettingsFrom.MEMORY_CARD, heldItem.getComponents(), player);
             this.frequency = storedFrequency;
             this.getHost().markForSave();
             this.getHost().markForUpdate();
             memoryCard.notifyUser(player, MemoryCardMessages.SETTINGS_LOADED);
-        });
+        }, this::refreshConfigEventRegister);
         return true;
     }
 
@@ -264,23 +268,25 @@ public class Pp2mpUnitManagerPart extends CablePart
         super.onMainNodeStateChanged(reason);
         this.clearReceiveStorageCache();
 
-        this.refreshConfigEventRegister();
-
-        if (this.initializeUnitId()) {
-            this.refreshConfigEventRegister();
+        IGrid grid = this.grid();
+        if (grid != null) {
+            Pp2mpGridService.get(grid).topologyChanged();
+        } else {
+            this.clearConfigBinding();
         }
+        this.initializeUnitId();
         this.logic.alertPendingRetry();
     }
 
     /* 首次入网时分配单元标识，放置和节点更新使用同一流程。 */
-    private boolean initializeUnitId() {
+    private void initializeUnitId() {
         if (this.unitId != 0) {
-            return false;
+            return;
         }
 
         IGrid grid = this.grid();
         if (grid == null) {
-            return false;
+            return;
         }
 
         Pp2mpGridService gridService = Pp2mpGridService.get(grid);
@@ -292,7 +298,6 @@ public class Pp2mpUnitManagerPart extends CablePart
 
         this.getHost().markForSave();
         this.getHost().markForUpdate();
-        return true;
     }
 
     @Override
@@ -357,47 +362,61 @@ public class Pp2mpUnitManagerPart extends CablePart
         }
     }
 
-    /* 刷新配置时间注册 */
+    /* 先校准管理器本地值，再向当前拓扑中的端口发布最终结果。 */
     public void refreshConfigEventRegister() {
-        this.refreshProviderFilter();
-        this.clearReceiveStorageCache();
+        if (this.isClientSide() || this.refreshingConfig) {
+            return;
+        }
+        this.refreshingConfig = true;
+        try {
+            Pp2mpInputPart input = this.findInput(this.frequency, this.grid());
+            if (input != this.boundInput) {
+                this.clearConfigBinding();
+                this.boundInput = input;
+                if (input != null) {
+                    input.getData().eventSource().register(this.data);
+                }
+            }
+            if (input != null) {
+                this.data.apply(input.getData().getConfig());
+            }
+            this.refreshProviderFilter();
+        } finally {
+            this.refreshingConfig = false;
+        }
+        this.applyPortConfig(this.data.getConfig());
+    }
 
+    /* 按当前归属推送，端口换管理器后不会残留在旧来源的监听列表中。 */
+    private void applyPortConfig(UnitConfig config) {
+        IGrid grid = this.grid();
+        if (this.refreshingConfig || grid == null || this.frequency == 0 || this.unitId == 0) {
+            return;
+        }
+        Pp2mpGridService service = Pp2mpGridService.get(grid);
+        if (service.findManager(this.frequency, this.unitId) != this) {
+            return;
+        }
+        for (Pp2mpUnitPortPart port : service.getPorts(this.frequency, this.unitId)) {
+            if (port instanceof Pp2mpUnitOutputTypePortPart outputPort) {
+                outputPort.getData().apply(config);
+            } else if (port instanceof Pp2mpUnitProviderPortPart providerPort) {
+                providerPort.applyProviderFilter(this.data.getProviderFilter());
+            }
+        }
+    }
+
+    public void clearConfigBinding() {
         if (this.boundInput != null) {
             this.boundInput.getData().eventSource().unregister(this.data);
             this.boundInput = null;
         }
+    }
 
-        for (Pp2mpUnitOutputTypePortData portData : this.boundOutputPortConfigs) {
-            this.data.eventSource().unregister(portData);
-        }
-        this.boundOutputPortConfigs.clear();
-
-        IGrid grid = this.grid();
-        if (grid == null || this.unitId == 0) {
-            return;
-        }
-
-        for (Pp2mpUnitPortPart port : Pp2mpGridService.get(grid).getPorts(
-                this.frequency, this.unitId
-        )) {
-            if (!(port instanceof Pp2mpUnitOutputTypePortPart outputPort)) {
-                continue;
-            }
-            Pp2mpUnitOutputTypePortData portData = outputPort.getData();
-            this.data.eventSource().register(portData);
-            this.boundOutputPortConfigs.add(portData);
-            portData.apply(this.data.getConfig());
-        }
-
-        if (this.frequency == 0) {
-            return;
-        }
-
-        this.boundInput = this.findInput(this.frequency, grid);
-        if (this.boundInput != null) {
-            this.boundInput.getData().eventSource().register(this.data);
-            this.data.apply(this.boundInput.getData().getConfig());
-        }
+    @Override
+    public void removeFromWorld() {
+        this.clearConfigBinding();
+        super.removeFromWorld();
     }
 
     /* 设置碰撞箱 */

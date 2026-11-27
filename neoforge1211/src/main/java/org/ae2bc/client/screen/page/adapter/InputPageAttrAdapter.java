@@ -28,7 +28,7 @@ public class InputPageAttrAdapter implements GeneralAttrAccess, OutputAttrAccess
         InputConfig config = menu.getConfig();
         GeneralPageConfig general = updater.apply(config.general());
         menu.configChange(new InputConfig(
-                config.version(), general,
+                general,
                 config.output(), config.unit(), config.taskAllocationMode(), config.taskSplitMode()
         ));
     }
@@ -43,7 +43,7 @@ public class InputPageAttrAdapter implements GeneralAttrAccess, OutputAttrAccess
         InputConfig config = menu.getConfig();
         OutputPageConfig output = updater.apply(config.output());
         menu.configChange(new InputConfig(
-                config.version(), config.general(),
+                config.general(),
                 output, config.unit(), config.taskAllocationMode(), config.taskSplitMode()
         ));
     }
@@ -58,7 +58,7 @@ public class InputPageAttrAdapter implements GeneralAttrAccess, OutputAttrAccess
         InputConfig config = menu.getConfig();
         UnitPageConfig unit = updater.apply(config.unit());
         menu.configChange(new InputConfig(
-                config.version(), config.general(),
+                config.general(),
                 config.output(), unit, config.taskAllocationMode(), config.taskSplitMode()
         ));
     }

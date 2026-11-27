@@ -1,11 +1,13 @@
 package org.ae2bc.core.unit;
 
 
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 
 /**
  * 红石参数
  */
+@EqualsAndHashCode
 public final class RedstonePortParam {
     private final @Getter RedstoneMode mode;
     private final @Getter short strength;

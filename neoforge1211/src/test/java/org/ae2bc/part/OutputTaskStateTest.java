@@ -8,12 +8,14 @@ import appeng.api.stacks.AEKey;
 import net.minecraft.core.Direction;
 import net.minecraft.world.item.Items;
 import org.ae2bc.fake_crafting_converter.FakeCraftingConverterBlockEntity;
+import org.ae2bc.part.general.Pp2mpGridService;
 import org.ae2bc.part.output.Pp2mpOutputData;
 import org.ae2bc.part.output.Pp2mpOutputLogic;
 import org.ae2bc.part.output.Pp2mpOutputPart;
 import org.ae2bc.registry.ItemRegistry;
 import org.junit.jupiter.api.Assertions;
 import org.junit.jupiter.api.Test;
+import org.mockito.Mockito;
 
 import java.lang.reflect.Proxy;
 import java.util.LinkedHashMap;
@@ -111,8 +113,13 @@ class OutputTaskStateTest {
     }
 
     private static final class TestPart extends Pp2mpOutputPart {
+        private static final Pp2mpGridService GRID_SERVICE = Mockito.mock(Pp2mpGridService.class);
         private static final IGrid EMPTY_GRID = (IGrid) Proxy.newProxyInstance(
                 IGrid.class.getClassLoader(), new Class<?>[]{IGrid.class}, (proxy, method, arguments) -> {
+                    if (method.getName().equals("getService")) {
+                        Assertions.assertEquals(Pp2mpGridService.class, arguments[0]);
+                        return TestPart.GRID_SERVICE;
+                    }
                     if (method.getName().equals("getMachines")) {
                         Assertions.assertEquals(FakeCraftingConverterBlockEntity.class, arguments[0]);
                         return Set.of();
@@ -126,7 +133,7 @@ class OutputTaskStateTest {
                     }
                     throw new UnsupportedOperationException(method.getName());
                 });
-        private IManagedGridNode testNode;
+        private final IManagedGridNode testNode;
         private boolean connected = true;
 
         private TestPart() {

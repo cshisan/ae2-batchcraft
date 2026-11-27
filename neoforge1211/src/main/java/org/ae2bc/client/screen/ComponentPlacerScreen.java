@@ -16,11 +16,13 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Button;
+import net.minecraft.client.gui.components.StringWidget;
 import net.minecraft.client.gui.components.Tooltip;
 import net.minecraft.client.gui.narration.NarratedElementType;
 import net.minecraft.client.gui.narration.NarrationElementOutput;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.world.entity.player.Inventory;
 import org.ae2bc.core.placer.DataModel;
 import org.ae2bc.client.screen.component.ScrollingAE2Button;
@@ -44,6 +46,7 @@ public final class ComponentPlacerScreen extends AEBaseScreen<ComponentPlacerMen
     private final AE2Button resetOffsets;
     private final AE2Button clearSelection;
     private final AE2Button execute;
+    private final StringWidget aeLink;
 
     public ComponentPlacerScreen(ComponentPlacerMenu menu, Inventory playerInventory, Component title, ScreenStyle style) {
         super(menu, playerInventory, title, style);
@@ -64,6 +67,8 @@ public final class ComponentPlacerScreen extends AEBaseScreen<ComponentPlacerMen
         )));
         this.widgets.add("unitId", unitIdWidget);
         this.widgets.add("upgrades", new UpgradesPanel(menu.getSlots(SlotSemantics.UPGRADE), this::getCompatibleUpgrades));
+        this.aeLink = new StringWidget(Component.empty(), this.font).alignRight();
+        this.widgets.add("aeLink", this.aeLink);
 
         Direction front = playerInventory.player.getDirection();
         Direction left = front.getCounterClockWise();
@@ -118,17 +123,17 @@ public final class ComponentPlacerScreen extends AEBaseScreen<ComponentPlacerMen
     @Override
     protected void init() {
         super.init();
-        this.setMarkerLabel("cable_label", "gui.ae2_batchcraft.component_placer.cable", 36);
-        this.setMarkerLabel("part_label", "gui.ae2_batchcraft.component_placer.part", 36);
-        this.setMarkerLabel("frequencyText", "gui.ae2_batchcraft.component_placer.frequency", 36);
-        this.setMarkerLabel("unitIdText", "gui.ae2_batchcraft.component_placer.unit_id", 36);
+        this.setMarkerLabel("cable_label", "gui.ae2_batchcraft.component_placer.cable");
+        this.setMarkerLabel("part_label", "gui.ae2_batchcraft.component_placer.part");
+        this.setMarkerLabel("frequencyText", "gui.ae2_batchcraft.component_placer.frequency");
+        this.setMarkerLabel("unitIdText", "gui.ae2_batchcraft.component_placer.unit_id");
     }
 
-    private void setMarkerLabel(String textId, String translationKey, int maxWidth) {
+    private void setMarkerLabel(String textId, String translationKey) {
         Component label = Component.translatable(translationKey);
-        if (this.font.width(label) > maxWidth) {
+        if (this.font.width(label) > 36) {
             String ellipsis = "...";
-            String prefix = this.font.plainSubstrByWidth(label.getString(), maxWidth - this.font.width(ellipsis));
+            String prefix = this.font.plainSubstrByWidth(label.getString(), 36 - this.font.width(ellipsis));
             label = Component.literal(prefix + ellipsis);
         }
         this.setTextContent(textId, label);
@@ -173,8 +178,17 @@ public final class ComponentPlacerScreen extends AEBaseScreen<ComponentPlacerMen
         this.setTextContent("modeText", Component.translatable(data.frequencyMode()
                 ? "gui.ae2_batchcraft.component_placer.mode.frequency"
                 : "gui.ae2_batchcraft.component_placer.mode.placement"));
-        this.setTextHidden("aeLinkWarning", data.aeConnected());
-        this.setTextHidden("aeLinkConnected", !data.aeConnected());
+        String statusKey = data.aeConnected() ? "linked"
+                : this.menu.isPaired() ? "disconnected" : "not_linked";
+        this.aeLink.setMessage(Component.translatable("gui.ae2_batchcraft.component_placer." + statusKey));
+        this.aeLink.setColor(data.aeConnected() ? 0x55FF55 : 0xFF5555);
+        MutableComponent linkTooltip = Component.translatable(
+                "gui.ae2_batchcraft.component_placer." + statusKey + ".tooltip");
+        Component linkError = this.menu.getLinkError();
+        if (!data.aeConnected() && linkError != null) {
+            linkTooltip.append("\n").append(linkError);
+        }
+        this.aeLink.setTooltip(Tooltip.create(linkTooltip));
         this.execute.setTooltip(Tooltip.create(Component.translatable(
                 "gui.ae2_batchcraft.component_placer.execute.tooltip").append("\n").append(this.selectionStatus())));
     }

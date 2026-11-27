@@ -4,10 +4,12 @@ import org.ae2bc.common.Utils;
 import org.ae2bc.core.common.ProductExtractionParam;
 import org.ae2bc.core.constant.ProductExtractionConfigConstants;
 import org.ae2bc.core.unit.ReturnMode;
+import lombok.EqualsAndHashCode;
 import lombok.Getter;
 import lombok.experimental.Accessors;
 
 @Getter
+@EqualsAndHashCode
 @Accessors(fluent = true)
 public class GeneralPageConfig {
     private final ReturnMode returnMode;

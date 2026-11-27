@@ -47,7 +47,7 @@ public final class Pp2mpResourceIntakeLogic {
     private List<AEKey> pullCandidates = List.of();
     private int pullCursor;
     private int snapshotAge;
-    private int snapshotVersion;
+    private boolean filterDirty = true;
     private long snapshotGeneration = Long.MIN_VALUE;
     private boolean candidatesExhausted = true;
     private boolean transferring;
@@ -94,6 +94,11 @@ public final class Pp2mpResourceIntakeLogic {
     /* 配置改变后清除主动提取冷却，使新参数立即生效。 */
     public void resetPullCooldown() {
         this.pullCooldown = 0;
+    }
+
+    /* 规则修改仅使候选失效，不修改传输中正在遍历的列表。 */
+    public void onProviderFilterChanged() {
+        this.filterDirty = true;
     }
 
     /* 库存收发或能力变化只标记候选过期，不在传输回调中改动正在遍历的列表。 */
@@ -225,7 +230,7 @@ public final class Pp2mpResourceIntakeLogic {
     private void refreshCandidates() {
         Pp2mpProviderFilterData filter = this.part.getData().getProviderFilter();
         long generation = this.sourceTarget.generation();
-        boolean invalid = generation != this.snapshotGeneration || filter.version() != this.snapshotVersion;
+        boolean invalid = generation != this.snapshotGeneration || this.filterDirty;
         boolean whitelist = filter.isWhitelist() && !filter.markers().isEmpty();
         if (!invalid && (whitelist || !this.candidatesExhausted
                 && this.snapshotAge < Pp2mpResourceIntakeLogic.SNAPSHOT_MAX_AGE)) {
@@ -254,7 +259,7 @@ public final class Pp2mpResourceIntakeLogic {
         this.pullCandidates = List.copyOf(keys);
         this.pullCursor = invalid || keys.isEmpty() ? 0 : Math.floorMod(this.pullCursor, keys.size());
         this.snapshotGeneration = generation;
-        this.snapshotVersion = filter.version();
+        this.filterDirty = false;
         this.snapshotAge = 0;
         this.candidatesExhausted = false;
     }

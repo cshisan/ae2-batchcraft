@@ -16,8 +16,10 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.ItemInteractionResult;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.ItemStack;
@@ -30,6 +32,7 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 import net.neoforged.neoforge.client.event.InputEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
+import net.neoforged.neoforge.event.entity.player.UseItemOnBlockEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.ae2bc.core.placer.SelectionStatus;
 import org.ae2bc.placer.packet.ComponentPlacerServerPacket;
@@ -39,6 +42,8 @@ import org.jspecify.annotations.NonNull;
 import java.util.List;
 
 public final class ComponentPlacerItem extends WirelessTerminalItem implements IMemoryCard {
+    private static final ResourceLocation EXTENDED_CHARGER = ResourceLocation.fromNamespaceAndPath("extendedae", "ex_charger");
+
     public ComponentPlacerItem() {
         super(AEConfig.instance().getWirelessTerminalBattery(), new Properties().stacksTo(1));
     }
@@ -65,6 +70,21 @@ public final class ComponentPlacerItem extends WirelessTerminalItem implements I
         );
         event.setCancellationResult(InteractionResult.sidedSuccess(event.getLevel().isClientSide()));
         event.setCanceled(true);
+    }
+
+    /* 通过方块交互检查后，让扩展充能台处理主手物品，避免被内存卡逻辑截获。 */
+    public static void onUseItemOnBlock(UseItemOnBlockEvent event) {
+        Player player = event.getPlayer();
+        ItemStack stack = event.getItemStack();
+        if (event.isCanceled() || event.getUsePhase() != UseItemOnBlockEvent.UsePhase.BLOCK
+                || event.getHand() != InteractionHand.MAIN_HAND || player == null
+                || player.isSecondaryUseActive() || !(stack.getItem() instanceof ComponentPlacerItem)
+                || !ComponentPlacerItem.isFrequencyMode(stack)) {
+            return;
+        }
+        if (event.getLevel().getBlockState(event.getPos()).getBlockHolder().is(ComponentPlacerItem.EXTENDED_CHARGER)) {
+            event.cancelWithResult(ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION);
+        }
     }
 
     /* 通过客户端按住 Shift 滚轮切换放置模式和频率模式。 */

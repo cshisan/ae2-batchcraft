@@ -1,6 +1,7 @@
 package org.ae2bc.part.codec;
 
 import net.minecraft.nbt.CompoundTag;
+import org.ae2bc.core.part.InputConfig;
 import org.ae2bc.core.part.UnitPageConfig;
 import org.ae2bc.core.unit.RedstoneMode;
 import org.ae2bc.core.unit.RedstonePortParam;
@@ -29,7 +30,8 @@ public class UnitPageAttrCodec {
     }
 
     public static boolean breakPickup(CompoundTag data) {
-        return data.getBoolean(CONFIG_UNIT_BREAK_PICKUP);
+        return data.contains(UnitPageAttrCodec.CONFIG_UNIT_BREAK_PICKUP)
+                ? data.getBoolean(UnitPageAttrCodec.CONFIG_UNIT_BREAK_PICKUP) : InputConfig.DEFAULT.unit().breakPickup();
     }
 
     public static OutputPortMode outputPortMode(CompoundTag data) {
@@ -37,11 +39,16 @@ public class UnitPageAttrCodec {
         return OutputPortMode.null2defaultOf(id);
     }
 
+    /* 分别补全缺失的红石参数，保留其余已保存配置。 */
     public static RedstonePortParam redstonePortParam(CompoundTag data) {
+        RedstonePortParam defaults = InputConfig.DEFAULT.unit().redstonePortParam();
         int id = data.getInt(CONFIG_UNIT_REDSTONE_PORT_PARAM_REDSTONE_MODE);
-        short strength = data.getShort(CONFIG_UNIT_REDSTONE_PORT_PARAM_STRENGTH);
-        short pulseWidth = data.getShort(CONFIG_UNIT_REDSTONE_PORT_PARAM_PULSE_WIDTH);
-        short pulsePeriod = data.getShort(CONFIG_UNIT_REDSTONE_PORT_PARAM_PULSE_PERIOD);
+        short strength = data.contains(UnitPageAttrCodec.CONFIG_UNIT_REDSTONE_PORT_PARAM_STRENGTH)
+                ? data.getShort(UnitPageAttrCodec.CONFIG_UNIT_REDSTONE_PORT_PARAM_STRENGTH) : defaults.getStrength();
+        short pulseWidth = data.contains(UnitPageAttrCodec.CONFIG_UNIT_REDSTONE_PORT_PARAM_PULSE_WIDTH)
+                ? data.getShort(UnitPageAttrCodec.CONFIG_UNIT_REDSTONE_PORT_PARAM_PULSE_WIDTH) : defaults.getPulseWidth();
+        short pulsePeriod = data.contains(UnitPageAttrCodec.CONFIG_UNIT_REDSTONE_PORT_PARAM_PULSE_PERIOD)
+                ? data.getShort(UnitPageAttrCodec.CONFIG_UNIT_REDSTONE_PORT_PARAM_PULSE_PERIOD) : defaults.getPulsePeriod();
         return RedstonePortParam.of(RedstoneMode.null2defaultOf(id), strength, pulseWidth, pulsePeriod);
     }
 }

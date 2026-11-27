@@ -137,28 +137,6 @@
         "top": 117
       }
     },
-    "aeLinkWarning": {
-      "text": {
-        "translate": "gui.ae2_batchcraft.component_placer.not_linked",
-        "color": "red"
-      },
-      "position": {
-        "left": 168,
-        "top": 117
-      },
-      "align": "RIGHT"
-    },
-    "aeLinkConnected": {
-      "text": {
-        "translate": "gui.ae2_batchcraft.component_placer.linked",
-        "color": "green"
-      },
-      "position": {
-        "left": 168,
-        "top": 117
-      },
-      "align": "RIGHT"
-    },
     "player_inventory_title": {
       "text": {
         "translate": "container.inventory"
@@ -212,6 +190,12 @@
     }
   },
   "widgets": {
+    "aeLink": {
+      "left": 86,
+      "top": 117,
+      "width": 82,
+      "height": 9
+    },
     "frequency": {
       "left": 101,
       "top": 35,
